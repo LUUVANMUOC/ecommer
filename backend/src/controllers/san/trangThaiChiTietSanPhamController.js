@@ -202,7 +202,33 @@ const TrangThaiChiTietSanPhamController = {
             console.error('Lỗi lấy tất cả sản phẩm:', error);
             res.status(500).json({ message: error.message });
         }
-    }
+    },
+        // 🟢 API Gửi duyệt hàng loạt
+    submitAllForApproval: async (req, res) => {
+        try {
+            const { sp_ma } = req.body;
+            if (!sp_ma) {
+                return res.status(400).json({ message: 'Thiếu mã sản phẩm.' });
+            }
+
+            const result = await TrangThaiChiTietSanPhamModel.submitAllByProduct(sp_ma);
+            
+            if (result.count === 0) {
+                return res.status(200).json({ 
+                    message: 'Tất cả phân loại đã được gửi duyệt hoặc đang chờ duyệt. Không có phân loại nào cần gửi.',
+                    count: 0 
+                });
+            }
+
+            res.status(200).json({
+                message: `Đã gửi duyệt thành công ${result.count} phân loại!`,
+                count: result.count
+            });
+        } catch (error) {
+            console.error('Lỗi gửi duyệt hàng loạt:', error);
+            res.status(400).json({ message: error.message });
+        }
+    },
 };
 
 module.exports = TrangThaiChiTietSanPhamController;

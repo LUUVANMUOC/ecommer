@@ -19,6 +19,7 @@ import KhachHangLogin from "../pages/auth/khachhang/Login";
 import KhachHangRegister from "../pages/auth/khachhang/Register";
 // Shipper                                                          ← THÊM
 import ShipperLogin from "../pages/auth/shipper/Login"; // ← THÊM
+import ShopProfile from "../pages/khachhang/ShopProfile"; // 🟢 Import
 
 // ================= MAIN LAYOUT ROUTES =================
 import AdminRoutes from "./AdminRoutes";
@@ -61,6 +62,7 @@ const AppRoutes = () => {
       <Route path="/shipper/*" element={<ShipperRoutes />} /> {/* ← THÊM */}
       <Route path="/quan-ly-kho/*" element={<QuanLyKhoRoutes />} />
       <Route path="/khach-hang/*" element={<KhachHangRoutes />} />
+      <Route path="/shop/:gh_ma" element={<ShopProfile />} />
       {/* 5. Trang báo lỗi 404 */}
       <Route path="*" element={<NotFound />} />
     </Routes>

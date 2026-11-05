@@ -4,10 +4,11 @@ import { useState, useEffect, useRef } from "react";
 import sanPhamService from "../../services/gianhang/sanPhamService";
 import danhMucSanPhamService from "../../services/gianhang/danhMucSanPhamService";
 import chiTietSanPhamService from "../../services/gianhang/chiTietSanPhamService";
-import axiosClient from "../../config/axiosClient";
+import thuongHieuService from "../../services/san/thuongHieuService"; // 🟢 Thêm import này
 import CrudDrawer from "../common/Crud/CrudDrawer";
 
-export const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
+export const BACKEND_URL =
+  import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 export const imgUrl = (link) => `${BACKEND_URL}${link}`;
 
 export const formatVND = (n) =>
@@ -141,7 +142,9 @@ export const FilterBar = ({
     >
       <div className="flex flex-wrap items-center gap-2">
         <span className="inline-flex items-center gap-1.5 rounded-full border border-[#14201C] px-3.5 py-2 text-sm font-semibold text-[#14201C]">
-          <span className="material-symbols-outlined text-[18px]">filter_alt</span>
+          <span className="material-symbols-outlined text-[18px]">
+            filter_alt
+          </span>
           Bộ lọc
           {activeCount > 0 && (
             <span className="grid h-5 min-w-[20px] place-items-center rounded-full bg-[#F2A93B] px-1.5 text-[11px] font-bold text-[#14201C]">
@@ -180,25 +183,36 @@ export const FilterBar = ({
               {isOpen && (
                 <div className="absolute left-0 top-full z-30 mt-2 w-[min(440px,90vw)] overflow-hidden rounded-2xl border border-[#E2DED3] bg-white shadow-2xl">
                   <div className="p-4">
-                    <p className="mb-3 text-sm font-semibold text-[#14201C]">{f.label}</p>
+                    <p className="mb-3 text-sm font-semibold text-[#14201C]">
+                      {f.label}
+                    </p>
                     <div className="flex max-h-64 flex-wrap gap-2 overflow-y-auto pr-1">
-                      {[{ value: "", label: "Tất cả" }, ...f.options].map((opt) => {
-                        const on = (draft[f.key] || "") === opt.value;
-                        return (
-                          <button
-                            key={opt.value || "__all__"}
-                            type="button"
-                            onClick={() => pickOption(f.key, opt.value)}
-                            className={`rounded-lg border px-3 py-2 text-sm transition-colors ${
-                              on
-                                ? "border-[#F2A93B] bg-[#FDF3E1] font-semibold text-[#8A5A0B]"
-                                : "border-[#D9CFC2] text-[#3D4A44] hover:border-[#14201C]/40"
-                            }`}
-                          >
-                            {opt.label}
-                          </button>
-                        );
-                      })}
+                      {[{ value: "", label: "Tất cả" }, ...f.options].map(
+                        (opt) => {
+                          const on = (draft[f.key] || "") === opt.value;
+                          return (
+                            <button
+                              key={opt.value || "__all__"}
+                              type="button"
+                              onClick={() => pickOption(f.key, opt.value)}
+                              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm transition-colors ${
+                                on
+                                  ? "border-[#F2A93B] bg-[#FDF3E1] font-semibold text-[#8A5A0B]"
+                                  : "border-[#D9CFC2] text-[#3D4A44] hover:border-[#14201C]/40"
+                              }`}
+                            >
+                              {opt.logo && (
+                                <img
+                                  src={imgUrl(opt.logo)}
+                                  alt={opt.label}
+                                  className="h-5 w-5 shrink-0 rounded-full border border-gray-200 object-cover"
+                                />
+                              )}
+                              <span>{opt.label}</span>
+                            </button>
+                          );
+                        },
+                      )}
                     </div>
                   </div>
                   <div className="grid grid-cols-2 gap-3 border-t border-[#EFEBE2] bg-[#FBFAF7] p-4">
@@ -214,7 +228,9 @@ export const FilterBar = ({
                       onClick={applyDraft}
                       className="rounded-full bg-[#14201C] py-2.5 text-sm font-semibold text-white hover:bg-[#1E3A34]"
                     >
-                      {resultCount !== null ? `Xem ${resultCount} kết quả` : "Áp dụng"}
+                      {resultCount !== null
+                        ? `Xem ${resultCount} kết quả`
+                        : "Áp dụng"}
                     </button>
                   </div>
                 </div>
@@ -235,7 +251,9 @@ export const FilterBar = ({
               onClick={onClear}
               className="inline-flex items-center gap-1 text-sm font-semibold text-[#B42318] underline-offset-2 hover:underline"
             >
-              <span className="material-symbols-outlined text-[16px]">close</span>
+              <span className="material-symbols-outlined text-[16px]">
+                close
+              </span>
               Xóa tất cả
             </button>
           )}
@@ -249,8 +267,12 @@ export const FilterBar = ({
 export const StatCell = ({ icon, iconClass, value, label }) => (
   <div className="flex flex-col items-center gap-0.5 px-1 py-2.5">
     <div className="flex items-center gap-1">
-      <span className={`material-symbols-outlined text-[15px] ${iconClass}`}>{icon}</span>
-      <span className="text-sm font-bold tabular-nums text-[#14201C]">{value}</span>
+      <span className={`material-symbols-outlined text-[15px] ${iconClass}`}>
+        {icon}
+      </span>
+      <span className="text-sm font-bold tabular-nums text-[#14201C]">
+        {value}
+      </span>
     </div>
     <span className="text-[11px] font-medium text-[#7A857F]">{label}</span>
   </div>
@@ -271,9 +293,28 @@ export const SpecRow = ({ label, value }) => (
   </div>
 );
 
-// Ảnh lớn có mũi tên, mô tả hiện ngay bên dưới, và dải thumbnail
+// 🟢 ĐÃ CẬP NHẬT: Ảnh lớn có mũi tên, tự động cuộn thanh thumbnail
+// 🟢 ĐÃ CẬP NHẬT: Thêm nút mũi tên cuộn thumbnail
 export const Gallery = ({ images, index, onIndex }) => {
   const total = images.length;
+  const activeThumbRef = useRef(null);
+  const thumbContainerRef = useRef(null); // 🟢 Ref cho khung chứa thumbnail
+
+  // Tự động cuộn thumbnail tới ảnh đang xem (chỉ cuộn trong khung, không cuộn trang)
+  useEffect(() => {
+    if (activeThumbRef.current && thumbContainerRef.current) {
+      const container = thumbContainerRef.current;
+      const activeEl = activeThumbRef.current;
+
+      // Tính toán vị trí để ảnh active nằm giữa khung
+      const scrollLeft =
+        activeEl.offsetLeft -
+        container.offsetWidth / 2 +
+        activeEl.offsetWidth / 2;
+
+      container.scrollTo({ left: scrollLeft, behavior: "smooth" });
+    }
+  }, [index]);
 
   if (!total) {
     return (
@@ -329,26 +370,74 @@ export const Gallery = ({ images, index, onIndex }) => {
       </div>
 
       <p className="min-h-[1.5rem] px-1 text-sm text-[#14201C]">
-        {img.hasp_mota || <span className="italic text-[#9AA39E]">Ảnh chưa có mô tả</span>}
+        {img.hasp_mota || (
+          <span className="italic text-[#9AA39E]">Ảnh chưa có mô tả</span>
+        )}
       </p>
 
       {total > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-1">
-          {images.map((im, i) => (
-            <button
-              key={im.hasp_ma ?? i}
-              type="button"
-              onClick={() => onIndex(i)}
-              title={im.hasp_mota || `Ảnh ${i + 1}`}
-              className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition-all ${
-                i === index
-                  ? "border-[#F2A93B]"
-                  : "border-transparent opacity-60 hover:opacity-100"
-              }`}
-            >
-              <img src={imgUrl(im.hasp_link)} alt="" className="h-full w-full object-cover" />
-            </button>
-          ))}
+        // 🟢 KHUNG CHỨA THUMBNAIL VÀ 2 NÚT MŨI TÊN
+        <div className="relative group/thumb">
+          {/* Nút cuộn trái */}
+          <button
+            onClick={() => {
+              if (thumbContainerRef.current) {
+                thumbContainerRef.current.scrollBy({
+                  left: -200,
+                  behavior: "smooth",
+                });
+              }
+            }}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-white shadow-md border border-gray-200 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-opacity opacity-0 group-hover/thumb:opacity-100"
+          >
+            <span className="material-symbols-outlined text-[16px]">
+              chevron_left
+            </span>
+          </button>
+
+          {/* Dãy ảnh thumbnail */}
+          <div
+            ref={thumbContainerRef}
+            className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar"
+          >
+            {images.map((im, i) => (
+              <button
+                key={im.hasp_ma ?? i}
+                ref={i === index ? activeThumbRef : null}
+                type="button"
+                onClick={() => onIndex(i)}
+                title={im.hasp_mota || `Ảnh ${i + 1}`}
+                className={`relative h-16 w-16 shrink-0 overflow-hidden rounded-lg border-2 transition-all ${
+                  i === index
+                    ? "border-[#F2A93B]"
+                    : "border-transparent opacity-60 hover:opacity-100"
+                }`}
+              >
+                <img
+                  src={imgUrl(im.hasp_link)}
+                  alt=""
+                  className="h-full w-full object-cover"
+                />
+              </button>
+            ))}
+          </div>
+
+          {/* Nút cuộn phải */}
+          <button
+            onClick={() => {
+              if (thumbContainerRef.current) {
+                thumbContainerRef.current.scrollBy({
+                  left: 200,
+                  behavior: "smooth",
+                });
+              }
+            }}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-7 h-7 bg-white shadow-md border border-gray-200 rounded-full flex items-center justify-center text-gray-600 hover:bg-gray-50 transition-opacity opacity-0 group-hover/thumb:opacity-100"
+          >
+            <span className="material-symbols-outlined text-[16px]">
+              chevron_right
+            </span>
+          </button>
         </div>
       )}
     </div>
@@ -359,7 +448,10 @@ export const Gallery = ({ images, index, onIndex }) => {
 export const AllImagesGrid = ({ images, onPick }) => (
   <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
     {images.map((img, i) => (
-      <figure key={img.hasp_ma ?? i} className="overflow-hidden rounded-xl border border-[#E2DED3]">
+      <figure
+        key={img.hasp_ma ?? i}
+        className="overflow-hidden rounded-xl border border-[#E2DED3]"
+      >
         <button
           type="button"
           onClick={() => onPick(i)}
@@ -381,7 +473,9 @@ export const AllImagesGrid = ({ images, onPick }) => (
           )}
         </button>
         <figcaption className="min-h-[2.75rem] border-t border-[#EFEBE2] px-3 py-2 text-xs leading-relaxed text-[#3D4A44]">
-          {img.hasp_mota || <span className="italic text-[#9AA39E]">Chưa có mô tả</span>}
+          {img.hasp_mota || (
+            <span className="italic text-[#9AA39E]">Chưa có mô tả</span>
+          )}
         </figcaption>
       </figure>
     ))}
@@ -396,14 +490,18 @@ export const AttributeChips = ({ attributes }) => {
       {attributes.map((tt, i) => {
         const val =
           tt.gttt_giatridinhtinh ??
-          (tt.gttt_giatridinhluong != null ? String(tt.gttt_giatridinhluong) : null);
+          (tt.gttt_giatridinhluong != null
+            ? String(tt.gttt_giatridinhluong)
+            : null);
         if (val === null || val === "") return null;
         return (
           <span
             key={tt.ttsp_ma ?? i}
             className="inline-flex items-center gap-1 rounded-full border border-[#E2DED3] bg-[#FBFAF7] px-3 py-1 text-sm"
           >
-            <span className="font-medium text-[#5B6661]">{tt.ttsp_ten || tt.ttsp_ma}:</span>
+            <span className="font-medium text-[#5B6661]">
+              {tt.ttsp_ten || tt.ttsp_ma}:
+            </span>
             <span className="font-bold text-[#14201C]">{val}</span>
           </span>
         );
@@ -517,7 +615,12 @@ export const SanPhamFormDrawer = ({
       <div className="grid grid-cols-2 gap-4">
         <label className="block space-y-1.5">
           <span className={labelClass}>Thương hiệu</span>
-          <select name="th_ma" value={formData.th_ma} onChange={handleChange} className={fieldClass}>
+          <select
+            name="th_ma"
+            value={formData.th_ma}
+            onChange={handleChange}
+            className={fieldClass}
+          >
             <option value="">-- Chọn --</option>
             {brands.map((b) => (
               <option key={b.th_ma} value={b.th_ma}>
@@ -528,7 +631,12 @@ export const SanPhamFormDrawer = ({
         </label>
         <label className="block space-y-1.5">
           <span className={labelClass}>Danh mục</span>
-          <select name="dmsp_ma" value={formData.dmsp_ma} onChange={handleChange} className={fieldClass}>
+          <select
+            name="dmsp_ma"
+            value={formData.dmsp_ma}
+            onChange={handleChange}
+            className={fieldClass}
+          >
             <option value="">-- Chọn --</option>
             {categories.map((c) => (
               <option key={c.dmsp_ma} value={c.dmsp_ma}>
@@ -545,7 +653,7 @@ export const SanPhamFormDrawer = ({
 // Tải thương hiệu và danh mục của gian hàng (dùng cho form sản phẩm)
 export const loadProductOptions = async (shopId) => {
   const [resB, resC] = await Promise.all([
-    axiosClient.get("/thuong-hieu"),
+    thuongHieuService.getByShop(shopId),
     danhMucSanPhamService.getByGianHang(shopId),
   ]);
   return { brands: resB.data, categories: resC.data };

@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict co8UXRboCoxi0OwrnjQ6j0i3kK5NQCs8cntsVQN4HSPBY2COFwkuSIi0GKmGGE0
+\restrict h5he7YNucHp8tljphpzmj6Sef350UQOoKGmZLIGaOczTEt1kNhn5b9Hcf5gwuI7
 
 -- Dumped from database version 18.6
 -- Dumped by pg_dump version 18.6
@@ -24,156 +24,95 @@ SET default_tablespace = '';
 SET default_table_access_method = heap;
 
 --
--- Name: kho; Type: TABLE; Schema: public; Owner: postgres
+-- Name: danhmucsanpham; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.kho (
-    kho_ma character varying(10) NOT NULL,
-    kho_ten character varying(50) NOT NULL,
-    kho_hinhanh text NOT NULL,
-    dc_ma character varying(10) NOT NULL,
-    dvvc_ma character varying(10) NOT NULL,
-    kho_hashpass text
+CREATE TABLE public.danhmucsanpham (
+    dmsp_ma character varying(10) NOT NULL,
+    dmsp_ten character varying(50) NOT NULL,
+    dmsp_mota text NOT NULL,
+    dmsp_hinhanh text NOT NULL,
+    gh_ma character varying(10) NOT NULL
 );
 
 
-ALTER TABLE public.kho OWNER TO postgres;
+ALTER TABLE public.danhmucsanpham OWNER TO postgres;
 
 --
--- Name: phieu_tat_toan; Type: TABLE; Schema: public; Owner: postgres
+-- Name: sanpham; Type: TABLE; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.phieu_tat_toan (
-    ptt_ma character varying(10) NOT NULL,
-    kho_ma character varying(10) NOT NULL,
-    ptt_tong_tien_san numeric(18,2) NOT NULL,
-    ptt_tong_tien_shop numeric(18,2) NOT NULL,
-    ptt_ngay_tat_toan timestamp with time zone DEFAULT now() NOT NULL,
-    ptt_trang_thai character varying(20) DEFAULT 'DA_THANH_TOAN'::character varying NOT NULL
-);
-
-
-ALTER TABLE public.phieu_tat_toan OWNER TO postgres;
-
---
--- Name: thongtinnhantien_gianhang; Type: TABLE; Schema: public; Owner: postgres
---
-
-CREATE TABLE public.thongtinnhantien_gianhang (
+CREATE TABLE public.sanpham (
+    sp_ma character varying(10) NOT NULL,
+    sp_ten character varying(50) NOT NULL,
+    sp_mota text NOT NULL,
+    sp_luotxem integer DEFAULT 0 NOT NULL,
+    sp_luotthich integer DEFAULT 0 NOT NULL,
+    sp_luotmua integer DEFAULT 0 NOT NULL,
+    sp_diemdanhgiatrungbinh numeric(3,2) DEFAULT 0 NOT NULL,
     gh_ma character varying(10) NOT NULL,
-    nh_ma character varying(10) CONSTRAINT thongtinnhantien_gianhang_nganhang_ma_not_null NOT NULL,
-    ttnt_gianhang_sotaikhoan character varying(14) NOT NULL,
-    ttnt_gianhang_tentaikhoan character varying(50)
+    th_ma character varying(10),
+    dmsp_ma character varying(10),
+    CONSTRAINT sanpham_sp_diemdanhgiatrungbinh_check CHECK (((sp_diemdanhgiatrungbinh >= (0)::numeric) AND (sp_diemdanhgiatrungbinh <= (5)::numeric))),
+    CONSTRAINT sanpham_sp_luotmua_check CHECK ((sp_luotmua >= 0)),
+    CONSTRAINT sanpham_sp_luotthich_check CHECK ((sp_luotthich >= 0)),
+    CONSTRAINT sanpham_sp_luotxem_check CHECK ((sp_luotxem >= 0))
 );
 
 
-ALTER TABLE public.thongtinnhantien_gianhang OWNER TO postgres;
+ALTER TABLE public.sanpham OWNER TO postgres;
 
 --
--- Name: thongtinnhantien_stmdt; Type: TABLE; Schema: public; Owner: postgres
+-- Name: danhmucsanpham danhmucsanpham_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-CREATE TABLE public.thongtinnhantien_stmdt (
-    stmdt_ma character varying(10) NOT NULL,
-    nganhang_ma character varying(10) NOT NULL,
-    ttnt_stmdt_sotaikhoan character varying(14) NOT NULL,
-    ttnt_stmdt_tentaikhoan character varying(50)
-);
-
-
-ALTER TABLE public.thongtinnhantien_stmdt OWNER TO postgres;
-
---
--- Name: kho kho_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.kho
-    ADD CONSTRAINT kho_pkey PRIMARY KEY (kho_ma);
+ALTER TABLE ONLY public.danhmucsanpham
+    ADD CONSTRAINT danhmucsanpham_pkey PRIMARY KEY (dmsp_ma);
 
 
 --
--- Name: phieu_tat_toan phieu_tat_toan_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: sanpham sanpham_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.phieu_tat_toan
-    ADD CONSTRAINT phieu_tat_toan_pkey PRIMARY KEY (ptt_ma);
-
-
---
--- Name: thongtinnhantien_gianhang thongtinnhantien_gianhang_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.thongtinnhantien_gianhang
-    ADD CONSTRAINT thongtinnhantien_gianhang_pkey PRIMARY KEY (gh_ma, nh_ma);
+ALTER TABLE ONLY public.sanpham
+    ADD CONSTRAINT sanpham_pkey PRIMARY KEY (sp_ma);
 
 
 --
--- Name: thongtinnhantien_stmdt thongtinnhantien_stmdt_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+-- Name: danhmucsanpham danhmucsanpham_gh_ma_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.thongtinnhantien_stmdt
-    ADD CONSTRAINT thongtinnhantien_stmdt_pkey PRIMARY KEY (stmdt_ma, nganhang_ma);
-
-
---
--- Name: phieu_tat_toan fk_ptt_kho; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.phieu_tat_toan
-    ADD CONSTRAINT fk_ptt_kho FOREIGN KEY (kho_ma) REFERENCES public.kho(kho_ma);
+ALTER TABLE ONLY public.danhmucsanpham
+    ADD CONSTRAINT danhmucsanpham_gh_ma_fkey FOREIGN KEY (gh_ma) REFERENCES public.gianhang(gh_ma);
 
 
 --
--- Name: kho kho_dc_ma_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: sanpham sanpham_dmsp_ma_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.kho
-    ADD CONSTRAINT kho_dc_ma_fkey FOREIGN KEY (dc_ma) REFERENCES public.diachi(dc_ma);
-
-
---
--- Name: kho kho_dvvc_ma_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.kho
-    ADD CONSTRAINT kho_dvvc_ma_fkey FOREIGN KEY (dvvc_ma) REFERENCES public.donvivanchuyen(dvvc_ma);
+ALTER TABLE ONLY public.sanpham
+    ADD CONSTRAINT sanpham_dmsp_ma_fkey FOREIGN KEY (dmsp_ma) REFERENCES public.danhmucsanpham(dmsp_ma);
 
 
 --
--- Name: thongtinnhantien_gianhang thongtinnhantien_gianhang_gh_ma_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: sanpham sanpham_gh_ma_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.thongtinnhantien_gianhang
-    ADD CONSTRAINT thongtinnhantien_gianhang_gh_ma_fkey FOREIGN KEY (gh_ma) REFERENCES public.gianhang(gh_ma);
-
-
---
--- Name: thongtinnhantien_gianhang thongtinnhantien_gianhang_nganhang_ma_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.thongtinnhantien_gianhang
-    ADD CONSTRAINT thongtinnhantien_gianhang_nganhang_ma_fkey FOREIGN KEY (nh_ma) REFERENCES public.nganhang(nhg_ma);
+ALTER TABLE ONLY public.sanpham
+    ADD CONSTRAINT sanpham_gh_ma_fkey FOREIGN KEY (gh_ma) REFERENCES public.gianhang(gh_ma);
 
 
 --
--- Name: thongtinnhantien_stmdt thongtinnhantien_stmdt_nganhang_ma_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+-- Name: sanpham sanpham_th_ma_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
-ALTER TABLE ONLY public.thongtinnhantien_stmdt
-    ADD CONSTRAINT thongtinnhantien_stmdt_nganhang_ma_fkey FOREIGN KEY (nganhang_ma) REFERENCES public.nganhang(nhg_ma);
-
-
---
--- Name: thongtinnhantien_stmdt thongtinnhantien_stmdt_stmdt_ma_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
---
-
-ALTER TABLE ONLY public.thongtinnhantien_stmdt
-    ADD CONSTRAINT thongtinnhantien_stmdt_stmdt_ma_fkey FOREIGN KEY (stmdt_ma) REFERENCES public.san_thuong_mai_dien_tu(stmdt_ma);
+ALTER TABLE ONLY public.sanpham
+    ADD CONSTRAINT sanpham_th_ma_fkey FOREIGN KEY (th_ma) REFERENCES public.thuonghieu(th_ma);
 
 
 --
 -- PostgreSQL database dump complete
 --
 
-\unrestrict co8UXRboCoxi0OwrnjQ6j0i3kK5NQCs8cntsVQN4HSPBY2COFwkuSIi0GKmGGE0
+\unrestrict h5he7YNucHp8tljphpzmj6Sef350UQOoKGmZLIGaOczTEt1kNhn5b9Hcf5gwuI7
 

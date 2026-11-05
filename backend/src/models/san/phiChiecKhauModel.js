@@ -31,18 +31,54 @@ const PhiChiecKhauModel = {
     }
   },
 
-  // Cập nhật phí chiết khấu
+  // Cập nhật phí chiết khấu VÀ tự động đồng bộ lại giá bán sản phẩm
   updateFee: async (data) => {
     const { nh_ma, stmdt_ma, psck_phantram } = data;
-    const query = `
-      INSERT INTO phisanchieckhau (psck_thoidiem, psck_phantram, nh_ma, stmdt_ma)
-      VALUES (clock_timestamp(), $1, $2, $3) 
-      ON CONFLICT (nh_ma, psck_thoidiem, stmdt_ma) 
-      DO UPDATE SET psck_phantram = EXCLUDED.psck_phantram
-      RETURNING *;
-    `;
-    const result = await pool.query(query, [psck_phantram, nh_ma, stmdt_ma]);
-    return result.rows[0];
+    
+    // Mở kết nối và bắt đầu Transaction
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      // 1. Lưu lịch sử phí mới
+      const queryInsert = `
+        INSERT INTO phisanchieckhau (psck_thoidiem, psck_phantram, nh_ma, stmdt_ma)
+        VALUES (clock_timestamp(), $1, $2, $3) 
+        RETURNING *;
+      `;
+      const result = await client.query(queryInsert, [psck_phantram, nh_ma, stmdt_ma]);
+
+      // 2. Cập nhật lại giá bán (ctsp_gianban) cho TẤT CẢ sản phẩm thuộc ngành hàng này
+      // Công thức: Giá gốc mới nhất * (1 + phí_phần_trăm / 100)
+      const queryUpdatePrice = `
+        UPDATE chitietsanpham ctsp
+        SET ctsp_gianban = ROUND(
+            (SELECT gb.gb_gia 
+             FROM giabangoc gb 
+             WHERE gb.ctsp_ma = ctsp.ctsp_ma 
+             ORDER BY gb.gb_thoidiem DESC 
+             LIMIT 1) * (1 + ($1 / 100.0)), 
+        2)
+        WHERE ctsp.nh_ma = $2 
+        AND EXISTS (
+            SELECT 1 FROM giabangoc gb2 
+            WHERE gb2.ctsp_ma = ctsp.ctsp_ma
+        );
+      `;
+      await client.query(queryUpdatePrice, [psck_phantram, nh_ma]);
+
+      // Nếu mọi thứ suôn sẻ, lưu lại toàn bộ
+      await client.query('COMMIT');
+      return result.rows[0];
+
+    } catch (error) {
+      // Nếu có bất kỳ lỗi nào (ví dụ lỗi SQL, lỗi mạng), hủy toàn bộ thay đổi
+      await client.query('ROLLBACK');
+      console.error("LỖI KHI CẬP NHẬT PHÍ VÀ GIÁ SẢN PHẨM:", error);
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 };
 

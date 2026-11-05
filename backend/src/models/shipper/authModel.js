@@ -1,4 +1,3 @@
-// backend/src/models/shipper/authModel.js
 const pool = require('../../config/db');
 
 const ShipperAuthModel = {
@@ -25,6 +24,24 @@ const ShipperAuthModel = {
     `;
     const res = await pool.query(query, [sdt]);
     return res.rows[0] || null;
+  },
+
+  // 🟢 Thêm hàm lấy thông tin (bao gồm pass) để check mật khẩu cũ
+  findById: async (shipper_ma) => {
+    const res = await pool.query(
+      `SELECT * FROM shipper WHERE shipper_ma = $1`,
+      [shipper_ma]
+    );
+    return res.rows[0] || null;
+  },
+
+  // 🟢 Thêm hàm cập nhật mật khẩu mới
+  updatePassword: async (shipper_ma, newHashPass) => {
+    const res = await pool.query(
+      `UPDATE shipper SET shipper_hashpass = $1 WHERE shipper_ma = $2 RETURNING shipper_ma`,
+      [newHashPass, shipper_ma]
+    );
+    return res.rows[0];
   }
 };
 

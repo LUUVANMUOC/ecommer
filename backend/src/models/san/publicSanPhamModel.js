@@ -16,7 +16,7 @@ const PublicSanPhamModel = {
       )
       SELECT 
         sp.sp_ma, sp.sp_ten, sp.sp_mota, sp.sp_luotmua, sp.sp_diemdanhgiatrungbinh,
-        th.th_ma, th.th_ten,
+        th.th_ma, th.th_ten, th.th_hinhanh, -- 🟢 Thêm th_hinhanh ở đây
         dm.dmsp_ma, dm.dmsp_ten,
         MIN(av.ctsp_gianban) AS min_price, MAX(av.ctsp_gianban) AS max_price,
         (SELECT image FROM approved_variants WHERE sp_ma = sp.sp_ma AND image IS NOT NULL LIMIT 1) AS cover_image,
@@ -27,7 +27,8 @@ const PublicSanPhamModel = {
       LEFT JOIN danhmucsanpham dm ON sp.dmsp_ma = dm.dmsp_ma
       GROUP BY 
         sp.sp_ma, sp.sp_ten, sp.sp_mota, sp.sp_luotmua, sp.sp_diemdanhgiatrungbinh,
-        th.th_ma, th.th_ten, dm.dmsp_ma, dm.dmsp_ten
+        th.th_ma, th.th_ten, th.th_hinhanh, -- 🟢 Thêm th_hinhanh vào GROUP BY
+        dm.dmsp_ma, dm.dmsp_ten
       ORDER BY sp.sp_ma DESC
     `;
     const result = await pool.query(query);
@@ -107,7 +108,114 @@ const PublicSanPhamModel = {
       message: isLiked ? "Đã thích sản phẩm" : "Đã bỏ thích", 
       data: result.rows[0] 
     };
-  }
+  },
+      // 🟢 Hàm ghi nhận lượt xem (Cộng view + Lưu lịch sử)
+    recordView: async (ctsp_ma, kh_ma) => {
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // 1. Tăng lượt xem cho phân loại sản phẩm
+            await client.query(
+                `UPDATE chitietsanpham 
+                 SET ctsp_luotxem = COALESCE(ctsp_luotxem, 0) + 1 
+                 WHERE ctsp_ma = $1`,
+                [ctsp_ma]
+            );
+
+            // 2. Nếu là khách đã đăng nhập -> Lưu lịch sử xem
+            if (kh_ma) {
+                // Xóa lịch sử cũ của sản phẩm này để đưa lên đầu (tránh trùng lặp)
+                await client.query(
+                    `DELETE FROM chitietlichsutimkiem 
+                     WHERE kh_ma = $1 AND ctsp_ma = $2`,
+                    [kh_ma, ctsp_ma]
+                );
+                
+                // Chèn lịch sử mới
+                await client.query(
+                    `INSERT INTO chitietlichsutimkiem (kh_ma, ctsp_ma, ctlstk_thoidiem) 
+                     VALUES ($1, $2, CURRENT_TIMESTAMP)`,
+                    [kh_ma, ctsp_ma]
+                );
+            }
+
+            await client.query('COMMIT');
+            return { success: true };
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+    },
+
+    // 🟢 Hàm lấy danh sách lịch sử xem
+    getViewHistory: async (kh_ma) => {
+        const query = `
+            SELECT 
+                ls.ctlstk_thoidiem AS "ThoiGianXem",
+                ctsp.ctsp_ma AS "Ctsp_Ma",
+                ctsp.ctsp_ten AS "TenPhanLoai",
+                ctsp.ctsp_gianban AS "GiaBan",
+                sp.sp_ma AS "Sp_Ma",
+                sp.sp_ten AS "TenSanPham",
+                (SELECT hasp_link FROM hinhanhsanpham WHERE ctsp_ma = ctsp.ctsp_ma ORDER BY hasp_laanhchinh DESC LIMIT 1) AS "Image"
+            FROM chitietlichsutimkiem ls
+            JOIN chitietsanpham ctsp ON ls.ctsp_ma = ctsp.ctsp_ma
+            JOIN sanpham sp ON ctsp.sp_ma = sp.sp_ma
+            WHERE ls.kh_ma = $1
+            ORDER BY ls.ctlstk_thoidiem DESC
+            LIMIT 50
+        `;
+        const result = await pool.query(query, [kh_ma]);
+        return result.rows;
+    },
+        // 🟢 Thêm hàm lấy sản phẩm theo Shop và Danh mục
+    getByShop: async (gh_ma, dmsp_ma) => {
+        let query = `
+            WITH approved_variants AS (
+                SELECT ctsp.sp_ma, ctsp.ctsp_ma, ctsp.ctsp_gianban, ctsp.ctsp_ten, ctsp.ctsp_soluongton,
+                       (SELECT hasp_link FROM hinhanhsanpham WHERE ctsp_ma = ctsp.ctsp_ma ORDER BY hasp_laanhchinh DESC LIMIT 1) AS image
+                FROM chitietsanpham ctsp
+                JOIN LATERAL (
+                    SELECT ttctsp_ma FROM chitiettrangthaisanpham 
+                    WHERE ctsp_ma = ctsp.ctsp_ma ORDER BY ctttsp_thoidiem DESC LIMIT 1
+                ) status ON true
+                WHERE status.ttctsp_ma = 'TTCTSP0002' AND ctsp.ctsp_soluongton > 0
+            )
+            SELECT 
+                sp.sp_ma, sp.sp_ten, sp.sp_mota, sp.sp_luotmua, sp.sp_diemdanhgiatrungbinh,
+                th.th_ma, th.th_ten,
+                dm.dmsp_ma, dm.dmsp_ten,
+                MIN(av.ctsp_gianban) AS min_price, MAX(av.ctsp_gianban) AS max_price,
+                (SELECT image FROM approved_variants WHERE sp_ma = sp.sp_ma AND image IS NOT NULL LIMIT 1) AS cover_image,
+                MIN(av.ctsp_ma) AS first_variant_id 
+            FROM sanpham sp
+            JOIN approved_variants av ON sp.sp_ma = av.sp_ma
+            LEFT JOIN thuonghieu th ON sp.th_ma = th.th_ma
+            LEFT JOIN danhmucsanpham dm ON sp.dmsp_ma = dm.dmsp_ma
+            WHERE sp.gh_ma = $1
+        `;
+        
+        const params = [gh_ma];
+
+        // Nếu có truyền dmsp_ma (Lọc theo danh mục), thì thêm điều kiện
+        if (dmsp_ma) {
+            query += ` AND sp.dmsp_ma = $2`;
+            params.push(dmsp_ma);
+        }
+
+        query += `
+            GROUP BY 
+                sp.sp_ma, sp.sp_ten, sp.sp_mota, sp.sp_luotmua, sp.sp_diemdanhgiatrungbinh,
+                th.th_ma, th.th_ten, dm.dmsp_ma, dm.dmsp_ten
+            ORDER BY sp.sp_ma DESC
+        `;
+
+        const result = await pool.query(query, params);
+        return result.rows;
+    },
 };
 
 module.exports = PublicSanPhamModel;

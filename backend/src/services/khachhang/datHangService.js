@@ -52,7 +52,7 @@ const DatHangService = {
       console.log(formatLog('1. TẠO ĐƠN HÀNG TỔNG (DONHANGKHACHMUA)'));
       console.log(`   - Mã đơn tổng mới: ${newDmMa}`);
       console.log(`   - Khách hàng: ${payload.kh_ma} | Địa chỉ: ${payload.ttnh_ma}`);
-      console.log(`   - Tổng tiền: ${formatVND(payload.finalTotal)}`);
+      console.log(`   - Tổng tiền thanh toán cuối cùng: ${formatVND(payload.finalTotal)}`);
 
       await client.query(`
         INSERT INTO donhangkhachmua (dm_ma, dm_tongtien, kh_ma, ttnh_ma)
@@ -80,11 +80,30 @@ const DatHangService = {
           newDtsMa = 'DTS' + (currentNum + 1).toString().padStart(7, '0');
         }
 
+        // 🚚 BẮT ĐẦU LOG CHI TIẾT PHÍ VẬN CHUYỂN & TÍNH TOÁN
+        console.log(`   🚚 [CHI TIẾT PHÍ VẬN CHUYỂN & TỔNG TIỀN SHOP NÀY]`);
+        console.log(`      - Tiền hàng gốc (SubTotal): ${formatVND(order.subTotal)}`);
+        console.log(`      - Giảm giá từ Shop (Voucher Shop): -${formatVND(order.shopDiscount)}`);
+        
+        console.log(`      - Phí vận chuyển gốc (Trước giảm giá): ${formatVND(order.originalShippingFee || 'Không có dữ liệu')}`);
+        console.log(`      - Giảm giá vận chuyển (Voucher VC): -${formatVND(order.shippingDiscount)}`);
+        console.log(`      - Phí vận chuyển THỰC TẾ KHÁCH PHẢI TRẢ (finalShippingFee): ${formatVND(order.finalShippingFee)}`);
+        
+        if (order.voucherVC) {
+          console.log(`      - Mã Voucher Vận chuyển áp dụng: ${order.voucherVC}`);
+        }
+        
+        console.log(`      - Cân nặng (klkh_ma): ${order.klkh_ma} | ĐVVC: ${order.dvvc_ma}`);
+
+        // Công thức tính tổng tiền khách phải trả cho Shop này:
         const finalAmountForShop = order.subTotal - order.shopDiscount + order.finalShippingFee;
 
-        console.log(`   - Mã đơn Shop mới: ${newDtsMa}`);
-        console.log(`   - Tiền hàng: ${formatVND(order.subTotal)} | Giảm giá Shop: ${formatVND(order.shopDiscount)} | Phí Ship: ${formatVND(order.finalShippingFee)}`);
-        console.log(`   - Khách phải trả cho Shop này: ${formatVND(finalAmountForShop)}`);
+        console.log(`      ------------------------------------------------`);
+        console.log(`      💰 CÔNG THỨC: (Tiền hàng) - (Giảm giá Shop) + (Phí Ship Thực Tế)`);
+        console.log(`      💰 TÍNH TOÁN: ${formatVND(order.subTotal)} - ${formatVND(order.shopDiscount)} + ${formatVND(order.finalShippingFee)}`);
+        console.log(`      => TỔNG KHÁCH TRẢ CHO SHOP NÀY: ${formatVND(finalAmountForShop)}`);
+        console.log(`      ------------------------------------------------`);
+        // 🚚 KẾT THÚC LOG CHI TIẾT
 
         await client.query(`
           INSERT INTO donhangtheoshop (

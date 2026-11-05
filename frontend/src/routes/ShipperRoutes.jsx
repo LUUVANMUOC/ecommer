@@ -6,6 +6,7 @@ import ShipperHome from "../pages/shipper/dashboard/ShipperHome";
 import DonChoLay from "../pages/shipper/DonChoLay";
 import TrungChuyen from "../pages/shipper/TrungChuyen";
 import GiaoHang from "../pages/shipper/GiaoHang";
+import TaiKhoan from "../pages/shipper/TaiKhoan"; // 🟢 Import trang Tài Khoản mới
 
 // Guard check quyền truy cập theo lsp_ma (business key — quy ước cố định)
 const RoleGuard = ({ allowed, children }) => {
@@ -78,6 +79,9 @@ const ShipperRoutes = () => {
               </RoleGuard>
             }
           />
+
+          {/* 🟢 Tài khoản — Tất cả các loại Shipper đều có quyền truy cập */}
+          <Route path="tai-khoan" element={<TaiKhoan />} />
         </Route>
       </Route>
     </Routes>

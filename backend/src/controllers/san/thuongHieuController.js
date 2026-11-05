@@ -10,14 +10,22 @@ const ThuongHieuController = {
         }
     },
 
+    // 🟢 THÊM HÀM NÀY
+    getByShop: async (req, res) => {
+        try {
+            const data = await ThuongHieuService.getByShop(req.params.gh_ma);
+            res.status(200).json(data);
+        } catch (error) {
+            res.status(500).json({ message: error.message });
+        }
+    },
+
     create: async (req, res) => {
         try {
             const data = { ...req.body };
-            // File từ multer sẽ nằm ở req.file
             if (req.file) {
                 data.th_hinhanh = `/uploads/brands/${req.file.filename}`;
             }
-
             const result = await ThuongHieuService.create(data);
             res.status(201).json({ message: 'Thêm thành công!', data: result });
         } catch (error) {
@@ -31,7 +39,6 @@ const ThuongHieuController = {
             if (req.file) {
                 data.th_hinhanh = `/uploads/brands/${req.file.filename}`;
             }
-
             const result = await ThuongHieuService.update(req.params.id, data);
             res.status(200).json({ message: 'Cập nhật thành công!', data: result });
         } catch (error) {

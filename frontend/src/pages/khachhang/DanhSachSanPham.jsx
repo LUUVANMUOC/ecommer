@@ -2,10 +2,12 @@
 import { useState, useEffect, useMemo, useContext } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import publicSanPhamService from "../../services/san/publicSanPhamService";
+import gioHangService from "../../services/khachhang/gioHangService";
 import { AuthContext } from "../../contexts/AuthContext";
 import { formatVND } from "../../components/shop/SanPhamShared";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
+const imgUrl = (link) => (link ? `${BACKEND_URL}${link}` : "");
 
 const DanhSachSanPham = () => {
   const [products, setProducts] = useState([]);
@@ -13,9 +15,10 @@ const DanhSachSanPham = () => {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
 
+  const [cartCount, setCartCount] = useState(0);
+
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedBrand, setSelectedBrand] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
   const [sortBy, setSortBy] = useState("newest");
 
   useEffect(() => {
@@ -32,22 +35,51 @@ const DanhSachSanPham = () => {
     fetchProducts();
   }, []);
 
+  useEffect(() => {
+    if (user && user.kh_ma) {
+      gioHangService
+        .getCartCount(user.kh_ma)
+        .then((res) => setCartCount(res.data.total))
+        .catch(() => {});
+    } else {
+      setCartCount(0);
+    }
+  }, [user]);
+
   const handleLogout = () => {
     logout();
     navigate("/");
   };
 
-  const { brands, categories } = useMemo(() => {
+  // Lấy danh sách Thương hiệu cho bộ lọc
+  const brands = useMemo(() => {
     const bMap = new Map();
-    const cMap = new Map();
     products.forEach((p) => {
       if (p.th_ma && p.th_ten) bMap.set(p.th_ma, p.th_ten);
-      if (p.dmsp_ma && p.dmsp_ten) cMap.set(p.dmsp_ma, p.dmsp_ten);
     });
-    return {
-      brands: Array.from(bMap, ([id, name]) => ({ id, name })),
-      categories: Array.from(cMap, ([id, name]) => ({ id, name })),
-    };
+    return Array.from(bMap, ([id, name]) => ({ id, name }));
+  }, [products]);
+
+  // Tính Top 10 Thương hiệu nổi bật (có nhiều sản phẩm nhất)
+  const topBrands = useMemo(() => {
+    const countMap = {};
+    products.forEach((p) => {
+      if (p.th_ma && p.th_ten) {
+        if (!countMap[p.th_ma]) {
+          countMap[p.th_ma] = {
+            id: p.th_ma,
+            name: p.th_ten,
+            logo: p.th_hinhanh,
+            count: 0,
+          };
+        }
+        countMap[p.th_ma].count++;
+      }
+    });
+    // Sắp xếp giảm dần theo số lượng sản phẩm và lấy Top 10
+    return Object.values(countMap)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
   }, [products]);
 
   const filteredProducts = useMemo(() => {
@@ -56,9 +88,8 @@ const DanhSachSanPham = () => {
       const term = searchTerm.toLowerCase();
       result = result.filter((p) => p.sp_ten.toLowerCase().includes(term));
     }
+    // 🟢 Đã xóa bộ lọc Danh mục ở đây
     if (selectedBrand) result = result.filter((p) => p.th_ma === selectedBrand);
-    if (selectedCategory)
-      result = result.filter((p) => p.dmsp_ma === selectedCategory);
 
     switch (sortBy) {
       case "price_asc":
@@ -74,7 +105,7 @@ const DanhSachSanPham = () => {
         break;
     }
     return result;
-  }, [products, searchTerm, selectedBrand, selectedCategory, sortBy]);
+  }, [products, searchTerm, selectedBrand, sortBy]);
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16 font-sans">
@@ -114,7 +145,13 @@ const DanhSachSanPham = () => {
               <span className="material-symbols-outlined text-[24px]">
                 shopping_cart
               </span>
+              {cartCount > 0 && (
+                <span className="absolute -top-1.5 -right-1.5 bg-[#DC2626] text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-sm">
+                  {cartCount}
+                </span>
+              )}
             </Link>
+
             {user ? (
               <div className="flex items-center gap-4">
                 <Link
@@ -154,6 +191,79 @@ const DanhSachSanPham = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
+        {/* 🟢 KHỐI THƯƠNG HIỆU NỔI BẬT */}
+        {topBrands.length > 0 && (
+          <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0]">
+            <div className="flex items-center justify-center mb-6">
+              <h2 className="text-xl font-bold text-[#0F172A] flex items-center gap-2">
+                <span className="material-symbols-outlined text-[#F59E0B] text-2xl">
+                  local_fire_department
+                </span>
+                Thương hiệu nổi bật
+              </h2>
+            </div>
+
+            {/* Thanh cuộn ngang (Ẩn thanh cuộn) - Canh giữa */}
+            <div
+              className="w-full overflow-x-auto pb-4 scrollbar-hide"
+              style={{ scrollbarWidth: "none", msOverflowStyle: "none" }}
+            >
+              <div className="flex gap-8 w-max mx-auto px-2">
+                {topBrands.map((brand) => (
+                  <div
+                    key={brand.id}
+                    onClick={() =>
+                      setSelectedBrand(
+                        brand.id === selectedBrand ? "" : brand.id,
+                      )
+                    }
+                    className="flex flex-col items-center gap-3 cursor-pointer min-w-[100px] group"
+                  >
+                    {/* Lớp ngoài: Viền mỏng, không scale để tránh bị cắt */}
+                    <div
+                      className={`w-24 h-24 rounded-full border flex items-center justify-center bg-white transition-all duration-300 ${
+                        selectedBrand === brand.id
+                          ? "border-2 border-[#2563EB] shadow-md"
+                          : "border-gray-200 shadow-sm group-hover:border-[#2563EB] group-hover:shadow-md group-hover:-translate-y-1"
+                      }`}
+                    >
+                      {/* Lớp trong: Cắt ảnh cho tròn */}
+                      <div className="w-full h-full rounded-full overflow-hidden flex items-center justify-center bg-white p-3">
+                        {brand.logo ? (
+                          <img
+                            src={imgUrl(brand.logo)}
+                            alt={brand.name}
+                            className="w-full h-full object-contain"
+                          />
+                        ) : (
+                          <span
+                            className={`material-symbols-outlined text-4xl ${
+                              selectedBrand === brand.id
+                                ? "text-[#2563EB]"
+                                : "text-gray-400"
+                            }`}
+                          >
+                            storefront
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <span
+                      className={`text-sm font-bold text-center line-clamp-1 w-full transition-colors ${
+                        selectedBrand === brand.id
+                          ? "text-[#2563EB]"
+                          : "text-[#334155] group-hover:text-[#2563EB]"
+                      }`}
+                    >
+                      {brand.name}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* BỘ LỌC */}
         <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#E2E8F0] flex flex-wrap gap-4 items-center justify-between">
           <div className="flex flex-wrap items-center gap-3">
@@ -175,18 +285,7 @@ const DanhSachSanPham = () => {
                 </option>
               ))}
             </select>
-            <select
-              value={selectedCategory}
-              onChange={(e) => setSelectedCategory(e.target.value)}
-              className="px-4 py-2 border border-[#E2E8F0] rounded-xl text-sm font-medium text-[#334155] outline-none bg-[#F8FAFC] hover:border-[#2563EB] transition-colors cursor-pointer min-w-[150px]"
-            >
-              <option value="">Danh mục</option>
-              {categories.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            {/* 🟢 ĐÃ XÓA DROPDOWN DANH MỤC Ở ĐÂY */}
           </div>
           <div className="flex items-center gap-3 text-sm">
             <span className="font-semibold text-[#64748B]">Sắp xếp:</span>
@@ -207,6 +306,15 @@ const DanhSachSanPham = () => {
         {loading ? (
           <div className="text-center py-20 text-[#64748B] font-medium">
             Đang tải sản phẩm...
+          </div>
+        ) : filteredProducts.length === 0 ? (
+          <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-[#E2E8F0]">
+            <span className="material-symbols-outlined text-6xl text-gray-300 mb-4">
+              search_off
+            </span>
+            <p className="text-lg font-bold text-gray-700">
+              Không tìm thấy sản phẩm nào phù hợp.
+            </p>
           </div>
         ) : (
           <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-5">
@@ -254,4 +362,5 @@ const DanhSachSanPham = () => {
     </div>
   );
 };
+
 export default DanhSachSanPham;

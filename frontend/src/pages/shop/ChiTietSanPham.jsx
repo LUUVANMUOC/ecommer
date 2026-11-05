@@ -369,6 +369,23 @@ const ChiTietSanPham = () => {
       setSubmittingStatus(null);
     }
   };
+  const handleSubmitAll = async () => {
+    if (
+      !window.confirm(
+        "Bạn có chắc chắn muốn gửi duyệt TẤT CẢ các phân loại chưa được duyệt?",
+      )
+    )
+      return;
+
+    try {
+      const res =
+        await trangThaiChiTietSanPhamService.submitAllForApproval(sp_ma);
+      showToast(res.data.message, res.data.count > 0 ? "success" : "info");
+      fetchVariants(); // Load lại danh sách
+    } catch (err) {
+      alert(err.response?.data?.message || "Lỗi gửi duyệt hàng loạt");
+    }
+  };
 
   const handleDeleteProduct = async () => {
     if (!product) return;
@@ -439,7 +456,16 @@ const ChiTietSanPham = () => {
           <span className="text-[#C9C3B5]">/</span>
           <span className="truncate text-[#5B6661]">{product.sp_ten}</span>
         </nav>
+
         <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={handleSubmitAll}
+            className="inline-flex items-center gap-1 rounded-lg bg-[#F2A93B] px-3.5 py-2 text-sm font-bold text-white hover:bg-[#e09b32]"
+          >
+            <span className="material-symbols-outlined text-[18px]">send</span>
+            Gửi duyệt tất cả
+          </button>
           <button
             type="button"
             onClick={() => setDrawerOpen(true)}

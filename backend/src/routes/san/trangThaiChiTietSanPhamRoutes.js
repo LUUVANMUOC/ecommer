@@ -27,4 +27,9 @@ router.get('/:ctsp_ma/latest', TrangThaiChiTietSanPhamController.getLatestByCtsp
 router.get('/', TrangThaiChiTietSanPhamController.getAll);
 router.get('/:id', TrangThaiChiTietSanPhamController.getById);
 
+// ==========================================================
+// SELLER ROUTES
+// ==========================================================
+router.post('/gui-duyet', TrangThaiChiTietSanPhamController.submitForApproval);
+router.post('/gui-duyet-hang-loat', TrangThaiChiTietSanPhamController.submitAllForApproval); // 🟢 Thêm dòng này
 module.exports = router;

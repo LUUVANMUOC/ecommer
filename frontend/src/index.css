@@ -1,3 +1,31 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+/* 🟢 Custom Scrollbar cho thanh cuộn ngang */
+/* 🟢 Custom Scrollbar ép buộc hiển thị */
+.custom-scrollbar {
+  /* Cho Firefox */
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+/* Cho Chrome, Edge, Safari */
+.custom-scrollbar::-webkit-scrollbar {
+  height: 8px; /* Tăng độ dày lên 8px cho dễ thấy */
+  display: block !important; 
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: #f1f5f9; 
+  border-radius: 8px;
+  margin-top: 4px; /* Tạo khoảng cách với ảnh phía trên */
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #cbd5e1; 
+  border-radius: 8px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8; 
+}

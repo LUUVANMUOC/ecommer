@@ -216,7 +216,13 @@ const GioHang = () => {
                   <span className="material-symbols-outlined text-[18px] text-[#2563EB]">
                     storefront
                   </span>{" "}
-                  {shop.gh_ten}
+                  {/* 🟢 ĐÃ CẬP NHẬT: Bọc Link để chuyển sang trang Shop Profile */}
+                  <Link
+                    to={`/shop/${shop.gh_ma}`}
+                    className="hover:text-[#2563EB] hover:underline transition-colors cursor-pointer"
+                  >
+                    {shop.gh_ten}
+                  </Link>
                 </span>
               </div>
 

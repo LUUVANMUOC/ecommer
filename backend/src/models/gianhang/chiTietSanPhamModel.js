@@ -165,7 +165,7 @@ const ChiTietSanPhamModel = {
         }
     },
 
-    updateFullDetail: async (id, data) => {
+        updateFullDetail: async (id, data) => {
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
@@ -265,6 +265,32 @@ const ChiTietSanPhamModel = {
                         tt.gttt_giatridinhtinh || null,
                         tt.gttt_giatridinhluong ?? null
                     ]);
+                }
+            }
+
+            // 🟢 6. TỰ ĐỘNG CHUYỂN TRẠNG THÁI SANG CHỜ DUYỆT KHI SHOP SỬA
+            const latestStatusRes = await client.query(
+                `SELECT ttctsp_ma FROM chitiettrangthaisanpham 
+                 WHERE ctsp_ma = $1 ORDER BY ctttsp_thoidiem DESC LIMIT 1`,
+                [id]
+            );
+            const currentStatus = latestStatusRes.rows[0]?.ttctsp_ma;
+
+            // Nếu đang bán (0002) hoặc bị đình chỉ (0003) mà Shop sửa -> Đưa về Chờ duyệt (0001)
+            if (currentStatus === 'TTCTSP0002' || currentStatus === 'TTCTSP0003') {
+                // Lấy mã sàn (stmdt_ma) giống hệt logic trong Controller bạn đã cung cấp
+                const stmdtRes = await client.query(
+                    `SELECT stmdt_ma FROM san_thuong_mai_dien_tu ORDER BY stmdt_ma ASC LIMIT 1`
+                );
+                const stmdt_ma = stmdtRes.rows[0]?.stmdt_ma;
+
+                if (stmdt_ma) {
+                    await client.query(
+                        `INSERT INTO chitiettrangthaisanpham 
+                            (stmdt_ma, ttctsp_ma, ctsp_ma, ctttsp_thoidiem, ctttsp_yeucau, ctttsp_phanhoi)
+                         VALUES ($1, 'TTCTSP0001', $2, CURRENT_TIMESTAMP, $3, null)`,
+                        [stmdt_ma, id, 'Hệ thống tự động chuyển chờ duyệt do Shop cập nhật thông tin sản phẩm.']
+                    );
                 }
             }
 

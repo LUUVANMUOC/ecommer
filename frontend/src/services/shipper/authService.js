@@ -1,11 +1,10 @@
-// src/services/shipper/authService.js
 import axiosClient from '../../config/axiosClient';
 
 const shipperAuthService = {
-  login: (data) => {
-    // data: { sdt, password }
-    return axiosClient.post('/dvvc/shipper/auth/login', data);
-  }
+  login: (data) => axiosClient.post('/dvvc/shipper/auth/login', data),
+  
+  // 🟢 Gọi API đổi mật khẩu
+  changePassword: (data) => axiosClient.put('/dvvc/shipper/auth/change-password', data),
 };
 
 export default shipperAuthService;

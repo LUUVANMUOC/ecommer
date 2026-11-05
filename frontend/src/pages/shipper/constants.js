@@ -16,6 +16,7 @@ export const LSP_UI_CONFIG = {
     menuItems: [
       { title: 'Trang chủ', path: '/shipper' },
       { title: 'Đơn chờ lấy', path: '/shipper/don-cho-lay' },
+      { title: 'Tài khoản', path: '/shipper/tai-khoan' }, // 🟢 Thêm menu Tài khoản
     ],
   },
   LSP02: {
@@ -33,6 +34,7 @@ export const LSP_UI_CONFIG = {
     menuItems: [
       { title: 'Trang chủ', path: '/shipper' },
       { title: 'Đơn trung chuyển', path: '/shipper/trung-chuyen' },
+      { title: 'Tài khoản', path: '/shipper/tai-khoan' }, // 🟢 Thêm menu Tài khoản
     ],
   },
   LSP03: {
@@ -50,6 +52,7 @@ export const LSP_UI_CONFIG = {
     menuItems: [
       { title: 'Trang chủ', path: '/shipper' },
       { title: 'Đơn cần giao', path: '/shipper/giao-hang' },
+      { title: 'Tài khoản', path: '/shipper/tai-khoan' }, // 🟢 Thêm menu Tài khoản
     ],
   },
 };
@@ -67,7 +70,10 @@ const FALLBACK_CONFIG = {
     borderColor: '#334155',
     logoutBtnColor: '#ef4444',
   },
-  menuItems: [{ title: 'Trang chủ', path: '/shipper' }],
+  menuItems: [
+    { title: 'Trang chủ', path: '/shipper' },
+    { title: 'Tài khoản', path: '/shipper/tai-khoan' }, // Fallback cũng có Tài khoản
+  ],
 };
 
 export const getLSPUIConfig = (lsp_ma) =>

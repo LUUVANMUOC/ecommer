@@ -5,7 +5,6 @@ const path = require('path');
 const fs = require('fs'); 
 const ThuongHieuController = require('../../controllers/san/thuongHieuController');
 
-// Lùi 3 cấp từ src/routes/san ra ngoài backend
 const uploadDir = path.join(__dirname, '../../../public/uploads/brands'); 
 if (!fs.existsSync(uploadDir)) {
     fs.mkdirSync(uploadDir, { recursive: true });
@@ -35,7 +34,7 @@ const upload = multer({
 });
 
 const uploadSingle = (req, res, next) => {
-    const uploadMiddleware = upload.single('icon'); // Key gửi từ Frontend là 'icon'
+    const uploadMiddleware = upload.single('icon');
     uploadMiddleware(req, res, function (err) {
         if (err instanceof multer.MulterError) {
             return res.status(400).json({ message: `Lỗi upload: ${err.message}` });
@@ -47,6 +46,10 @@ const uploadSingle = (req, res, next) => {
 };
 
 router.get('/', ThuongHieuController.getAll);
+
+// 🟢 THÊM ROUTE NÀY (Phải đặt trước /:id)
+router.get('/shop/:gh_ma', ThuongHieuController.getByShop);
+
 router.post('/', uploadSingle, ThuongHieuController.create);
 router.put('/:id', uploadSingle, ThuongHieuController.update);
 router.delete('/:id', ThuongHieuController.delete);

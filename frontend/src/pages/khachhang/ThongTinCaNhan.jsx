@@ -1,5 +1,5 @@
 // src/pages/khachhang/ThongTinCaNhan.jsx
-import { useState, useEffect, useContext, useCallback } from "react";
+import { useState, useEffect, useContext, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { AuthContext } from "../../contexts/AuthContext";
 import axiosClient from "../../config/axiosClient";
@@ -7,6 +7,7 @@ import khachHangProfileService from "../../services/khachhang/khachHangService";
 import theoDoiShopService from "../../services/khachhang/theoDoiShopService";
 import donHangService from "../../services/khachhang/donHangService";
 import trangThaiDonHangService from "../../services/san/trangThaiDonHangService";
+import publicSanPhamService from "../../services/san/publicSanPhamService";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
 import { ChangePasswordForm } from "../../components/account/AccountForms";
 import {
@@ -36,6 +37,17 @@ const STEP_ICONS = {
   TTDH05: "verified",
   TTDH06: "cancel",
 };
+
+// 🟢 Danh sách các tab trạng thái
+const ORDER_TABS = [
+  { id: "ALL", label: "Tất cả" },
+  { id: "TTDH01", label: "Chờ xác nhận" },
+  { id: "TTDH02", label: "Chờ lấy hàng" },
+  { id: "TTDH03", label: "Đang vận chuyển" },
+  { id: "TTDH04", label: "Đang giao" },
+  { id: "TTDH05", label: "Đã hoàn thành" },
+  { id: "TTDH06", label: "Đã hủy" },
+];
 
 const ThongTinCaNhan = () => {
   const { user } = useContext(AuthContext);
@@ -72,6 +84,14 @@ const ThongTinCaNhan = () => {
   const [orders, setOrders] = useState([]);
   const [loadingOrders, setLoadingOrders] = useState(false);
   const [orderSteps, setOrderSteps] = useState([]);
+
+  // 🟢 State cho tính năng lọc và thu gọn đơn hàng
+  const [selectedOrderStatus, setSelectedOrderStatus] = useState("ALL");
+  const [expandedOrders, setExpandedOrders] = useState({});
+
+  // 🟢 State cho Lịch sử xem
+  const [historyViews, setHistoryViews] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
 
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
@@ -160,13 +180,29 @@ const ThongTinCaNhan = () => {
     }
   }, [kh_ma]);
 
+  // 🟢 Hàm fetch Lịch sử xem
+  const fetchHistory = useCallback(async () => {
+    if (!kh_ma) return;
+    setLoadingHistory(true);
+    try {
+      const res = await publicSanPhamService.getViewHistory(kh_ma);
+      setHistoryViews(res.data);
+    } catch (err) {
+      showToast("Lỗi tải lịch sử xem hàng", "error");
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, [kh_ma]);
+
   useEffect(() => {
     if (activeTab === "shop-theo-doi") fetchFollowedShops();
     if (activeTab === "don-hang") fetchOrders();
-  }, [activeTab, fetchFollowedShops, fetchOrders]);
+    if (activeTab === "lich-su-xem") fetchHistory();
+  }, [activeTab, fetchFollowedShops, fetchOrders, fetchHistory]);
 
   // ✅ Hàm xử lý hủy đơn
-  const handleCancelOrder = async (dts_ma) => {
+  const handleCancelOrder = async (e, dts_ma) => {
+    e.stopPropagation(); // Ngăn việc click vào nút Hủy lại kích hoạt mở/thu gọn đơn hàng
     if (
       !window.confirm(
         "Bạn có chắc chắn muốn hủy đơn hàng này? Hành động này không thể hoàn tác.",
@@ -268,6 +304,22 @@ const ThongTinCaNhan = () => {
     }
   };
 
+  // 🟢 Hàm toggle mở/thu gọn đơn hàng
+  const toggleOrder = (dm_ma) => {
+    setExpandedOrders((prev) => ({
+      ...prev,
+      [dm_ma]: !prev[dm_ma],
+    }));
+  };
+
+  // 🟢 Lọc đơn hàng theo trạng thái được chọn
+  const filteredOrders = useMemo(() => {
+    if (selectedOrderStatus === "ALL") return orders;
+    return orders.filter((order) =>
+      order.shops.some((shop) => shop.TrangThaiHienTai === selectedOrderStatus),
+    );
+  }, [orders, selectedOrderStatus]);
+
   const renderTimeline = (currentStatus) => {
     if (currentStatus === "TTDH06") {
       return (
@@ -348,6 +400,7 @@ const ThongTinCaNhan = () => {
   const menuItems = [
     { id: "ho-so", icon: "person", label: "Hồ Sơ Của Tôi" },
     { id: "don-hang", icon: "receipt_long", label: "Đơn Hàng Của Tôi" },
+    { id: "lich-su-xem", icon: "history", label: "Lịch Sử Xem Hàng" },
     { id: "dia-chi", icon: "location_on", label: "Sổ Địa Chỉ" },
     { id: "ngan-hang", icon: "account_balance", label: "Tài Khoản Ngân Hàng" },
     { id: "shop-theo-doi", icon: "storefront", label: "Shop Đã Theo Dõi" },
@@ -539,21 +592,38 @@ const ThongTinCaNhan = () => {
               <h2 className="text-xl font-bold text-[#0F172A] mb-1">
                 Đơn Hàng Của Tôi
               </h2>
-              <p className="text-sm font-medium text-[#64748B] mb-8 border-b border-[#F1F5F9] pb-4">
+              <p className="text-sm font-medium text-[#64748B] mb-4">
                 Theo dõi tiến trình và trạng thái các đơn hàng
               </p>
+
+              {/* 🟢 THANH TAB TRẠNG THÁI */}
+              <div className="flex overflow-x-auto border-b border-[#E2E8F0] mb-6 custom-scrollbar">
+                {ORDER_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setSelectedOrderStatus(tab.id)}
+                    className={`px-6 py-3 font-semibold text-sm whitespace-nowrap transition-colors border-b-2 ${
+                      selectedOrderStatus === tab.id
+                        ? "text-[#2563EB] border-[#2563EB]"
+                        : "text-[#64748B] border-transparent hover:text-[#0F172A]"
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
 
               {loadingOrders ? (
                 <div className="text-center py-10 text-[#64748B] font-medium">
                   Đang tải danh sách đơn hàng...
                 </div>
-              ) : orders.length === 0 ? (
+              ) : filteredOrders.length === 0 ? (
                 <div className="text-center py-20 border border-dashed border-[#E2E8F0] rounded-2xl">
                   <span className="material-symbols-outlined text-6xl text-gray-300 mb-4">
                     receipt_long
                   </span>
                   <p className="text-lg font-bold text-gray-700">
-                    Bạn chưa có đơn hàng nào.
+                    Không có đơn hàng nào ở trạng thái này.
                   </p>
                   <Link
                     to="/"
@@ -563,121 +633,211 @@ const ThongTinCaNhan = () => {
                   </Link>
                 </div>
               ) : (
-                <div className="space-y-6">
-                  {orders.map((order) => (
+                <div className="space-y-4">
+                  {filteredOrders.map((order) => (
                     <div
                       key={order.DM_Ma}
                       className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden"
                     >
-                      <div className="bg-[#F8FAFC] px-6 py-4 border-b border-[#E2E8F0] flex flex-wrap justify-between items-center gap-2">
+                      {/* 🟢 HEADER ĐƠN HÀNG (BẤM ĐỂ MỞ RỘNG) */}
+                      <div
+                        onClick={() => toggleOrder(order.DM_Ma)}
+                        className="bg-[#F8FAFC] px-6 py-4 flex flex-wrap justify-between items-center gap-2 cursor-pointer hover:bg-gray-100 transition-colors"
+                      >
                         <div>
-                          <p className="font-bold text-[#0F172A]">
+                          <p className="font-bold text-[#0F172A] flex items-center gap-2">
                             Mã Đơn:{" "}
                             <span className="text-[#2563EB]">
                               {order.DM_Ma}
                             </span>
                           </p>
-                          <p className="text-sm text-[#64748B]">
+                          <p className="text-sm text-[#64748B] mt-1">
                             Ngày đặt:{" "}
                             {new Date(order.NgayLap).toLocaleDateString(
                               "vi-VN",
                             )}
                           </p>
                         </div>
-                        <div className="text-right">
-                          <p className="text-sm text-[#64748B]">
-                            Tổng thanh toán
-                          </p>
-                          <p className="text-xl font-extrabold text-[#DC2626]">
-                            {formatVND(order.TongTien)}
-                          </p>
+
+                        <div className="flex items-center gap-6">
+                          <div className="text-right">
+                            <p className="text-sm text-[#64748B]">
+                              Tổng thanh toán
+                            </p>
+                            <p className="text-xl font-extrabold text-[#DC2626]">
+                              {formatVND(order.TongTien)}
+                            </p>
+                          </div>
+                          {/* Icon mũi tên chỉ hướng mở rộng */}
+                          <span className="material-symbols-outlined text-[#2563EB] text-3xl bg-white rounded-full shadow-sm">
+                            {expandedOrders[order.DM_Ma]
+                              ? "expand_less"
+                              : "expand_more"}
+                          </span>
                         </div>
                       </div>
 
-                      <div className="px-6 py-3 bg-white border-b border-[#E2E8F0] text-sm text-[#64748B] flex items-start gap-2">
-                        <span className="material-symbols-outlined text-[#2563EB] text-[18px]">
-                          location_on
-                        </span>
-                        <span>Giao đến: {order.DiaChiNhan}</span>
-                      </div>
-
-                      <div className="divide-y divide-[#E2E8F0]">
-                        {order.shops.map((shop) => (
-                          <div key={shop.DTS_Ma} className="p-6">
-                            {/* ✅ HEADER SHOP VÀ NÚT HỦY */}
-                            <div className="flex items-center justify-between mb-4">
-                              <div className="flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[#2563EB]">
-                                  storefront
-                                </span>
-                                <span className="font-bold text-[#0F172A]">
-                                  {shop.TenShop}
-                                </span>
-                              </div>
-                              {/* Chỉ hiện nút Hủy nếu trạng thái là TTDH01 */}
-                              {shop.TrangThaiHienTai === "TTDH01" && (
-                                <button
-                                  onClick={() => handleCancelOrder(shop.DTS_Ma)}
-                                  className="text-sm font-semibold text-[#DC2626] hover:underline bg-red-50 px-3 py-1.5 rounded-lg border border-red-100"
-                                >
-                                  Hủy Đơn Hàng
-                                </button>
-                              )}
-                            </div>
-
-                            <div className="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
-                              {renderTimeline(shop.TrangThaiHienTai)}
-                            </div>
-
-                            <div className="space-y-4 mb-4">
-                              {shop.items.map((item) => (
-                                <div
-                                  key={item.Ctsp_Ma}
-                                  className="flex gap-4 items-center text-sm"
-                                >
-                                  <img
-                                    src={
-                                      item.Image
-                                        ? `${BACKEND_URL}${item.Image}`
-                                        : "https://placehold.co/100x100"
-                                    }
-                                    className="w-16 h-16 rounded-lg object-cover border border-[#E2E8F0]"
-                                    alt=""
-                                  />
-                                  <div className="flex-1 min-w-0">
-                                    <p className="font-semibold text-[#0F172A] truncate">
-                                      {item.TenSanPham}
-                                    </p>
-                                    <p className="text-[#64748B] text-xs mt-0.5">
-                                      Phân loại: {item.TenPhanLoai}
-                                    </p>
-                                    <p className="text-[#64748B] text-xs">
-                                      Số lượng: {item.SoLuong}
-                                    </p>
-                                  </div>
-                                  <p className="font-bold text-[#DC2626]">
-                                    {formatVND(item.GiaBan * item.SoLuong)}
-                                  </p>
-                                </div>
-                              ))}
-                            </div>
-
-                            <div className="flex justify-end text-sm border-t border-[#E2E8F0] pt-3 gap-6">
-                              <span className="text-[#64748B]">
-                                Phí vận chuyển:{" "}
-                                <strong className="text-[#0F172A]">
-                                  {formatVND(shop.TienVanChuyen)}
-                                </strong>
-                              </span>
-                              <span className="text-[#64748B]">
-                                Tổng Shop:{" "}
-                                <strong className="text-[#DC2626] text-base">
-                                  {formatVND(shop.TongThanhToan)}
-                                </strong>
-                              </span>
-                            </div>
+                      {/* 🟢 PHẦN CHI TIẾT (CHỈ HIỆN KHI MỞ RỘNG) */}
+                      {expandedOrders[order.DM_Ma] && (
+                        <>
+                          <div className="px-6 py-3 bg-white border-b border-t border-[#E2E8F0] text-sm text-[#64748B] flex items-start gap-2">
+                            <span className="material-symbols-outlined text-[#2563EB] text-[18px]">
+                              location_on
+                            </span>
+                            <span>Giao đến: {order.DiaChiNhan}</span>
                           </div>
-                        ))}
+
+                          <div className="divide-y divide-[#E2E8F0]">
+                            {order.shops.map((shop) => (
+                              <div key={shop.DTS_Ma} className="p-6">
+                                <div className="flex items-center justify-between mb-4">
+                                  <div className="flex items-center gap-2">
+                                    <span className="material-symbols-outlined text-[#2563EB]">
+                                      storefront
+                                    </span>
+                                    <span className="font-bold text-[#0F172A]">
+                                      {shop.TenShop}
+                                    </span>
+                                  </div>
+                                  {shop.TrangThaiHienTai === "TTDH01" && (
+                                    <button
+                                      onClick={(e) =>
+                                        handleCancelOrder(e, shop.DTS_Ma)
+                                      }
+                                      className="text-sm font-semibold text-[#DC2626] hover:underline bg-red-50 px-3 py-1.5 rounded-lg border border-red-100"
+                                    >
+                                      Hủy Đơn Hàng
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div className="mb-6 bg-gray-50 p-4 rounded-xl border border-gray-100">
+                                  {renderTimeline(shop.TrangThaiHienTai)}
+                                </div>
+
+                                <div className="space-y-4 mb-4">
+                                  {shop.items.map((item) => (
+                                    <div
+                                      key={item.Ctsp_Ma}
+                                      className="flex gap-4 items-center text-sm"
+                                    >
+                                      <img
+                                        src={
+                                          item.Image
+                                            ? `${BACKEND_URL}${item.Image}`
+                                            : "https://placehold.co/100x100"
+                                        }
+                                        className="w-16 h-16 rounded-lg object-cover border border-[#E2E8F0]"
+                                        alt=""
+                                      />
+                                      <div className="flex-1 min-w-0">
+                                        <p className="font-semibold text-[#0F172A] truncate">
+                                          {item.TenSanPham}
+                                        </p>
+                                        <p className="text-[#64748B] text-xs mt-0.5">
+                                          Phân loại: {item.TenPhanLoai}
+                                        </p>
+                                        <p className="text-[#64748B] text-xs">
+                                          Số lượng: {item.SoLuong}
+                                        </p>
+                                      </div>
+                                      <p className="font-bold text-[#DC2626]">
+                                        {formatVND(item.GiaBan * item.SoLuong)}
+                                      </p>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <div className="flex justify-end text-sm border-t border-[#E2E8F0] pt-3 gap-6">
+                                  <span className="text-[#64748B]">
+                                    Phí vận chuyển:{" "}
+                                    <strong className="text-[#0F172A]">
+                                      {formatVND(shop.TienVanChuyen)}
+                                    </strong>
+                                  </span>
+                                  <span className="text-[#64748B]">
+                                    Tổng Shop:{" "}
+                                    <strong className="text-[#DC2626] text-base">
+                                      {formatVND(shop.TongThanhToan)}
+                                    </strong>
+                                  </span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* 🟢 TAB LỊCH SỬ XEM HÀNG */}
+          {activeTab === "lich-su-xem" && (
+            <div>
+              <h2 className="text-xl font-bold text-[#0F172A] mb-1">
+                Lịch Sử Xem Hàng
+              </h2>
+              <p className="text-sm font-medium text-[#64748B] mb-8 border-b border-[#F1F5F9] pb-4">
+                Danh sách các sản phẩm bạn đã xem gần đây
+              </p>
+
+              {loadingHistory ? (
+                <div className="text-center py-10 text-[#64748B] font-medium">
+                  Đang tải lịch sử...
+                </div>
+              ) : historyViews.length === 0 ? (
+                <div className="text-center py-20 border border-dashed border-[#E2E8F0] rounded-2xl">
+                  <span className="material-symbols-outlined text-6xl text-gray-300 mb-4">
+                    history
+                  </span>
+                  <p className="text-lg font-bold text-gray-700">
+                    Bạn chưa xem sản phẩm nào.
+                  </p>
+                  <Link
+                    to="/"
+                    className="mt-4 inline-block px-6 py-2 bg-[#2563EB] text-white rounded-xl font-bold hover:bg-[#1D4ED8]"
+                  >
+                    Khám phá ngay
+                  </Link>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {historyViews.map((item, index) => (
+                    <div
+                      key={`${item.Ctsp_Ma}-${index}`}
+                      className="flex gap-4 items-center bg-white border border-[#E2E8F0] p-3 rounded-2xl hover:shadow-md transition-shadow"
+                    >
+                      <Link
+                        to={`/san-pham/${item.Sp_Ma}?ctsp_ma=${item.Ctsp_Ma}`}
+                        className="shrink-0"
+                      >
+                        <img
+                          src={
+                            item.Image
+                              ? `${BACKEND_URL}${item.Image}`
+                              : "https://placehold.co/100x100"
+                          }
+                          alt=""
+                          className="w-20 h-20 rounded-xl object-cover border border-[#F1F5F9]"
+                        />
+                      </Link>
+                      <div className="flex-1 min-w-0">
+                        <Link
+                          to={`/san-pham/${item.Sp_Ma}?ctsp_ma=${item.Ctsp_Ma}`}
+                        >
+                          <h3 className="font-bold text-[#0F172A] truncate hover:text-[#2563EB]">
+                            {item.TenSanPham}
+                          </h3>
+                        </Link>
+                        <p className="text-xs text-[#64748B] mt-1">
+                          Phân loại: {item.TenPhanLoai}
+                        </p>
+                        <p className="text-sm font-bold text-[#DC2626] mt-2">
+                          {formatVND(item.GiaBan)}
+                        </p>
                       </div>
                     </div>
                   ))}

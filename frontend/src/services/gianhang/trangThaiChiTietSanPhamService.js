@@ -10,6 +10,8 @@ const trangThaiChiTietSanPhamService = {
     // Seller
     submitForApproval: (ctsp_ma, yeucau) =>
         axiosClient.post(`${BASE}/gui-duyet`, { ctsp_ma, yeucau }),
+    submitAllForApproval: (sp_ma) => 
+        axiosClient.post(`${BASE}/gui-duyet-hang-loat`, { sp_ma }), 
     getByCtsp: (ctsp_ma) => axiosClient.get(`${BASE}/${ctsp_ma}/lichsu`),
     getLatestByCtsp: (ctsp_ma) => axiosClient.get(`${BASE}/${ctsp_ma}/latest`),
 
@@ -20,6 +22,7 @@ const trangThaiChiTietSanPhamService = {
         axiosClient.post(`${BASE}/admin/${ctsp_ma}/duyet`, { phanhoi }),
     suspend: (ctsp_ma, phanhoi) =>
         axiosClient.post(`${BASE}/admin/${ctsp_ma}/dinh-chi`, { phanhoi }),
+    
 };
 
 export default trangThaiChiTietSanPhamService;

@@ -152,7 +152,63 @@ const TrangThaiChiTietSanPhamModel = {
         `;
         const result = await pool.query(query);
         return result.rows;
-    }
+    },
+        // 🟢 THÊM HÀM NÀY ĐỂ GỬI DUYỆT HÀNG LOẠT
+    submitAllByProduct: async (sp_ma) => {
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+
+            // Lấy mã sàn mặc định
+            const stmdtRes = await client.query(
+                'SELECT stmdt_ma FROM san_thuong_mai_dien_tu ORDER BY stmdt_ma ASC LIMIT 1'
+            );
+            const stmdt_ma = stmdtRes.rows[0]?.stmdt_ma;
+            if (!stmdt_ma) throw new Error('Chưa có sàn trong hệ thống.');
+
+            // Lấy tất cả phân loại của sản phẩm này
+            const ctspRes = await client.query(
+                'SELECT ctsp_ma FROM chitietsanpham WHERE sp_ma = $1',
+                [sp_ma]
+            );
+            if (ctspRes.rows.length === 0) {
+                throw new Error('Sản phẩm không có phân loại nào.');
+            }
+
+            let submittedCount = 0;
+
+            for (const row of ctspRes.rows) {
+                const ctsp_ma = row.ctsp_ma;
+
+                // Lấy trạng thái mới nhất
+                const latestStatusRes = await client.query(
+                    `SELECT ttctsp_ma FROM chitiettrangthaisanpham 
+                     WHERE ctsp_ma = $1 ORDER BY ctttsp_thoidiem DESC LIMIT 1`,
+                    [ctsp_ma]
+                );
+                const currentStatus = latestStatusRes.rows[0]?.ttctsp_ma;
+
+                // Chỉ gửi duyệt nếu chưa từng gửi (null) hoặc đang bị đình chỉ (0003)
+                if (!currentStatus || currentStatus === 'TTCTSP0003') {
+                    await client.query(
+                        `INSERT INTO chitiettrangthaisanpham 
+                            (stmdt_ma, ttctsp_ma, ctsp_ma, ctttsp_thoidiem, ctttsp_yeucau, ctttsp_phanhoi)
+                         VALUES ($1, 'TTCTSP0001', $2, CURRENT_TIMESTAMP, $3, null)`,
+                        [stmdt_ma, ctsp_ma, 'Yêu cầu duyệt hàng loạt từ Shop']
+                    );
+                    submittedCount++;
+                }
+            }
+
+            await client.query('COMMIT');
+            return { count: submittedCount };
+        } catch (error) {
+            await client.query('ROLLBACK');
+            throw error;
+        } finally {
+            client.release();
+        }
+    },
 };
 
 module.exports = TrangThaiChiTietSanPhamModel;

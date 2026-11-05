@@ -122,7 +122,11 @@ const QuanLySanPham = () => {
     {
       key: "th_ma",
       label: "Thương hiệu",
-      options: brands.map((b) => ({ value: b.th_ma, label: b.th_ten })),
+      options: brands.map((b) => ({
+        value: b.th_ma,
+        label: b.th_ten,
+        logo: b.th_hinhanh || b.th_logo, // 🟢 Truyền thêm đường dẫn ảnh (tùy thuộc vào tên cột trong DB của bạn)
+      })),
     },
     {
       key: "dmsp_ma",

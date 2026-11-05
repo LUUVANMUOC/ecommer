@@ -7,6 +7,11 @@ const ThuongHieuService = {
         return await ThuongHieuModel.getAll();
     },
 
+    // 🟢 THÊM HÀM NÀY
+    getByShop: async (gh_ma) => {
+        return await ThuongHieuModel.getByShop(gh_ma);
+    },
+
     getById: async (id) => {
         const item = await ThuongHieuModel.getById(id);
         if (!item) throw new Error('Không tìm thấy thương hiệu này!');
@@ -37,16 +42,12 @@ const ThuongHieuService = {
         const existing = await ThuongHieuModel.getById(id);
         if (!existing) throw new Error('Không tìm thấy thương hiệu để cập nhật!');
         
-        // Xử lý xóa ảnh cũ nếu có ảnh mới
         if (data.th_hinhanh && existing.th_hinhanh && data.th_hinhanh !== existing.th_hinhanh) {
             try {
                 const fileName = path.basename(existing.th_hinhanh);
-                // Đường dẫn lùi 3 cấp để ra ngoài thư mục src, trỏ vào public/uploads/brands
                 const filePath = path.join(__dirname, '../../../public/uploads/brands', fileName);
-                
                 if (fs.existsSync(filePath)) {
                     fs.unlinkSync(filePath);
-                    console.log(`[UPDATE] Đã xóa icon cũ: ${fileName}`);
                 }
             } catch (error) {
                 console.error("Lỗi khi xóa icon cũ:", error);
@@ -71,18 +72,14 @@ const ThuongHieuService = {
         if (existing.th_hinhanh) {
             try {
                 const fileName = path.basename(existing.th_hinhanh);
-                // Lùi 3 cấp
                 const filePath = path.join(__dirname, '../../../public/uploads/brands', fileName);
-                
                 if (fs.existsSync(filePath)) {
                     fs.unlinkSync(filePath);
-                    console.log(`[DELETE] Đã xóa file icon: ${fileName}`);
                 }
             } catch (error) {
                 console.error("Lỗi khi xóa file icon:", error);
             }
         }
-
         return deletedRecord;
     }
 };

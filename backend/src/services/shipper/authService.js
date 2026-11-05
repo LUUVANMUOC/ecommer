@@ -1,4 +1,3 @@
-// backend/src/services/shipper/authService.js
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const ShipperAuthModel = require('../../models/shipper/authModel');
@@ -6,8 +5,6 @@ require('dotenv').config();
 
 const ShipperAuthService = {
   loginShipper: async (sdt, password) => {
-    console.log('--- BẮT ĐẦU ĐĂNG NHẬP SHIPPER ---');
-
     const shipper = await ShipperAuthModel.findBySdt(sdt);
     if (!shipper) {
       throw new Error('Số điện thoại hoặc mật khẩu không đúng!');
@@ -48,6 +45,25 @@ const ShipperAuthService = {
         role: 'shipper'
       }
     };
+  },
+
+  // 🟢 Hàm đổi mật khẩu
+  changePassword: async (shipper_ma, oldPassword, newPassword) => {
+    const shipper = await ShipperAuthModel.findById(shipper_ma);
+    if (!shipper) throw new Error('Không tìm thấy tài khoản shipper!');
+
+    // 1. Kiểm tra mật khẩu cũ
+    const isMatch = await bcrypt.compare(oldPassword, shipper.shipper_hashpass);
+    if (!isMatch) throw new Error('Mật khẩu hiện tại không chính xác!');
+
+    // 2. Hash mật khẩu mới
+    const salt = await bcrypt.genSalt(10);
+    const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+    // 3. Cập nhật vào DB
+    await ShipperAuthModel.updatePassword(shipper_ma, hashedPassword);
+
+    return { message: 'Đổi mật khẩu thành công!' };
   }
 };
 

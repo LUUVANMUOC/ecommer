@@ -31,6 +31,9 @@ const ChiTietSanPhamKhachHang = () => {
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
 
+  // 🟢 State số lượng
+  const [quantity, setQuantity] = useState(1);
+
   // State cho Like
   const [isLiked, setIsLiked] = useState(false);
   const [liking, setLiking] = useState(false);
@@ -90,10 +93,40 @@ const ChiTietSanPhamKhachHang = () => {
     product?.variants.find((v) => v.ctsp_ma === activeVariantId) ||
     product?.variants[0];
 
+  // 🟢 Reset số lượng về 1 khi đổi phân loại
+  useEffect(() => {
+    setQuantity(1);
+  }, [activeVariantId]);
+
+  // 🟢 LOGIC ĐẾM 30 GIÂY ĐỂ TÍNH LƯỢT XEM
+  useEffect(() => {
+    if (!activeVariant?.ctsp_ma) return;
+
+    const timer = setTimeout(() => {
+      publicSanPhamService
+        .recordView({
+          ctsp_ma: activeVariant.ctsp_ma,
+          kh_ma: user?.kh_ma || null,
+        })
+        .catch((err) => console.log("Lỗi lưu lượt xem:", err));
+    }, 30000); // 30.000 ms = 30 giây
+
+    return () => clearTimeout(timer);
+  }, [activeVariant?.ctsp_ma, user?.kh_ma]);
+
   const handleSelectVariant = (variant) => {
     setActiveVariantId(variant.ctsp_ma);
     setActiveImageIdx(0);
     setSearchParams({ ctsp_ma: variant.ctsp_ma });
+  };
+
+  // 🟢 Hàm xử lý tăng/giảm số lượng
+  const handleQuantityChange = (val) => {
+    const newQty = quantity + val;
+    const maxStock = activeVariant?.ctsp_soluongton || 0;
+    if (newQty >= 1 && newQty <= maxStock) {
+      setQuantity(newQty);
+    }
   };
 
   // Xử lý Thả tim
@@ -127,19 +160,49 @@ const ChiTietSanPhamKhachHang = () => {
       return navigate("/khach-hang/login");
     if (activeVariant?.ctsp_soluongton <= 0)
       return showToast("Hết hàng", "error");
+
+    // 🟢 XỬ LÝ KHI BẤM NÚT "MUA NGAY"
+    if (isBuyNow) {
+      // 1. Tạo object giả lập y hệt cấu trúc của một item trong Giỏ Hàng
+      const buyNowItem = {
+        gh_ma: product.gh_ma,
+        gh_ten: product.gh_ten,
+        sp_ma: product.sp_ma,
+        sp_ten: product.sp_ten,
+        ctsp_ma: activeVariant.ctsp_ma,
+        ctsp_ten: activeVariant.ctsp_ten,
+        image: activeVariant.images?.[0]?.hasp_link || "", // Lấy đường dẫn ảnh (không cần ghép Backend_URL)
+        ctsp_gianban: activeVariant.ctsp_gianban,
+        ctgh_soluong: quantity, // Số lượng bạn đã chọn bằng nút +/-
+        ctsp_soluongton: activeVariant.ctsp_soluongton,
+      };
+
+      // 2. Tính tổng tiền (để đề phòng trang Thanh Toán có dùng)
+      const totalPrice = Number(activeVariant.ctsp_gianban) * quantity;
+
+      // 3. Chuyển thẳng sang trang Thanh Toán
+      navigate("/khach-hang/thanh-toan", {
+        state: {
+          checkoutItems: [buyNowItem],
+          totalPrice: totalPrice,
+        },
+      });
+      return;
+    }
+
+    // 🟢 XỬ LÝ KHI BẤM NÚT "THÊM VÀO GIỎ"
     try {
       await gioHangService.addToCart({
         kh_ma: user.kh_ma,
         ctsp_ma: activeVariant.ctsp_ma,
-        soluong: 1,
+        soluong: quantity,
       });
       showToast("Đã thêm vào giỏ hàng!");
       gioHangService
         .getCartCount(user.kh_ma)
         .then((res) => setCartCount(res.data.total));
-      if (isBuyNow) navigate("/khach-hang/gio-hang");
     } catch (error) {
-      showToast("Lỗi!", "error");
+      showToast(error.response?.data?.message || "Lỗi!", "error");
     }
   };
 
@@ -269,7 +332,6 @@ const ChiTietSanPhamKhachHang = () => {
                 {product.sp_diemdanhgiatrungbinh || 0}
               </span>
               <div className="w-px h-4 bg-[#E2E8F0]"></div>
-              {/* ✅ ĐÃ SỬA DÒNG DƯỚI ĐÂY */}
               <span>
                 Đã bán {activeVariant?.ctsp_luotmua || product.sp_luotmua || 0}
               </span>
@@ -313,17 +375,28 @@ const ChiTietSanPhamKhachHang = () => {
                 <span className="w-24 text-sm font-semibold text-[#64748B]">
                   Số lượng:
                 </span>
+                {/* 🟢 CẬP NHẬT NÚT TĂNG GIẢM */}
                 <div className="flex items-center border border-[#E2E8F0] rounded-xl overflow-hidden bg-white">
-                  <button className="px-4 py-2 hover:bg-[#F8FAFC] text-[#334155] transition-colors border-r border-[#E2E8F0]">
+                  <button
+                    onClick={() => handleQuantityChange(-1)}
+                    disabled={
+                      quantity <= 1 || activeVariant?.ctsp_soluongton <= 0
+                    }
+                    className="px-4 py-2 hover:bg-[#F8FAFC] text-[#334155] transition-colors border-r border-[#E2E8F0] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
                     -
                   </button>
                   <input
                     type="text"
-                    value="1"
+                    value={quantity}
                     className="w-14 text-center text-sm font-bold text-[#0F172A] outline-none"
                     readOnly
                   />
-                  <button className="px-4 py-2 hover:bg-[#F8FAFC] text-[#334155] transition-colors border-l border-[#E2E8F0]">
+                  <button
+                    onClick={() => handleQuantityChange(1)}
+                    disabled={quantity >= (activeVariant?.ctsp_soluongton || 0)}
+                    className="px-4 py-2 hover:bg-[#F8FAFC] text-[#334155] transition-colors border-l border-[#E2E8F0] disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
                     +
                   </button>
                 </div>
@@ -357,29 +430,37 @@ const ChiTietSanPhamKhachHang = () => {
         </div>
 
         <div className="bg-white rounded-3xl shadow-sm border border-[#E2E8F0] p-5 flex items-center justify-between mb-6">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full border-2 border-blue-100 overflow-hidden bg-[#F8FAFC] p-1">
+          {/* 🟢 ĐÃ BỌC LINK ĐỂ CHUYỂN SANG TRANG SHOP */}
+          <Link
+            to={`/shop/${product.gh_ma}`}
+            className="flex items-center gap-4 cursor-pointer group"
+          >
+            <div className="w-14 h-14 rounded-full border-2 border-blue-100 overflow-hidden bg-[#F8FAFC] p-1 group-hover:border-[#2563EB] transition-colors">
               <img
                 src={
                   product.gh_hinhanh
                     ? `${BACKEND_URL}${product.gh_hinhanh}`
-                    : ""
+                    : "https://placehold.co/100x100"
                 }
                 className="w-full h-full object-cover rounded-full"
               />
             </div>
             <div>
-              <h3 className="font-bold text-[#0F172A] text-lg flex items-center gap-1">
+              <h3 className="font-bold text-[#0F172A] text-lg flex items-center gap-1 group-hover:text-[#2563EB] transition-colors">
                 {product.gh_ten}{" "}
                 <span className="material-symbols-outlined text-[16px] text-[#2563EB]">
                   verified
                 </span>
               </h3>
-              <p className="text-xs font-medium text-[#64748B]">
-                Mã Shop: {product.gh_ma}
+              <p className="text-xs font-medium text-[#64748B] flex items-center gap-1 mt-0.5 group-hover:text-[#2563EB] transition-colors">
+                Xem Shop{" "}
+                <span className="material-symbols-outlined text-[14px]">
+                  arrow_forward_ios
+                </span>
               </p>
             </div>
-          </div>
+          </Link>
+
           <div className="flex gap-2">
             <button
               onClick={async () => {
