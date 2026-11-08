@@ -15,7 +15,7 @@ const ShopDashboard = () => {
       children: [
         {
           title: "Danh mục sản phẩm",
-          path: "/nguoi-ban/danh-muc-san-pham", // Trỏ tới trang index
+          path: "/nguoi-ban/danh-muc-san-pham",
         },
         {
           title: "Quản lý Sản phẩm",
@@ -29,21 +29,13 @@ const ShopDashboard = () => {
           title: "Mã giảm giá của Shop",
           path: "/nguoi-ban/ma-giam-gia-shop",
         },
+        // 🟢 Thêm mục Lịch sử nhận tiền vào đây
+        {
+          title: "Lịch sử nhận tiền",
+          path: "/nguoi-ban/lich-su-dong-tien",
+        },
       ],
     },
-    // {
-    //   title: "Cấu hình hệ thống",
-    //   children: [
-    //     {
-    //       title: "Cài đặt gian hàng",
-    //       path: "/nguoi-ban/cai-dat",
-    //     },
-    //     {
-    //       title: "Quản lý đánh giá",
-    //       path: "/nguoi-ban/danh-gia",
-    //     },
-    //   ],
-    // },
     {
       title: "Hỗ trợ",
       children: [
@@ -57,12 +49,12 @@ const ShopDashboard = () => {
       title: "Thông tin cửa hàng",
       children: [
         {
-          title: "Hồ sơ cửa hàng", // Sửa lại tên cho chuyên nghiệp
-          path: "/nguoi-ban/thong-tin-cua-hang", // Đã sửa: Thêm tiền tố /nguoi-ban/
+          title: "Hồ sơ cửa hàng",
+          path: "/nguoi-ban/thong-tin-cua-hang",
         },
         {
-          title: "Vận chuyển", // Sửa lại tên cho chuyên nghiệp
-          path: "/nguoi-ban/van-chuyen", // Đã sửa: Thêm tiền tố /nguoi-ban/
+          title: "Vận chuyển",
+          path: "/nguoi-ban/van-chuyen",
         },
       ],
     },
@@ -70,13 +62,13 @@ const ShopDashboard = () => {
 
   // 2. Cấu hình Màu sắc riêng cho Shop (Màu cam đất, tối giản)
   const shopTheme = {
-    sidebarBg: "#1e293b", // Màu nền xám đậm
-    sidebarText: "#e2e8f0", // Màu chữ sáng
-    menuHoverBg: "#334155", // Màu khi di chuột
-    menuActiveBg: "#ea580c", // Màu cam khi chọn (Orange-600)
-    menuActiveText: "#ffffff", // Màu chữ khi chọn
-    borderColor: "#334155", // Màu đường viền
-    logoutBtnColor: "#ef4444", // Màu nút đăng xuất
+    sidebarBg: "#1e293b",
+    sidebarText: "#e2e8f0",
+    menuHoverBg: "#334155",
+    menuActiveBg: "#ea580c",
+    menuActiveText: "#ffffff",
+    borderColor: "#334155",
+    logoutBtnColor: "#ef4444",
   };
 
   const handleLogout = () => {

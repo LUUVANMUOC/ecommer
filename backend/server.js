@@ -7,12 +7,15 @@ const pool = require('./src/config/db');
 const axios = require('axios'); 
 
 // ================= 1. IMPORT ROUTES =================
+const thanhToanVanChuyenRoutes = require('./src/routes/san/thanhToanVanChuyenRoutes');
+const phiVanChuyenRoutes = require('./src/routes/san/phiVanChuyenRoutes');
 
 // Auth & Sàn
 const sanAuthRoutes = require('./src/routes/san/authRoutes');
 const gianHangAuthRoutes = require('./src/routes/gianhang/gianHangAuthRoutes'); 
 const dvvcAuthRoutes = require('./src/routes/dvvc/authRoutes');
-const sanThuongMaiRoutes = require('./src/routes/san/sanThuongMaiRoutes'); 
+const sanThuongMaiRoutes = require('./src/routes/san/sanThuongMaiRoutes');
+const adminDonHangRoutes = require('./src/routes/san/adminDonHangRoutes');
 
 // Danh mục & Hệ thống
 const tinhRoutes = require('./src/routes/san/tinhRoutes');
@@ -24,13 +27,14 @@ const phiChiecKhauRoutes = require('./src/routes/san/phiChiecKhauRoutes');
 const nganhHangRoutes = require('./src/routes/san/nganhHangRoutes');
 const gianHangKienNghiRoutes = require('./src/routes/san/gianHangKienNghiRoutes');
 const loaiShipperRoutes = require('./src/routes/san/loaiShipperRoutes');
-
+const dongTienRoutes = require('./src/routes/san/dongTienRoutes');
 // Mã giảm giá
 const maGiamGiaSanRoutes = require('./src/routes/san/maGiamGiaSanRoutes');
 const maGiamGiaVanChuyenRoutes = require('./src/routes/san/maGiamGiaVanChuyenRoutes');
 const maGiamGiaShopRoutes = require('./src/routes/gianhang/maGiamGiaShopRoutes');
 
 // Quản lý kho
+const phieuKhoRoutes = require('./src/routes/quanlykho/phieuKhoRoutes');
 const quanLyKhoAuthRoutes = require('./src/routes/quanlykho/authRoutes');
 const quanLyKhoShipperRoutes = require('./src/routes/quanlykho/shipperRoutes');
 const quanLyKhoPhanCongRoutes = require('./src/routes/quanlykho/phanCongRoutes');
@@ -81,26 +85,41 @@ const donHangRoutes = require('./src/routes/khachhang/donHangRoutes');
 const trangThaiDonHangRoutes = require('./src/routes/san/trangThaiDonHangRoutes');
 const phiVanChuyenController = require('./src/controllers/khachhang/phiVanChuyenController');
 
-// Bổ sung Import cho Cron đối soát SePay
-const sepayConfig = require('./src/config/sepayConfig');
+// Bổ sung Import cho Cron & Xử lý
 const TatToanModel = require('./src/models/quanlykho/tatToanModel');
+const quanLyDongTienRoutes = require('./src/routes/san/quanLyDongTienRoutes');
 
-// ================= 2. KHỞI TẠO APP & MIDDLEWARE =================
-const app = express(); // Khởi tạo app ĐẦU TIÊN
+// ================= 2. KHỞI TẠO APP =================
+const app = express(); 
 
-// ================= 3. CẤU HÌNH WEBHOOK (PHẢI ĐẶT TRƯỚC express.json) =================
+// ================= 3. CẤU HÌNH WEBHOOK (BẮT BUỘC ĐẶT TRƯỚC express.json) =================
+// Lưu ý: express.raw() phải được dùng ở đây để lấy raw body cho việc xác thực HMAC
+
+// 🟢 Route Webhook Động dành cho từng Shop (Truyền :gh_ma trên URL)
+app.post(
+  '/api/webhook/sepay/:gh_ma',
+  express.raw({ type: 'application/json' }),
+  require('./src/controllers/quanlykho/webhookSepayController').handleShopWebhook
+);
+app.post(
+  '/api/webhook/sepay/dvvc/:dvvc_ma',
+  express.raw({ type: 'application/json' }),
+  require('./src/controllers/quanlykho/webhookSepayController').handleDvvcWebhook
+);
+
+// 🟢 Route Webhook Cũ (Dành cho Sàn, giữ lại để không lỗi)
 app.post(
   '/api/webhook/sepay',
   express.raw({ type: 'application/json' }),
   require('./src/controllers/quanlykho/webhookSepayController').handle
 );
 
-// Các Middleware toàn cục
+// ================= 4. MIDDLEWARE TOÀN CỤC =================
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
 app.use(cors()); 
 app.use(express.json()); 
 
-// ================= 4. KHAI BÁO ROUTES =================
+// ================= 5. KHAI BÁO ROUTES =================
 
 // 1. Auth & Người dùng
 app.use('/api/auth', sanAuthRoutes); 
@@ -117,9 +136,10 @@ app.use('/api/ngan-hang', nganHangRoutes);
 app.use('/api/thuong-hieu', thuongHieuRoutes);
 app.use('/api/thuoc-tinh-san-pham', thuocTinhSanPhamRoutes);
 app.use('/api/phi-chiec-khau', phiChiecKhauRoutes);
-app.use('/api/nganh-hang', nganhHangRoutes);
+app.use('/api/nganh-hang', nganHangRoutes);
 app.use('/api/kien-nghi', gianHangKienNghiRoutes);
 app.use('/api/loai-shipper', loaiShipperRoutes);
+app.use('/api/admin/don-hang', adminDonHangRoutes);
 
 // 3. Mã giảm giá
 app.use('/api/ma-giam-gia-san', maGiamGiaSanRoutes);
@@ -136,6 +156,10 @@ app.use('/api/trang-thai-chi-tiet', trangThaiChiTietSanPhamRoutes);
 app.use('/api/nguoi-ban/van-chuyen', vanChuyenShopRoutes);
 app.use('/api/nguoi-ban/don-hang', donHangShopRoutes);
 app.use('/api/san-pham', publicSanPhamRoutes);
+app.use('/api/admin/thanh-toan-van-chuyen', thanhToanVanChuyenRoutes);
+
+// 🟢 Route Admin quản lý dòng tiền
+app.use('/api/admin/dong-tien', quanLyDongTienRoutes);
 
 // 5. Quản lý Kho (QLK)
 app.use('/api/quan-ly-kho/shipper', quanLyKhoShipperRoutes);
@@ -144,7 +168,8 @@ app.use('/api/quan-ly-kho/trung-chuyen', quanLyKhoTrungChuyenRoutes);
 app.use('/api/quan-ly-kho/phan-cong-giao-hang', quanLyKhoPhanCongGiaoHangRoutes);
 app.use('/api/quan-ly-kho/lich-su', quanLyKhoLichSuRoutes);
 app.use('/api/quan-ly-kho/thu-tien-shipper', qlkThuTienShipperRoutes); 
-app.use('/api/quan-ly-kho/tat-toan', qlkTatToanRoutes);               
+app.use('/api/quan-ly-kho/tat-toan', qlkTatToanRoutes);   
+app.use('/api/quan-ly-kho/phieu-kho', phieuKhoRoutes);
 
 // 6. Đơn vị vận chuyển (DVVC)
 app.use('/api/dvvc/bang-gia', bangGiaVanChuyenRoutes); 
@@ -171,58 +196,17 @@ app.use('/api/khach-hang/ma-giam-gia-shop', maGiamGiaShopRoutesKH);
 app.use('/api/khach-hang/dat-hang', datHangRoutes);
 app.use('/api/khach-hang/don-hang', donHangRoutes);
 app.post('/api/khach-hang/tinh-phi-ship', phiVanChuyenController.calculateFee);
+app.use('/api/dong-tien', dongTienRoutes);
+app.use('/api/phi-van-chuyen', phiVanChuyenRoutes);
 
 // 9. Trạng thái đơn hàng
 app.use('/api/trang-thai-don-hang', trangThaiDonHangRoutes);
 
 // ==========================================
-// 5. CRONJOB
+// 6. CRONJOB
 // ==========================================
 
-// 5.1. Cron đối soát SePay (30 phút/lần)
-cron.schedule('*/30 * * * *', async () => {
-  try {
-    const now = new Date();
-    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-    const fmt = (d) => d.toISOString().replace('T', ' ').substring(0, 19);
-
-    const res = await axios.get(
-      `${sepayConfig.apiBaseUrl}/userapi/transactions/list`,
-      {
-        params: {
-          transaction_date_min: fmt(oneHourAgo),
-          transaction_date_max: fmt(now),
-          limit: 5000,
-        },
-        headers: {
-          Authorization: `Bearer ${sepayConfig.apiToken}`,
-        },
-      }
-    );
-
-    const transactions = res.data?.transactions || res.data || [];
-    let recovered = 0;
-
-    for (const tx of transactions) {
-      if (tx.transferType !== 'in') continue;
-      const result = await TatToanModel.xuLyWebhook(tx);
-      if (result.success) recovered++;
-    }
-
-    if (recovered > 0) {
-      console.log(`🔄 [RECONCILE] Phục hồi ${recovered} giao dịch bị lỡ.`);
-    }
-  } catch (error) {
-    // 🟢 Xử lý riêng lỗi 520 (SePay đang bảo trì/quá tải) để không spam Terminal
-    if (error.response && error.response.status === 520) {
-      console.log('⚠️ [RECONCILE] SePay đang bảo trì (Lỗi 520), sẽ thử lại sau 30 phút.');
-    } else {
-      console.error('❌ [RECONCILE] Lỗi:', error.message);
-    }
-  }
-});
-
-// 5.2. Cron tự động dọn dẹp phiếu tất toán quá hạn 2 phút (chạy mỗi phút)
+// 6.1. Cron tự động dọn dẹp phiếu tất toán quá hạn 2 phút (chạy mỗi phút)
 cron.schedule('* * * * *', async () => {
   try {
     await TatToanModel.donDepPhieuQuaHan();
@@ -231,7 +215,7 @@ cron.schedule('* * * * *', async () => {
   }
 });
 
-// 5.3. Cron tự động cập nhật trạng thái Voucher (1 phút/lần)
+// 6.2. Cron tự động cập nhật trạng thái Voucher (1 phút/lần)
 cron.schedule('* * * * *', async () => {
     try {
         const querySan = `
@@ -299,10 +283,10 @@ cron.schedule('* * * * *', async () => {
     }
 });
 
-// ================= 6. START SERVER =================
+// ================= 7. START SERVER =================
 const PORT = process.env.PORT || 8080; 
 app.listen(PORT, () => {
     console.log(`🚀 Server Backend đang chạy ở cổng ${PORT}`);
     console.log(`🔗 API URL: http://localhost:${PORT}/api/auth`);
-    console.log(`⏰ Cronjobs đã được bật (Voucher, Dọn dẹp phiếu, Đối soát SePay).`);
+    console.log(`⏰ Cronjobs đã được bật (Voucher, Dọn dẹp phiếu).`);
 });

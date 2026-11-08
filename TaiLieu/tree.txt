@@ -1,0 +1,21 @@
+Folder PATH listing for volume New Volume
+Volume serial number is E6B6-35FA
+D:.
+    backup_2_bang.sql
+    backup_cautruc_cacbang.sql
+    backup_tables.sql
+    backup_toanbo.sql
+    cdm2.png
+    gan_ma_xa.py
+    gen_sql_diachi_kho.py
+    insert_diachi.sql
+    insert_diachi_kho.sql
+    link_xa_co_ma.csv
+    link_xa_o_to.csv
+    tao_link_xa.py
+    tree.txt
+    xa_link.csv
+    xa_link.xlsx
+    
+No subfolders exist 
+

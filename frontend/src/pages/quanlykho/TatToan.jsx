@@ -14,7 +14,6 @@ const TatToan = () => {
   const [showQR, setShowQR] = useState(false);
   const [pttMa, setPttMa] = useState(null);
   const [qrStatuses, setQrStatuses] = useState({});
-
   const [selectedDtsMa, setSelectedDtsMa] = useState([]);
   const [timeLeft, setTimeLeft] = useState(120);
 
@@ -37,7 +36,6 @@ const TatToan = () => {
         setSelectedDtsMa(res.data.orders.map((o) => o.DTS_Ma));
       }
     } catch (err) {
-      console.error(err);
       showToast("Lỗi tải dữ liệu", "error");
     } finally {
       setLoading(false);
@@ -48,15 +46,11 @@ const TatToan = () => {
     fetchData();
   }, [kho_ma]);
 
-  // Đếm ngược thời gian
   useEffect(() => {
     if (!showQR) return;
     if (timeLeft <= 0) {
       setShowQR(false);
-      showToast(
-        "Mã QR đã hết hạn do quá 2 phút. Các đơn hàng đã được trả lại danh sách.",
-        "error",
-      );
+      showToast("Mã QR đã hết hạn do quá 2 phút. Vui lòng tạo lại.", "error");
       fetchData();
       return;
     }
@@ -64,6 +58,7 @@ const TatToan = () => {
     return () => clearInterval(timerId);
   }, [showQR, timeLeft]);
 
+  // Tính toán danh sách tiền của từng Shop
   const { tongSanHienTai, tongShopHienTai, danhSachShopQR } = useMemo(() => {
     if (!data || !data.orders)
       return { tongSanHienTai: 0, tongShopHienTai: 0, danhSachShopQR: {} };
@@ -112,12 +107,12 @@ const TatToan = () => {
     );
   };
 
-  // Polling cập nhật trạng thái thanh toán từng mã
   const startPolling = (ma) => {
     const interval = setInterval(async () => {
       try {
         const res = await qlkTaiChinhService.getTrangThaiTatToan(ma);
 
+        // Cập nhật trạng thái cho từng mã QR
         const statuses = {};
         res.data.ds_qr.forEach((qr) => {
           statuses[qr.qr_ma] = qr.qr_trang_thai;
@@ -144,7 +139,6 @@ const TatToan = () => {
         "error",
       );
     }
-
     try {
       const selectedOrdersData = data.orders.filter((o) =>
         selectedDtsMa.includes(o.DTS_Ma),
@@ -224,7 +218,7 @@ const TatToan = () => {
           Tất Toán Dòng Tiền
         </h1>
         <p className="text-sm text-[#64748B] mt-1">
-          Chọn các đơn hàng bên dưới để tính toán và tạo mã QR thanh toán
+          Chọn các đơn hàng bên dưới để tính toán và tạo mã QR thanh toán.
         </p>
       </div>
 
@@ -255,16 +249,12 @@ const TatToan = () => {
                 <th className="p-3 w-12 text-center">
                   <input
                     type="checkbox"
-                    className="w-4 h-4 cursor-pointer"
                     checked={selectedDtsMa.length === data.orders.length}
                     onChange={handleSelectAll}
                   />
                 </th>
                 <th className="p-3 font-semibold text-gray-600">Mã Đơn</th>
                 <th className="p-3 font-semibold text-gray-600">Gian Hàng</th>
-                <th className="p-3 font-semibold text-gray-600 text-right">
-                  Tiền Hàng
-                </th>
                 <th className="p-3 font-semibold text-gray-600 text-right">
                   Phí Sàn
                 </th>
@@ -284,16 +274,12 @@ const TatToan = () => {
                   <td className="p-3 text-center">
                     <input
                       type="checkbox"
-                      className="w-4 h-4 cursor-pointer"
                       checked={selectedDtsMa.includes(o.DTS_Ma)}
                       onChange={() => handleSelectOne(o.DTS_Ma)}
                     />
                   </td>
                   <td className="p-3 font-medium text-gray-800">{o.DTS_Ma}</td>
                   <td className="p-3 text-gray-600">{o.TenShop}</td>
-                  <td className="p-3 text-right text-gray-800">
-                    {formatVND(o.TienHang)}
-                  </td>
                   <td className="p-3 text-right text-red-600">
                     {formatVND(o.PhiSan)}
                   </td>
@@ -330,7 +316,6 @@ const TatToan = () => {
                   Vui lòng thanh toán trước khi hết thời gian
                 </p>
               </div>
-
               <div className="flex items-center gap-4">
                 <div
                   className={`px-4 py-2 rounded-xl font-bold text-lg flex items-center gap-2 ${timeLeft <= 30 ? "bg-red-100 text-red-600 animate-pulse" : "bg-orange-100 text-orange-600"}`}

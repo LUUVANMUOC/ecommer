@@ -1,7 +1,7 @@
 const pool = require('../../config/db');
 
 const ThongTinNhanTienModel = {
-    // 1. Lấy thông tin nhận tiền (Chỉ lấy 1 dòng duy nhất)
+    // 1. Lấy thông tin nhận tiền
     getByGianHang: async (gh_ma) => {
         try {
             const query = `
@@ -10,6 +10,7 @@ const ThongTinNhanTienModel = {
                     tt.nh_ma, 
                     tt.ttnt_gianhang_tentaikhoan,
                     tt.ttnt_gianhang_sotaikhoan,
+                    tt.sepay_webhook_secret, -- 🟢 Đã thêm cột này
                     nh.nhg_ten,
                     nh.nhg_logo
                 FROM thongtinnhantien_gianhang tt
@@ -25,31 +26,33 @@ const ThongTinNhanTienModel = {
         }
     },
 
-    // 2. Lưu thông tin (Xóa tài khoản cũ của shop, thêm tài khoản mới)
+    // 2. Lưu thông tin
     createOrUpdate: async (data) => {
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
 
-            // Xóa tài khoản cũ (nếu có) để đảm bảo mỗi shop chỉ có 1 tài khoản
+            // Xóa tài khoản cũ (nếu có)
             await client.query('DELETE FROM thongtinnhantien_gianhang WHERE gh_ma = $1', [data.gh_ma]);
 
-            // Thêm tài khoản mới
+            // Thêm tài khoản mới (Đã thêm trường sepay_webhook_secret)
             const query = `
                 INSERT INTO thongtinnhantien_gianhang (
                     gh_ma, 
                     nh_ma, 
                     ttnt_gianhang_tentaikhoan, 
-                    ttnt_gianhang_sotaikhoan
+                    ttnt_gianhang_sotaikhoan,
+                    sepay_webhook_secret -- 🟢 Đã thêm cột này
                 )
-                VALUES ($1, $2, $3, $4)
+                VALUES ($1, $2, $3, $4, $5)
                 RETURNING *
             `;
             const result = await client.query(query, [
                 data.gh_ma, 
                 data.nh_ma, 
                 data.ttnt_gianhang_tentaikhoan,
-                data.ttnt_gianhang_sotaikhoan
+                data.ttnt_gianhang_sotaikhoan,
+                data.sepay_webhook_secret // 🟢 Truyền dữ liệu vào
             ]);
 
             await client.query('COMMIT');

@@ -8,15 +8,12 @@ const AdminDashboard = () => {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  // 1. Cấu hình Menu (Lưu ý: Đổi 'id' thành 'path' để khớp với URL)
+  // 1. Cấu hình Menu
   const adminMenu = [
     {
       title: "Thông tin hệ thống",
       children: [
-        {
-          title: "Phí Chiếc Khấu",
-          path: "/admin/phi-chiec-khau",
-        },
+        { title: "Phí Chiếc Khấu", path: "/admin/phi-chiec-khau" },
         { title: "Thuộc tính sản phẩm", path: "/admin/thuoc-tinh-san-pham" },
         { title: "Thương hiệu", path: "/admin/thuong-hieu" },
         { title: "Mã giảm giá sàn", path: "/admin/ma-giam-gia-san" },
@@ -26,6 +23,7 @@ const AdminDashboard = () => {
         },
         { title: "Duyệt sản phẩm", path: "/admin/duyet-san-pham" },
         { title: "Quản lý sản phẩm", path: "/admin/quan-ly-san-pham" },
+        { title: "Quản lý Đơn hàng", path: "/admin/quan-ly-don-hang" },
       ],
     },
     {
@@ -36,18 +34,17 @@ const AdminDashboard = () => {
       title: "Thông tin sàn",
       path: "/admin/thong-tin-san",
     },
-    // {
-    //   title: "Quản lý người dùng",
-    //   children: [],
-    // },
-    // {
-    //   title: "Quản lý thông báo",
-    //   children: [],
-    // },
-    // {
-    //   title: "Quản lý kiến nghị",
-    //   children: [],
-    // },
+    {
+      title: "Quản lý dòng tiền",
+      path: "/admin/quan-ly-dong-tien",
+    },
+    // 🟢 THÊM MỤC MỚI TẠI ĐÂY
+    {
+      title: "Thanh toán Vận chuyển",
+      path: "/admin/thanh-toan-van-chuyen",
+    },
+    { title: "Lịch sử trả phí Ship", path: "/admin/lich-su-van-chuyen" },
+    { title: "Quản lý phí vận chuyển", path: "/admin/quan-ly-phi-van-chuyen" },
   ];
 
   // 2. Cấu hình Màu sắc riêng cho Admin
@@ -73,9 +70,7 @@ const AdminDashboard = () => {
       userName={user?.STMDTL_Ten || "Quản trị viên"}
       onLogout={handleLogout}
       theme={adminTheme}
-    >
-      {/* Không cần truyền children (hàm renderContent) vào đây nữa */}
-    </DashboardLayout>
+    ></DashboardLayout>
   );
 };
 

@@ -44,7 +44,17 @@ const DonHangShopController = {
     } catch (error) {
       res.status(400).json({ message: error.message });
     }
-  }
+  },
+  // Thêm hàm mới vào object
+  phanHoiDanhGia: async (req, res) => {
+    try {
+      const { dts_ma, ctsp_ma, kh_ma, phanhoi } = req.body;
+      const result = await DonHangShopModel.phanHoiDanhGia(dts_ma, ctsp_ma, kh_ma, phanhoi);
+      res.json(result);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
+  },
 };
 
 module.exports = DonHangShopController;

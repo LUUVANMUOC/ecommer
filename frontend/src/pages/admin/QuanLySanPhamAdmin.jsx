@@ -84,7 +84,6 @@ const QuanLySanPhamAdmin = () => {
     fetchData();
   }, []);
 
-  // 🟢 Gom nhóm dữ liệu thành Sản phẩm
   const groupedProducts = useMemo(() => {
     const grouped = rawData.reduce((acc, item) => {
       if (!acc[item.sp_ma]) {
@@ -102,15 +101,12 @@ const QuanLySanPhamAdmin = () => {
     return Object.values(grouped);
   }, [rawData]);
 
-  // 🟢 Áp dụng Bộ lọc
   const filteredProducts = useMemo(() => {
     return groupedProducts.filter((product) => {
       const matchSearch =
         product.sp_ten.toLowerCase().includes(searchTerm.toLowerCase()) ||
         product.gh_ten.toLowerCase().includes(searchTerm.toLowerCase());
-
       const matchShop = !filterShop || product.gh_ma === filterShop;
-
       const matchStatus =
         !filterStatus ||
         product.variants.some((v) =>
@@ -118,7 +114,6 @@ const QuanLySanPhamAdmin = () => {
             ? !v.ttctsp_ma
             : v.ttctsp_ma === filterStatus,
         );
-
       return matchSearch && matchShop && matchStatus;
     });
   }, [groupedProducts, searchTerm, filterShop, filterStatus]);
@@ -135,7 +130,6 @@ const QuanLySanPhamAdmin = () => {
   const handleConfirmSuspend = async () => {
     if (!modalAction.phanhoi.trim())
       return alert("Vui lòng nhập lý do đình chỉ!");
-
     setProcessing(true);
     try {
       await trangThaiChiTietSanPhamService.suspend(
@@ -144,11 +138,7 @@ const QuanLySanPhamAdmin = () => {
       );
       showToast(`Đã đình chỉ phân loại "${modalAction.ctsp_ten}"`);
       setModalAction({ isOpen: false });
-
-      // Load lại dữ liệu tổng
       fetchData();
-
-      // Cập nhật lại danh sách trong Modal đang mở (nếu có)
       if (selectedProduct) {
         setSelectedProduct((prev) => {
           if (!prev) return null;
@@ -169,7 +159,7 @@ const QuanLySanPhamAdmin = () => {
 
   return (
     <div className="w-full space-y-6">
-      {/* 🟢 HEADER & BỘ LỌC CƠ BẢN */}
+      {/* HEADER & BỘ LỌC CƠ BẢN */}
       <div className="bg-white p-5 rounded-2xl shadow-sm border border-[#E2DED3] flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#14201C]">
@@ -218,42 +208,30 @@ const QuanLySanPhamAdmin = () => {
         </div>
       </div>
 
-      {/* 🟢 THANH LỌC SHOP (Truyền thống) */}
+      {/* THANH LỌC SHOP */}
       <div className="bg-white px-5 py-3 rounded-2xl shadow-sm border border-[#E2DED3] flex items-center gap-3 overflow-x-auto custom-scrollbar">
         <span className="text-sm font-semibold text-[#7A857F] whitespace-nowrap flex items-center gap-1 pr-2 border-r border-[#E2DED3]">
           <span className="material-symbols-outlined text-[18px]">
             filter_alt
-          </span>
+          </span>{" "}
           Lọc Shop:
         </span>
-
-        {/* Nút Tất cả Shop */}
         <button
           onClick={() => setFilterShop("")}
-          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors border-2 ${
-            filterShop === ""
-              ? "border-[#F2A93B] bg-[#FDF3E1] text-[#8A5A0B]"
-              : "border-transparent bg-[#FBFAF7] text-[#5B6661] hover:border-[#E2DED3] hover:bg-[#F1EEE6]"
-          }`}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors border-2 ${filterShop === "" ? "border-[#F2A93B] bg-[#FDF3E1] text-[#8A5A0B]" : "border-transparent bg-[#FBFAF7] text-[#5B6661] hover:border-[#E2DED3] hover:bg-[#F1EEE6]"}`}
         >
           <span className="material-symbols-outlined text-[18px]">
             storefront
-          </span>
+          </span>{" "}
           Tất cả
         </button>
-
-        {/* Map các Shop */}
         {shops.map((shop) => {
           const isActive = filterShop === shop.gh_ma;
           return (
             <button
               key={shop.gh_ma}
               onClick={() => setFilterShop(shop.gh_ma)}
-              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-colors border-2 ${
-                isActive
-                  ? "border-[#F2A93B] bg-[#FDF3E1] text-[#8A5A0B]"
-                  : "border-transparent bg-[#FBFAF7] text-[#3D4A44] hover:border-[#E2DED3] hover:bg-[#F1EEE6]"
-              }`}
+              className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-colors border-2 ${isActive ? "border-[#F2A93B] bg-[#FDF3E1] text-[#8A5A0B]" : "border-transparent bg-[#FBFAF7] text-[#3D4A44] hover:border-[#E2DED3] hover:bg-[#F1EEE6]"}`}
             >
               <div className="w-7 h-7 rounded-full border border-gray-200 overflow-hidden bg-white shrink-0">
                 {shop.gh_hinhanh ? (
@@ -293,8 +271,6 @@ const QuanLySanPhamAdmin = () => {
           {filteredProducts.map((product) => {
             const firstVariant = product.variants[0];
             const coverImg = firstVariant?.main_image;
-
-            // Đếm số lượng phân loại theo trạng thái
             const countSuspended = product.variants.filter(
               (v) => v.ttctsp_ma === "TTCTSP0003",
             ).length;
@@ -351,7 +327,7 @@ const QuanLySanPhamAdmin = () => {
       {/* 🟢 MODAL CHI TIẾT SẢN PHẨM */}
       {selectedProduct && (
         <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
-          <div className="w-full max-w-5xl bg-[#F8FAFC] rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
+          <div className="w-full max-w-6xl bg-[#F8FAFC] rounded-2xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden">
             {/* Header Modal */}
             <div className="bg-white px-6 py-4 border-b border-[#E2DED3] flex items-center justify-between sticky top-0 z-10">
               <div className="flex items-center gap-4">
@@ -387,73 +363,154 @@ const QuanLySanPhamAdmin = () => {
               </button>
             </div>
 
-            {/* Body Modal: Danh sách Phân loại dạng Bảng */}
-            <div className="p-0 overflow-y-auto custom-scrollbar bg-white flex-1">
-              <table className="w-full text-left text-sm text-[#3D4A44]">
-                <thead className="bg-[#FBFAF7] text-xs uppercase text-[#7A857F] border-b border-[#E2DED3] sticky top-0 z-10">
-                  <tr>
-                    <th className="px-5 py-4 font-semibold">Phân loại</th>
-                    <th className="px-5 py-4 font-semibold">Giá khách trả</th>
-                    <th className="px-5 py-4 font-semibold">Tồn kho</th>
-                    <th className="px-5 py-4 font-semibold">Trạng thái</th>
-                    <th className="px-5 py-4 font-semibold text-right">
-                      Thao tác
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[#EFEBE2]">
-                  {selectedProduct.variants.map((item) => {
-                    const statusCfg =
-                      STATUS_CONFIG[item.ttctsp_ma] || STATUS_CONFIG.DEFAULT;
-                    const isSuspended = item.ttctsp_ma === "TTCTSP0003";
+            {/* Body Modal: Danh sách Phân loại dạng Thẻ (Card) chi tiết */}
+            <div className="p-6 overflow-y-auto custom-scrollbar bg-gray-50 flex-1 space-y-4">
+              {selectedProduct.variants.map((item) => {
+                const statusCfg =
+                  STATUS_CONFIG[item.ttctsp_ma] || STATUS_CONFIG.DEFAULT;
+                const isSuspended = item.ttctsp_ma === "TTCTSP0003";
 
-                    return (
-                      <tr
-                        key={item.ctsp_ma}
-                        className="hover:bg-[#FBFAF7]/50 transition-colors"
-                      >
-                        <td className="px-5 py-4">
-                          <p className="font-semibold text-[#14201C]">
-                            {item.ctsp_ten}
-                          </p>
-                          <p className="text-xs font-mono text-[#7A857F] mt-0.5">
-                            {item.ctsp_ma}
-                          </p>
-                        </td>
-                        <td className="px-5 py-4 font-semibold text-[#B42318]">
-                          {formatVND(item.ctsp_gianban)}
-                        </td>
-                        <td className="px-5 py-4 font-medium">
-                          {item.ctsp_soluongton}
-                        </td>
-                        <td className="px-5 py-4">
-                          <span
-                            className={`inline-block rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wider ${statusCfg.badge}`}
-                          >
-                            {statusCfg.label}
+                return (
+                  <div
+                    key={item.ctsp_ma}
+                    className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex flex-col md:flex-row gap-6"
+                  >
+                    {/* CỘT 1: Ảnh & Thông tin cơ bản */}
+                    <div className="flex gap-4 shrink-0 md:w-1/3">
+                      <div className="w-24 h-24 rounded-lg border border-gray-200 overflow-hidden bg-gray-50 shrink-0">
+                        {item.main_image ? (
+                          <img
+                            src={imgUrl(item.main_image)}
+                            className="w-full h-full object-cover"
+                            alt=""
+                          />
+                        ) : (
+                          <span className="flex h-full items-center justify-center material-symbols-outlined text-gray-300">
+                            image
                           </span>
-                        </td>
-                        <td className="px-5 py-4 text-right">
-                          <button
-                            onClick={() => handleOpenSuspend(item)}
-                            disabled={isSuspended}
-                            className={`inline-flex items-center gap-1 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
-                              isSuspended
-                                ? "bg-gray-100 text-gray-400 cursor-not-allowed"
-                                : "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200"
-                            }`}
+                        )}
+                      </div>
+                      <div>
+                        <span
+                          className={`inline-block rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider mb-2 ${statusCfg.badge}`}
+                        >
+                          {statusCfg.label}
+                        </span>
+                        <p className="font-bold text-lg text-[#14201C] leading-tight">
+                          {item.ctsp_ten}
+                        </p>
+                        <p className="text-xs font-mono text-gray-500 mt-1">
+                          Mã: {item.ctsp_ma}
+                        </p>
+                        <p className="text-xl font-bold text-red-600 mt-2">
+                          {formatVND(item.ctsp_gianban)}
+                        </p>
+                        <p className="text-xs text-gray-500 mt-1">
+                          Ngày tạo:{" "}
+                          {new Date(item.ctsp_ngaytao).toLocaleDateString(
+                            "vi-VN",
+                          )}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* CỘT 2: Kích thước & Khối lượng & Tồn kho */}
+                    <div className="flex-1 grid grid-cols-2 gap-4 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100">
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1">Tồn kho</p>
+                        <p className="font-bold text-lg text-[#0F172A]">
+                          {item.ctsp_soluongton}
+                        </p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-gray-500 mb-1">Khối lượng</p>
+                        <p className="font-bold text-[#0F172A]">
+                          {item.ctsp_khoiluong} kg
+                        </p>
+                      </div>
+                      <div className="col-span-2 border-t border-gray-200 pt-2 mt-1">
+                        <p className="text-xs text-gray-500 mb-1">
+                          Kích thước (D x R x C)
+                        </p>
+                        <p className="font-bold text-[#0F172A]">
+                          {item.ctsp_chieudai} x {item.ctsp_chieurong} x{" "}
+                          {item.ctsp_chieucao} cm
+                        </p>
+                      </div>
+                      <div className="col-span-2 border-t border-gray-200 pt-2 mt-1">
+                        <p className="text-xs text-gray-500 mb-1">
+                          Mô tả phân loại
+                        </p>
+                        <p className="text-gray-700 line-clamp-2 italic">
+                          "{item.ctsp_mota}"
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* CỘT 3: Thống kê & Đánh giá & Nút thao tác */}
+                    <div className="shrink-0 md:w-48 flex flex-col justify-between">
+                      <div className="grid grid-cols-3 gap-2 text-center">
+                        <div className="bg-blue-50 rounded-lg p-2 border border-blue-100">
+                          <p className="text-[10px] text-blue-600 font-semibold mb-1">
+                            Lượt xem
+                          </p>
+                          <p className="font-bold text-blue-700">
+                            {item.ctsp_luotxem}
+                          </p>
+                        </div>
+                        <div className="bg-pink-50 rounded-lg p-2 border border-pink-100">
+                          <p className="text-[10px] text-pink-600 font-semibold mb-1">
+                            Lượt thích
+                          </p>
+                          <p className="font-bold text-pink-700">
+                            {item.ctsp_luotthich}
+                          </p>
+                        </div>
+                        <div className="bg-green-50 rounded-lg p-2 border border-green-100">
+                          <p className="text-[10px] text-green-600 font-semibold mb-1">
+                            Đã bán
+                          </p>
+                          <p className="font-bold text-green-700">
+                            {item.ctsp_luotmua}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-3 flex items-center justify-center bg-yellow-50 rounded-lg p-2 border border-yellow-100 gap-2">
+                        <span className="text-xs font-semibold text-yellow-700">
+                          Đánh giá TB:
+                        </span>
+                        <div className="flex items-center gap-1 text-yellow-500 font-bold text-lg">
+                          {Number(item.ctsp_diemdanhgiatrungbinh || 0).toFixed(
+                            1,
+                          )}
+                          <span
+                            className="material-symbols-outlined text-[18px]"
+                            style={{ fontVariationSettings: "'FILL' 1" }}
                           >
-                            <span className="material-symbols-outlined text-[16px]">
-                              block
-                            </span>
-                            {isSuspended ? "Đã đình chỉ" : "Đình chỉ"}
-                          </button>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                            star
+                          </span>
+                        </div>
+                      </div>
+
+                      <button
+                        onClick={() => handleOpenSuspend(item)}
+                        disabled={isSuspended}
+                        className={`mt-4 w-full inline-flex items-center justify-center gap-2 rounded-xl px-3 py-2 text-sm font-bold transition-colors ${
+                          isSuspended
+                            ? "bg-gray-100 text-gray-400 cursor-not-allowed border border-gray-200"
+                            : "bg-red-50 text-red-600 hover:bg-red-100 border border-red-200 shadow-sm"
+                        }`}
+                      >
+                        <span className="material-symbols-outlined text-[18px]">
+                          block
+                        </span>
+                        {isSuspended ? "Đã bị đình chỉ" : "Đình chỉ phân loại"}
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
           </div>
         </div>
@@ -465,8 +522,8 @@ const QuanLySanPhamAdmin = () => {
           <div className="w-full max-w-md overflow-hidden rounded-2xl bg-white shadow-2xl">
             <div className="bg-red-50 px-5 py-4 border-b border-red-100">
               <h3 className="text-lg font-bold text-red-800 flex items-center gap-2">
-                <span className="material-symbols-outlined">warning</span>
-                Đình chỉ Sản phẩm
+                <span className="material-symbols-outlined">warning</span> Đình
+                chỉ Sản phẩm
               </h3>
             </div>
             <div className="p-5 space-y-3">

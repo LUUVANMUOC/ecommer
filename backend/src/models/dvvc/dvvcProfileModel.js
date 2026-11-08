@@ -1,6 +1,7 @@
 const db = require('../../config/db');
 
 const DvvcProfileModel = {
+    // 1. Lấy thông tin Profile (Đã thêm sepay_webhook_secret)
     getProfile: async (dvvc_ma) => {
         const query = `
             SELECT 
@@ -13,6 +14,7 @@ const DvvcProfileModel = {
                 tt.nganhang_ma AS "NganHang_Ma", 
                 tt.ttnt_dvvc_sotaikhoan AS "TTNT_DVVC_SoTaiKhoan", 
                 tt.ttnt_dvvc_tentaikhoan AS "TTNT_DVVC_TenTaiKhoan",
+                tt.sepay_webhook_secret AS "sepay_webhook_secret", -- 🟢 Đã thêm cột này
                 nh.nhg_ten AS "NHG_Ten", 
                 nh.nhg_logo AS "NHG_Logo"
             FROM donvivanchuyen d
@@ -24,6 +26,7 @@ const DvvcProfileModel = {
         return result.rows[0];
     },
 
+    // 2. Cập nhật thông tin cơ bản (Tên, Mô tả, Hình ảnh)
     updateProfile: async (dvvc_ma, data) => {
         const query = `
             UPDATE donvivanchuyen 
@@ -35,27 +38,43 @@ const DvvcProfileModel = {
         return result.rows[0];
     },
 
+    // 3. Lưu thông tin ngân hàng và Webhook Secret (Đã cập nhật)
     saveBankAccount: async (dvvc_ma, data) => {
         const query = `
-            INSERT INTO thongtinnhantien_dvvc (dvvc_ma, nganhang_ma, ttnt_dvvc_sotaikhoan, ttnt_dvvc_tentaikhoan)
-            VALUES ($1, $2, $3, $4)
+            INSERT INTO thongtinnhantien_dvvc (
+                dvvc_ma, 
+                nganhang_ma, 
+                ttnt_dvvc_sotaikhoan, 
+                ttnt_dvvc_tentaikhoan,
+                sepay_webhook_secret
+            )
+            VALUES ($1, $2, $3, $4, $5)
             ON CONFLICT (dvvc_ma, nganhang_ma) 
             DO UPDATE SET 
                 ttnt_dvvc_sotaikhoan = EXCLUDED.ttnt_dvvc_sotaikhoan,
-                ttnt_dvvc_tentaikhoan = EXCLUDED.ttnt_dvvc_tentaikhoan
+                ttnt_dvvc_tentaikhoan = EXCLUDED.ttnt_dvvc_tentaikhoan,
+                sepay_webhook_secret = EXCLUDED.sepay_webhook_secret -- 🟢 Cập nhật thêm Secret
             RETURNING *
         `;
-        const values = [dvvc_ma, data.NganHang_Ma, data.TTNT_DVVC_SoTaiKhoan, data.TTNT_DVVC_TenTaiKhoan];
+        const values = [
+            dvvc_ma, 
+            data.NganHang_Ma, 
+            data.TTNT_DVVC_SoTaiKhoan, 
+            data.TTNT_DVVC_TenTaiKhoan,
+            data.sepay_webhook_secret || null // 🟢 Truyền dữ liệu Secret
+        ];
         const result = await db.query(query, values);
         return result.rows[0];
     },
 
+    // 4. Xóa tài khoản ngân hàng
     deleteBankAccount: async (dvvc_ma) => {
         const query = `DELETE FROM thongtinnhantien_dvvc WHERE dvvc_ma = $1 RETURNING *`;
         const result = await db.query(query, [dvvc_ma]);
         return result.rows[0];
     },
 
+    // 5. Cập nhật mật khẩu
     updatePassword: async (dvvc_ma, newPasswordHash) => {
         const query = `
             UPDATE donvivanchuyen 

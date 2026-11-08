@@ -3,10 +3,6 @@ const ChiTietSanPhamModel = require('../../models/gianhang/chiTietSanPhamModel')
 const NganhHangModel = require('../../models/san/nganhHangModel');
 const pool = require('../../config/db');
 
-/**
- * Validate: ngành hàng phải là ngành lá (con cuối cùng)
- * vì chỉ ngành lá mới có phí chiết khấu.
- */
 const validateNganhHangLeaf = async (nh_ma) => {
     if (!nh_ma) {
         throw new Error('Vui lòng chọn ngành hàng cho phân loại sản phẩm.');
@@ -19,10 +15,6 @@ const validateNganhHangLeaf = async (nh_ma) => {
     }
 };
 
-/**
- * Lấy phí chiết khấu mới nhất của ngành hàng từ bảng phisanchieckhau.
- * Trả về 0 nếu chưa có.
- */
 const getPsckPhantramMoiNhat = async (nh_ma) => {
     try {
         const result = await pool.query(
@@ -55,7 +47,6 @@ const ChiTietSanPhamService = {
             newMa = 'CTSP' + (currentNumber + 1).toString().padStart(2, '0');
         }
 
-        // Lấy phí sàn mới nhất để Model tính ctsp_gianban
         const psck_phantram = await getPsckPhantramMoiNhat(data.nh_ma);
 
         const newData = {
@@ -66,6 +57,7 @@ const ChiTietSanPhamService = {
             ctsp_soluongton: Number(data.ctsp_soluongton) || 0,
             ctsp_chieudai: Number(data.ctsp_chieudai) || 1,
             ctsp_chieurong: Number(data.ctsp_chieurong) || 1,
+            ctsp_chieucao: Number(data.ctsp_chieucao) || 1, // 🟢 Thêm chiều cao
             ctsp_khoiluong: Number(data.ctsp_khoiluong) || 1,
             nh_ma: data.nh_ma,
             gb_gia: Number(data.gb_gia) || 0,
@@ -83,7 +75,6 @@ const ChiTietSanPhamService = {
 
         await validateNganhHangLeaf(data.nh_ma);
 
-        // Lấy lại phí sàn (có thể đã đổi từ lần tạo trước)
         const psck_phantram = await getPsckPhantramMoiNhat(data.nh_ma);
 
         const updateData = {
@@ -92,6 +83,7 @@ const ChiTietSanPhamService = {
             ctsp_soluongton: Number(data.ctsp_soluongton) || 0,
             ctsp_chieudai: Number(data.ctsp_chieudai) || 1,
             ctsp_chieurong: Number(data.ctsp_chieurong) || 1,
+            ctsp_chieucao: Number(data.ctsp_chieucao) || 1, // 🟢 Thêm chiều cao
             ctsp_khoiluong: Number(data.ctsp_khoiluong) || 1,
             nh_ma: data.nh_ma,
             gb_gia: Number(data.gb_gia) || 0,
@@ -108,7 +100,8 @@ const ChiTietSanPhamService = {
         if (!existing) throw new Error('Không tìm thấy chi tiết sản phẩm!');
         return await ChiTietSanPhamModel.delete(id);
     },
-        increaseView: async (ctsp_ma) => {
+    
+    increaseView: async (ctsp_ma) => {
         return await ChiTietSanPhamModel.increaseView(ctsp_ma);
     },
 

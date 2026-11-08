@@ -1,13 +1,19 @@
 // src/pages/khachhang/ShopProfile.jsx
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useRef, useCallback } from "react";
 import { useParams, Link, useNavigate } from "react-router-dom";
 import publicSanPhamService from "../../services/san/publicSanPhamService";
+import theoDoiShopService from "../../services/khachhang/theoDoiShopService";
 import { AuthContext } from "../../contexts/AuthContext";
-import { formatVND } from "../../components/shop/SanPhamShared";
+import {
+  formatVND,
+  formatPriceRange,
+} from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
 import { toAssetUrl } from "../../utils/accountUtils";
 import CustomerVoucherCard from "../../components/common/Voucher/CustomerVoucherCard";
+
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
+const ITEMS_PER_PAGE = 20; // Số sản phẩm tải mỗi lần
 
 const ShopProfile = () => {
   const { gh_ma } = useParams();
@@ -16,17 +22,25 @@ const ShopProfile = () => {
 
   const [shopInfo, setShopInfo] = useState(null);
   const [categories, setCategories] = useState([]);
-  const [vouchers, setVouchers] = useState([]); // 🟢 State lưu Voucher
+  const [vouchers, setVouchers] = useState([]);
+
+  // 🟢 State cho Sản phẩm & Phân trang (Lazy Load)
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
 
-  const [activeTab, setActiveTab] = useState("ALL"); // "ALL" hoặc dmsp_ma
-  const [isFollowing, setIsFollowing] = useState(false); // Giả lập state theo dõi (nếu cần)
+  const [activeTab, setActiveTab] = useState("ALL");
+  const [isFollowing, setIsFollowing] = useState(false);
+
   const [toast, setToast] = useState({
     show: false,
     message: "",
     type: "success",
   });
+
+  const observer = useRef(); // 🟢 Ref cho Lazy Load
 
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
@@ -39,11 +53,11 @@ const ShopProfile = () => {
       try {
         const [resShop, resVouchers] = await Promise.all([
           publicSanPhamService.getShopProfile(gh_ma),
-          publicSanPhamService.getShopVouchers(gh_ma), // 🟢 Gọi API Public lấy voucher
+          publicSanPhamService.getShopVouchers(gh_ma),
         ]);
         setShopInfo(resShop.data.info);
         setCategories(resShop.data.categories || []);
-        setVouchers(resVouchers.data || []); // 🟢 Lưu data voucher
+        setVouchers(resVouchers.data || []);
       } catch (error) {
         showToast("Lỗi tải thông tin Shop", "error");
       }
@@ -51,37 +65,98 @@ const ShopProfile = () => {
     fetchShopData();
   }, [gh_ma]);
 
-  // Tải sản phẩm (Khi mới vào hoặc khi đổi Tab)
+  // 🟢 Kiểm tra trạng thái theo dõi (nếu đã đăng nhập)
+  useEffect(() => {
+    if (user && user.role === "khachhang" && gh_ma) {
+      theoDoiShopService
+        .checkStatus(user.kh_ma, gh_ma)
+        .then((res) => setIsFollowing(res.data.isFollowing))
+        .catch(() => {});
+    }
+  }, [user, gh_ma]);
+
+  // 🟢 Reset trang khi đổi Tab hoặc đổi Shop
+  useEffect(() => {
+    setPage(1);
+    setProducts([]);
+    setHasMore(true);
+  }, [gh_ma, activeTab]);
+
+  // 🟢 Tải sản phẩm (Khi mới vào, khi đổi Tab, hoặc khi page tăng do cuộn)
   useEffect(() => {
     const fetchProducts = async () => {
-      setLoading(true);
+      if (page === 1) setLoading(true);
+      else setLoadingMore(true);
+
       try {
         const dmsp_ma = activeTab === "ALL" ? "" : activeTab;
+        // Cần truyền thêm page và ITEMS_PER_PAGE
         const res = await publicSanPhamService.getProductsByShop(
           gh_ma,
           dmsp_ma,
+          page,
+          ITEMS_PER_PAGE,
         );
-        setProducts(res.data);
+
+        // Xử lý dữ liệu trả về (tùy thuộc Backend trả mảng hay object)
+        const newProducts = res.data.data ? res.data.data : res.data;
+
+        if (page === 1) setProducts(newProducts);
+        else setProducts((prev) => [...prev, ...newProducts]);
+
+        // Nếu số lượng trả về ít hơn ITEMS_PER_PAGE => Đã hết sản phẩm
+        setHasMore(newProducts.length === ITEMS_PER_PAGE);
       } catch (error) {
         showToast("Lỗi tải danh sách sản phẩm", "error");
       } finally {
         setLoading(false);
+        setLoadingMore(false);
       }
     };
     if (gh_ma) fetchProducts();
-  }, [gh_ma, activeTab]);
+  }, [gh_ma, activeTab, page]);
 
-  const handleFollow = () => {
-    if (!user) return navigate("/khach-hang/login");
-    // Gọi API toggle follow ở đây (nếu có). Hiện tại chỉ giả lập UI
-    setIsFollowing(!isFollowing);
-    showToast(
-      isFollowing ? "Đã bỏ theo dõi Shop" : "Đã theo dõi Shop",
-      "success",
-    );
+  // 🟢 Logic Lazy Load
+  const lastProductRef = useCallback(
+    (node) => {
+      if (loading || loadingMore || !hasMore) return;
+      if (observer.current) observer.current.disconnect();
+      observer.current = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting) {
+          setPage((prevPage) => prevPage + 1);
+        }
+      });
+      if (node) observer.current.observe(node);
+    },
+    [loading, loadingMore, hasMore],
+  );
+
+  const handleFollow = async () => {
+    if (!user || user.role !== "khachhang") {
+      showToast("Vui lòng đăng nhập để theo dõi Shop!", "error");
+      return navigate("/khach-hang/login");
+    }
+
+    try {
+      const res = await theoDoiShopService.toggleFollow(user.kh_ma, gh_ma);
+      setIsFollowing(res.data.isFollowing);
+      showToast(
+        res.data.isFollowing
+          ? "Đã theo dõi Shop thành công!"
+          : "Đã bỏ theo dõi Shop!",
+        "success",
+      );
+      setShopInfo((prev) => ({
+        ...prev,
+        gh_theodoi: res.data.isFollowing
+          ? (prev.gh_theodoi || 0) + 1
+          : Math.max(0, (prev.gh_theodoi || 0) - 1),
+      }));
+    } catch (error) {
+      showToast("Lỗi khi thực hiện thao tác!", "error");
+    }
   };
 
-  // 🟢 Hàm xử lý Copy mã Voucher
   const handleCopyCode = (code) => {
     if (!code) return;
     navigator.clipboard?.writeText(code);
@@ -98,7 +173,6 @@ const ShopProfile = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16 font-sans">
-      {/* HEADER */}
       <header className="bg-white shadow-sm mb-6 sticky top-0 z-20">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <Link
@@ -122,13 +196,10 @@ const ShopProfile = () => {
       </header>
 
       <div className="max-w-7xl mx-auto px-6">
-        {/* BANNER SHOP INFO */}
+        {/* ... (Phần Header Shop Info & Voucher giữ nguyên) ... */}
         <div className="bg-white rounded-3xl shadow-sm border border-[#E2E8F0] p-6 md:p-8 mb-6 relative overflow-hidden">
-          {/* Hiệu ứng nền mờ (blob) tạo chiều sâu */}
           <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50 rounded-full blur-3xl opacity-60 -mr-16 -mt-16 pointer-events-none"></div>
-
           <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-6">
-            {/* Khối bên trái: Avatar + Info */}
             <div className="flex flex-col md:flex-row items-center gap-6 text-center md:text-left">
               <div className="w-24 h-24 md:w-28 md:h-28 rounded-full border-[5px] border-blue-50 shadow-sm overflow-hidden bg-white shrink-0">
                 <img
@@ -141,7 +212,6 @@ const ShopProfile = () => {
                   className="w-full h-full object-cover"
                 />
               </div>
-
               <div>
                 <h1 className="text-2xl font-bold text-[#0F172A] flex items-center justify-center md:justify-start gap-1.5">
                   {shopInfo?.gh_ten}
@@ -155,14 +225,16 @@ const ShopProfile = () => {
                 <p className="text-sm text-[#64748B] mt-1 line-clamp-1 max-w-lg">
                   {shopInfo?.gh_mota || "Chưa có mô tả"}
                 </p>
-
                 <div className="flex flex-wrap items-center justify-center md:justify-start gap-x-6 gap-y-2 mt-4 text-sm font-medium text-[#334155]">
                   <div className="flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[#F59E0B]">
+                    <span
+                      className="material-symbols-outlined text-[#F59E0B]"
+                      style={{ fontVariationSettings: "'FILL' 1" }}
+                    >
                       star
                     </span>
                     <span className="font-bold text-[#0F172A]">
-                      {shopInfo?.gh_danhgia || 0}
+                      {Number(shopInfo?.gh_danhgia || 0).toFixed(1)}
                     </span>{" "}
                     Đánh giá
                   </div>
@@ -178,8 +250,6 @@ const ShopProfile = () => {
                 </div>
               </div>
             </div>
-
-            {/* Khối bên phải: Nút Theo dõi */}
             <div className="shrink-0 mt-4 md:mt-0">
               <button
                 onClick={handleFollow}
@@ -198,7 +268,6 @@ const ShopProfile = () => {
           </div>
         </div>
 
-        {/* 🟢 VỊ TRÍ 1A: KHỐI VOUCHER CỦA SHOP (Giao diện mới) */}
         {vouchers.length > 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] p-5 mb-6">
             <div className="flex items-center gap-2 mb-4">
@@ -209,11 +278,9 @@ const ShopProfile = () => {
                 Mã Giảm Giá Của Shop
               </h2>
             </div>
-
             <div className="flex overflow-x-auto gap-4 pb-2 custom-scrollbar snap-x">
               {vouchers.map((voucher, index) => (
                 <div key={voucher.MGG_Shop_Ma || index} className="snap-start">
-                  {/* 🟢 Dùng Component Mới với đầy đủ data */}
                   <CustomerVoucherCard
                     voucher={{
                       MGG_San_Ma: voucher.MGG_Shop_Ma,
@@ -222,7 +289,6 @@ const ShopProfile = () => {
                         voucher.MGG_Shop_GiaTriDonToiThieu,
                       MGG_San_ThoiDiemKetThuc: voucher.MGG_Shop_ThoiDiemKetThuc,
                       MGG_San_SoLuongConLai: voucher.MGG_Shop_SoLuongConLai,
-                      // 🟢 BẮT BUỘC THÊM 2 DÒNG NÀY ĐỂ TÍNH THANH TIẾN TRÌNH
                       MGG_San_SoLuongBanDau: voucher.MGG_Shop_SoLuongBanDau,
                       MGG_San_ThoiDiemBatDau: voucher.MGG_Shop_ThoiDiemBatDau,
                     }}
@@ -234,7 +300,7 @@ const ShopProfile = () => {
           </div>
         )}
 
-        {/* THANH TABS DANH MỤC */}
+        {/* TABS DANH MỤC */}
         <div className="bg-white rounded-t-2xl shadow-sm border border-[#E2E8F0] border-b-0 overflow-x-auto flex sticky top-[72px] z-10 custom-scrollbar">
           <button
             onClick={() => setActiveTab("ALL")}
@@ -242,7 +308,6 @@ const ShopProfile = () => {
           >
             Tất cả sản phẩm
           </button>
-
           {categories.map((cat) => (
             <button
               key={cat.dmsp_ma}
@@ -254,10 +319,13 @@ const ShopProfile = () => {
           ))}
         </div>
 
-        {/* LƯỚI SẢN PHẨM */}
+        {/* DANH SÁCH SẢN PHẨM (LAZY LOAD) */}
         <div className="bg-white rounded-b-2xl shadow-sm border border-[#E2E8F0] p-6 min-h-[400px]">
-          {loading ? (
-            <div className="text-center py-20 text-[#64748B] font-medium">
+          {loading && page === 1 ? (
+            <div className="text-center py-20 text-[#2563EB] font-medium flex flex-col items-center gap-3">
+              <span className="animate-spin material-symbols-outlined text-4xl">
+                sync
+              </span>
               Đang tải sản phẩm...
             </div>
           ) : products.length === 0 ? (
@@ -270,48 +338,77 @@ const ShopProfile = () => {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-5">
-              {products.map((sp) => (
-                <Link
-                  to={`/san-pham/${sp.sp_ma}?ctsp_ma=${sp.first_variant_id}`}
-                  key={sp.sp_ma}
-                  className="group bg-white rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-[#E2E8F0] overflow-hidden flex flex-col"
-                >
-                  <div className="aspect-square relative overflow-hidden bg-[#F8FAFC]">
-                    <img
-                      src={
-                        sp.cover_image
-                          ? `${BACKEND_URL}${sp.cover_image}`
-                          : "https://placehold.co/300x300"
-                      }
-                      alt={sp.sp_ten}
-                      className="w-full h-full object-contain p-3 group-hover:scale-110 transition-transform duration-500"
-                    />
-                  </div>
-                  <div className="p-4 flex-1 flex flex-col">
-                    <h3 className="text-sm font-semibold text-[#0F172A] line-clamp-2 min-h-[40px] group-hover:text-[#2563EB] transition-colors leading-snug">
-                      {sp.sp_ten}
-                    </h3>
-                    <div className="mt-auto pt-3">
-                      <p className="text-[#DC2626] font-bold text-lg">
-                        {sp.min_price === sp.max_price
-                          ? formatVND(sp.min_price)
-                          : `${formatVND(sp.min_price)}...`}
-                      </p>
-                      <div className="flex items-center justify-between mt-2 text-xs text-[#64748B] font-medium">
-                        <span className="flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[14px] text-[#F59E0B]">
-                            star
-                          </span>
-                          {sp.sp_diemdanhgiatrungbinh || 0}
-                        </span>
-                        <span>Đã bán {sp.sp_luotmua || 0}</span>
+            <>
+              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-5">
+                {products.map((sp, index) => {
+                  const isLast = index === products.length - 1;
+                  return (
+                    <Link
+                      ref={isLast ? lastProductRef : null} // 🟢 Gắn ref cho phần tử cuối
+                      to={`/san-pham/${sp.sp_ma}?ctsp_ma=${sp.first_variant_id}`}
+                      key={`${sp.sp_ma}-${index}`}
+                      className="group bg-white rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-[#E2E8F0] overflow-hidden flex flex-col"
+                    >
+                      <div className="aspect-square relative overflow-hidden bg-[#F8FAFC]">
+                        <img
+                          src={
+                            sp.cover_image
+                              ? `${BACKEND_URL}${sp.cover_image}`
+                              : "https://placehold.co/300x300"
+                          }
+                          alt={sp.sp_ten}
+                          className="w-full h-full object-contain p-3 group-hover:scale-110 transition-transform duration-500"
+                        />
                       </div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
-            </div>
+                      <div className="p-4 flex-1 flex flex-col">
+                        <h3 className="text-sm font-semibold text-[#0F172A] line-clamp-2 min-h-[40px] group-hover:text-[#2563EB] transition-colors leading-snug">
+                          {sp.sp_ten}
+                        </h3>
+                        <div className="mt-auto pt-3">
+                          <p className="text-[#DC2626] font-bold text-lg">
+                            {formatPriceRange({
+                              minPrice: sp.min_price,
+                              maxPrice: sp.max_price,
+                            })}
+                          </p>
+                          <div className="flex items-center justify-between mt-2 text-xs text-[#64748B] font-medium">
+                            <span className="flex items-center gap-1">
+                              <span
+                                className="material-symbols-outlined text-[16px] text-[#F59E0B]"
+                                style={{ fontVariationSettings: "'FILL' 1" }}
+                              >
+                                star
+                              </span>
+                              {Number(sp.sp_diemdanhgiatrungbinh || 0).toFixed(
+                                1,
+                              )}
+                            </span>
+                            <span>Đã bán {sp.sp_luotmua || 0}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+
+              {/* 🟢 Hiệu ứng Loading khi tải thêm */}
+              {loadingMore && (
+                <div className="text-center py-6 text-[#2563EB] font-medium flex items-center justify-center gap-2">
+                  <span className="animate-spin material-symbols-outlined">
+                    sync
+                  </span>{" "}
+                  Đang tải thêm...
+                </div>
+              )}
+
+              {/* 🟢 Thông báo hết sản phẩm */}
+              {!hasMore && products.length > 0 && (
+                <div className="text-center py-6 text-gray-400 text-sm">
+                  --- Đã hiển thị tất cả sản phẩm ---
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

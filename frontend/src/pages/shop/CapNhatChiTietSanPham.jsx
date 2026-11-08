@@ -1,7 +1,4 @@
 // src/pages/shop/CapNhatChiTietSanPham.jsx
-// Trang thêm/sửa phân loại:
-//   /shop/san-pham/:sp_ma/phan-loai/moi            → thêm
-//   /shop/san-pham/:sp_ma/phan-loai/:ctsp_ma/sua   → sửa
 import { useState, useEffect } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import sanPhamService from "../../services/gianhang/sanPhamService";
@@ -19,6 +16,7 @@ import {
 
 const LIST_PATH = "/shop/san-pham";
 
+// 🟢 Thêm ctsp_chieucao vào EMPTY_FORM
 const EMPTY_FORM = {
   ctsp_ten: "",
   ctsp_mota: "",
@@ -26,6 +24,7 @@ const EMPTY_FORM = {
   ctsp_soluongton: 1,
   ctsp_chieudai: 10,
   ctsp_chieurong: 10,
+  ctsp_chieucao: 10,
   ctsp_khoiluong: 1,
   gb_gia: 0,
   thuoctinh: [],
@@ -47,12 +46,10 @@ const CapNhatChiTietSanPham = () => {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
-  // Ngành hàng: chỉ cho chọn nút lá (con cuối cùng)
   const leafNganhHangs = getLeafNganhHangs(buildNganhHangTree(nganhHangs));
   const currentNganhHangIsInvalidLeaf =
     !!formData.nh_ma && !leafNganhHangs.some((l) => l.nh_ma === formData.nh_ma);
 
-  // Tải dữ liệu
   useEffect(() => {
     const init = async () => {
       setLoading(true);
@@ -83,6 +80,7 @@ const CapNhatChiTietSanPham = () => {
               ctsp_soluongton: ct.ctsp_soluongton,
               ctsp_chieudai: ct.ctsp_chieudai,
               ctsp_chieurong: ct.ctsp_chieurong,
+              ctsp_chieucao: ct.ctsp_chieucao || 10, // 🟢 Load chiều cao
               ctsp_khoiluong: ct.ctsp_khoiluong,
               gb_gia: ct.gb_gia || 0,
               thuoctinh: (ct.thuoctinh || []).map((tt) => ({
@@ -119,7 +117,6 @@ const CapNhatChiTietSanPham = () => {
     init();
   }, [sp_ma, ctsp_ma]);
 
-  /* ---------- Ảnh ---------- */
   const handleSelectImages = (e) => {
     const files = Array.from(e.target.files);
     const newImages = files.map((file) => ({
@@ -161,7 +158,6 @@ const CapNhatChiTietSanPham = () => {
     setImages(next);
   };
 
-  /* ---------- Thuộc tính ---------- */
   const handleAddAttrRow = () => {
     setFormData((prev) => ({
       ...prev,
@@ -187,7 +183,6 @@ const CapNhatChiTietSanPham = () => {
     }));
   };
 
-  /* ---------- Lưu ---------- */
   const handleSave = async (e) => {
     e.preventDefault();
     if (!formData.ctsp_ten) return setError("Vui lòng nhập tên phân loại.");
@@ -209,6 +204,7 @@ const CapNhatChiTietSanPham = () => {
       dataToSend.append("ctsp_soluongton", formData.ctsp_soluongton);
       dataToSend.append("ctsp_chieudai", formData.ctsp_chieudai);
       dataToSend.append("ctsp_chieurong", formData.ctsp_chieurong);
+      dataToSend.append("ctsp_chieucao", formData.ctsp_chieucao); // 🟢 Gửi chiều cao
       dataToSend.append("ctsp_khoiluong", formData.ctsp_khoiluong);
       dataToSend.append("gb_gia", formData.gb_gia);
 
@@ -283,7 +279,6 @@ const CapNhatChiTietSanPham = () => {
 
   return (
     <div className="w-full space-y-6">
-      {/* Thanh điều hướng & nút lưu */}
       <div className="flex flex-wrap items-center justify-between gap-4">
         <nav className="flex min-w-0 items-center gap-2 text-sm">
           <Link
@@ -347,7 +342,6 @@ const CapNhatChiTietSanPham = () => {
         onSubmit={handleSave}
         className="grid grid-cols-1 items-start gap-6 lg:grid-cols-[minmax(0,1fr)_400px]"
       >
-        {/* CỘT TRÁI: thông tin */}
         <Card className="space-y-7 p-6">
           <section className="space-y-4">
             <h2 className="text-sm font-bold text-[#14201C]">Thông tin</h2>
@@ -410,7 +404,6 @@ const CapNhatChiTietSanPham = () => {
           <section className="space-y-4 border-t border-[#EFEBE2] pt-6">
             <h2 className="text-sm font-bold text-[#14201C]">Giá & tồn kho</h2>
 
-            {/* ✅ GHI CHÚ RÕ 2 LOẠI GIÁ */}
             <div className="rounded-xl border border-[#F2A93B]/40 bg-[#FDF3E1]/60 p-3 text-xs text-[#8A5A0B]">
               <p className="flex items-start gap-1.5">
                 <span className="material-symbols-outlined text-[16px]">
@@ -462,7 +455,6 @@ const CapNhatChiTietSanPham = () => {
               </label>
             </div>
 
-            {/* Nếu đang sửa, hiện giá khách trả hiện tại để đối chiếu */}
             {isEdit && (
               <div className="rounded-lg bg-[#F8F9FA] p-3 text-xs text-[#5B6661]">
                 <span className="material-symbols-outlined align-middle text-[14px] text-[#7A857F]">
@@ -474,11 +466,12 @@ const CapNhatChiTietSanPham = () => {
             )}
           </section>
 
+          {/* 🟢 Cập nhật phần Kích thước & khối lượng (chia 4 cột) */}
           <section className="space-y-4 border-t border-[#EFEBE2] pt-6">
             <h2 className="text-sm font-bold text-[#14201C]">
               Kích thước & khối lượng
             </h2>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <label className="block space-y-1.5">
                 <span className={labelClass}>Dài (cm)</span>
                 <input
@@ -501,6 +494,20 @@ const CapNhatChiTietSanPham = () => {
                   value={formData.ctsp_chieurong}
                   onChange={(e) =>
                     setFormData({ ...formData, ctsp_chieurong: e.target.value })
+                  }
+                  className={fieldClass}
+                />
+              </label>
+              {/* 🟢 Ô nhập Chiều cao */}
+              <label className="block space-y-1.5">
+                <span className={labelClass}>Cao (cm)</span>
+                <input
+                  type="number"
+                  step="0.1"
+                  min="0.1"
+                  value={formData.ctsp_chieucao}
+                  onChange={(e) =>
+                    setFormData({ ...formData, ctsp_chieucao: e.target.value })
                   }
                   className={fieldClass}
                 />
@@ -639,7 +646,6 @@ const CapNhatChiTietSanPham = () => {
           </section>
         </Card>
 
-        {/* CỘT PHẢI: ảnh */}
         <Card className="space-y-4 p-6 lg:sticky lg:top-24">
           <div className="flex items-center justify-between">
             <div>

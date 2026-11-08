@@ -8,7 +8,7 @@ import QuanLyKho from "../pages/dvvc/QuanLyKho";
 import QuanLyShipper from "../pages/dvvc/QuanLyShipper";
 import PhanCongShipper from "../pages/dvvc/PhanCongShipper";
 import TheoDoiDonHang from "../pages/dvvc/TheoDoiDonHang";
-
+import LichSuNhanTienShip from "../pages/dvvc/LichSuNhanTienShip";
 // Thêm vào <Routes>
 
 const DVVCRoutes = () => {
@@ -40,6 +40,7 @@ const DVVCRoutes = () => {
           <Route path="quan-ly-shipper" element={<QuanLyShipper />} />
           <Route path="phan-cong-shipper" element={<PhanCongShipper />} />
           <Route path="theo-doi-don-hang" element={<TheoDoiDonHang />} />
+          <Route path="lich-su-nhan-tien" element={<LichSuNhanTienShip />} />
         </Route>
       </Route>
     </Routes>

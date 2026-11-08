@@ -428,8 +428,10 @@ const DuyetSanPham = () => {
                         <span className="text-[#7A857F] block text-xs">
                           Kích thước
                         </span>
+                        {/* 🟢 CẬP NHẬT: Hiển thị thêm chiều cao */}
                         <b className="text-[#14201C]">
-                          {item.ctsp_chieudai} x {item.ctsp_chieurong} cm
+                          {item.ctsp_chieudai} x {item.ctsp_chieurong} x{" "}
+                          {item.ctsp_chieucao} cm
                         </b>
                       </div>
                       <div>

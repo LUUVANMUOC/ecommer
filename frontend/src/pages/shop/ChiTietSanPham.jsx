@@ -369,6 +369,7 @@ const ChiTietSanPham = () => {
       setSubmittingStatus(null);
     }
   };
+
   const handleSubmitAll = async () => {
     if (
       !window.confirm(
@@ -497,7 +498,6 @@ const ChiTietSanPham = () => {
             </span>
             {product.sp_diemdanhgiatrungbinh ?? 0}
           </span>
-          {/* ✅ Đã sửa lại các trường hiển thị để lấy từ activeVariant */}
           <span>
             Đã bán {activeVariant?.ctsp_luotmua ?? product.sp_luotmua ?? 0}
           </span>
@@ -783,9 +783,10 @@ const ChiTietSanPham = () => {
                       label="Số lượng tồn"
                       value={activeVariant.ctsp_soluongton}
                     />
+                    {/* 🟢 CẬP NHẬT: Hiển thị Kích thước 3 chiều */}
                     <SpecRow
-                      label="Kích thước (D × R)"
-                      value={`${activeVariant.ctsp_chieudai} × ${activeVariant.ctsp_chieurong} cm`}
+                      label="Kích thước (D × R × C)"
+                      value={`${activeVariant.ctsp_chieudai} × ${activeVariant.ctsp_chieurong} × ${activeVariant.ctsp_chieucao} cm`}
                     />
                     <SpecRow
                       label="Khối lượng"

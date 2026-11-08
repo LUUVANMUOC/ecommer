@@ -40,9 +40,9 @@ const EMPTY_BANK_FORM = {
   nh_ma: "",
   ttnt_gianhang_tentaikhoan: "",
   ttnt_gianhang_sotaikhoan: "",
+  sepay_webhook_secret: "",
 };
 
-// Thông báo tự tắt sau 3 giây, timer được dọn khi unmount
 const useToast = (duration = 3000) => {
   const HIDDEN = { show: false, message: "", type: "success" };
   const [toast, setToast] = useState(HIDDEN);
@@ -62,7 +62,6 @@ const useToast = (duration = 3000) => {
   return { toast, showToast };
 };
 
-// Logic tài khoản nhận tiền của cửa hàng
 const useBankAccount = (ownerId, notify) => {
   const [banks, setBanks] = useState([]);
   const [linkedBank, setLinkedBank] = useState(null);
@@ -89,12 +88,15 @@ const useBankAccount = (ownerId, notify) => {
         ttnt_gianhang_tentaikhoan:
           resLinked.data.ttnt_gianhang_tentaikhoan || "",
         ttnt_gianhang_sotaikhoan: resLinked.data.ttnt_gianhang_sotaikhoan,
+        sepay_webhook_secret: resLinked.data.sepay_webhook_secret || "",
       });
     }
   }, [ownerId]);
 
+  // 🟢 Sửa lại hàm saveBank để có thể gọi từ bất kỳ đâu (truyền e hoặc không)
   const saveBank = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
+
     if (!bankForm.nh_ma) return notify("Vui lòng chọn ngân hàng", "error");
     if (!bankForm.ttnt_gianhang_tentaikhoan)
       return notify("Vui lòng nhập tên chủ tài khoản", "error");
@@ -110,8 +112,9 @@ const useBankAccount = (ownerId, notify) => {
           bankForm.ttnt_gianhang_tentaikhoan,
         ),
         ttnt_gianhang_sotaikhoan: bankForm.ttnt_gianhang_sotaikhoan,
+        sepay_webhook_secret: bankForm.sepay_webhook_secret,
       });
-      notify("Lưu tài khoản nhận tiền thành công!");
+      notify("Lưu cấu hình nhận tiền thành công!");
 
       const res = await axiosClient.get(`/thong-tin-nhan-tien/${ownerId}`);
       setLinkedBank(res.data);
@@ -177,7 +180,6 @@ const ThongTinCuaHang = () => {
   const [selectedFile, setSelectedFile] = useState(null);
   const [qrBank, setQrBank] = useState(null);
 
-  // 🟢 BỔ SUNG: Hàm kết hợp thông tin để đảm bảo QR có đủ Tên Ngân Hàng
   const enrichedLinkedBank = useMemo(() => {
     if (!linkedBank) return null;
     const bankInfo = banks.find(
@@ -192,7 +194,6 @@ const ThongTinCuaHang = () => {
     };
   }, [linkedBank, banks]);
 
-  // 1. Tải dữ liệu ban đầu
   const fetchAllData = useCallback(async () => {
     if (!ownerId) {
       setLoading(false);
@@ -255,7 +256,6 @@ const ThongTinCuaHang = () => {
     setSelectedXa("");
   };
 
-  // 2. Lưu thay đổi hồ sơ
   const handleProfileSubmit = async (e) => {
     e.preventDefault();
     if (!selectedTinh)
@@ -287,7 +287,6 @@ const ThongTinCuaHang = () => {
     }
   };
 
-  // 3. Đổi mật khẩu — trả về true nếu thành công để form tự reset
   const handleChangePassword = async ({ oldPassword, newPassword }) => {
     try {
       await axiosClient.put("/nguoi-ban/auth/change-password", {
@@ -301,6 +300,12 @@ const ThongTinCuaHang = () => {
       showToast(err.response?.data?.message || "Lỗi khi đổi mật khẩu", "error");
       return false;
     }
+  };
+
+  const handleCopyWebhook = () => {
+    const webhookUrl = `${import.meta.env.VITE_BACKEND_URL || "http://localhost:8080"}/api/webhook/sepay/${ownerId}`;
+    navigator.clipboard.writeText(webhookUrl);
+    showToast("Đã copy Link Webhook!");
   };
 
   if (loading) return <AccountLoading />;
@@ -359,7 +364,7 @@ const ThongTinCuaHang = () => {
         icon="account_balance"
       >
         <BankAccountSection
-          linkedBank={enrichedLinkedBank} // 🟢 Truyền data đã làm giàu
+          linkedBank={enrichedLinkedBank}
           banks={banks}
           bankForm={bankForm}
           onBankFormChange={updateBankForm}
@@ -368,9 +373,72 @@ const ThongTinCuaHang = () => {
           onShowQR={setQrBank}
           saving={savingBank}
         />
+
+        {/* 🟢 KHU VỰC CẤU HÌNH SEPAY DÀNH CHO SHOP (GỘP CHUNG NÚT LƯU) */}
+        <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-2xl">
+          <h3 className="text-lg font-bold text-blue-900 mb-2 flex items-center gap-2">
+            <span className="material-symbols-outlined">webhook</span>
+            Cấu hình tự động nhận tiền (SePay)
+          </h3>
+          <p className="text-sm text-blue-700 mb-4">
+            Để hệ thống tự động cập nhật khi Kho chuyển tiền, bạn cần cấu hình
+            Webhook trên trang SePay của bạn.
+          </p>
+
+          <div className="flex flex-col md:flex-row items-center gap-3 mb-5">
+            <div className="w-full">
+              <label className="block text-sm font-semibold text-blue-900 mb-1">
+                1. Đường link Webhook của bạn
+              </label>
+              <input
+                type="text"
+                readOnly
+                value={`${import.meta.env.VITE_BACKEND_URL || "http://localhost:8080"}/api/webhook/sepay/${ownerId}`}
+                className="w-full px-4 py-3 rounded-xl border border-blue-300 bg-white text-blue-800 font-mono text-sm outline-none"
+              />
+            </div>
+            <button
+              onClick={handleCopyWebhook}
+              type="button"
+              className="mt-6 md:mt-0 px-4 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 whitespace-nowrap"
+            >
+              Copy Link
+            </button>
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-blue-900 mb-1">
+              2. Mã bảo mật (Webhook Secret)
+            </label>
+            <input
+              type="text"
+              value={bankForm.sepay_webhook_secret || ""}
+              onChange={(e) =>
+                updateBankForm({ sepay_webhook_secret: e.target.value })
+              }
+              placeholder="Dán mã Secret lấy từ SePay vào đây..."
+              className="w-full px-4 py-3 rounded-xl border border-blue-300 outline-none focus:border-blue-500"
+            />
+            <p className="text-xs text-blue-600 mt-2">
+              * Mã này giúp chống kẻ gian spam tín hiệu thanh toán ảo.
+            </p>
+          </div>
+
+          {/* 🟢 THÊM NÚT LƯU TOÀN BỘ THÔNG TIN Ở ĐÂY */}
+          <div className="mt-6 pt-4 border-t border-blue-200 flex justify-end">
+            <button
+              type="button"
+              onClick={saveBank}
+              disabled={savingBank}
+              className="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 disabled:bg-gray-400 flex items-center gap-2 shadow-md transition-all"
+            >
+              <span className="material-symbols-outlined">save</span>
+              {savingBank ? "Đang lưu..." : "Lưu toàn bộ thông tin"}
+            </button>
+          </div>
+        </div>
       </AccountSection>
 
-      {/* 🟢 Đảm bảo QR Modal nhận được bank đã làm giàu */}
       {qrBank && (
         <BankQRModal
           bank={enrichedLinkedBank}

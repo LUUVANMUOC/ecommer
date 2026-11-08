@@ -19,7 +19,7 @@ const TatToanModel = {
         dts.dts_ma AS "DTS_Ma",
         dts.dts_tongtienhang AS "TienHang",
         dts.dts_tongtienphisan AS "PhiSan",
-        (dts.dts_tongtienhang - dts.dts_tongtienphisan) AS "TienShop",
+        (dts.dts_tongtienhang - COALESCE(dts.dts_tonggiamgiashop, 0)) AS "TienShop",
         dts.gh_ma AS "GH_Ma",
         gh.gh_ten AS "TenShop",
         nh.nhg_ma AS "NganHang_Ma",
@@ -40,7 +40,7 @@ const TatToanModel = {
     return { thongTinSan, orders: ordersRes.rows };
   },
 
-  // 2. Tạo phiếu tất toán và sinh mã QR
+  // 2. Tạo phiếu tất toán và sinh N+1 mã QR
   taoPhieuVaQr: async (kho_ma, data) => {
     const client = await pool.connect();
     try {
@@ -61,7 +61,9 @@ const TatToanModel = {
       });
 
       const tongShop = Object.values(shopMap).reduce((sum, s) => sum + s.tong_tien, 0);
+      const tongTienTatToan = tongSan + tongShop;
 
+      // Sinh mã PTT
       const pttRes = await client.query(`SELECT ptt_ma FROM phieu_tat_toan ORDER BY ptt_ma DESC LIMIT 1`);
       let newPttMa = 'PTT0000001';
       if (pttRes.rows.length > 0) {
@@ -69,12 +71,14 @@ const TatToanModel = {
         newPttMa = 'PTT' + (num + 1).toString().padStart(7, '0');
       }
 
+      // Lưu phiếu tất toán
       await client.query(
         `INSERT INTO phieu_tat_toan (ptt_ma, kho_ma, ptt_tong_tien_san, ptt_tong_tien_shop, ptt_trang_thai_thanh_toan)
          VALUES ($1, $2, $3, $4, 'CHO_THANH_TOAN')`,
         [newPttMa, kho_ma, tongSan, tongShop]
       );
 
+      // Lưu chi tiết
       for (const item of data.selectedOrders) {
         await client.query(`
           INSERT INTO chitiet_tat_toan (ptt_ma, dts_ma, ctt_tien_san, ctt_tien_shop) 
@@ -82,17 +86,17 @@ const TatToanModel = {
         `, [newPttMa, item.DTS_Ma, item.PhiSan, item.TienShop]);
       }
 
-      // Tạo QR Sàn
-      const qrSan = QrSepayService.buildQrCode(newPttMa, 'SAN');
+      // TẠO MÃ QR CHO SÀN
+      const qrSan = `TT${newPttMa}S`;
       await client.query(
         `INSERT INTO qr_thanh_toan (qr_ma, ptt_ma, qr_loai, qr_so_tien)
          VALUES ($1, $2, 'SAN', $3)`,
         [qrSan, newPttMa, tongSan]
       );
 
-      // Tạo QR từng Shop
+      // TẠO MÃ QR CHO TỪNG SHOP
       for (const [gh_ma, shopData] of Object.entries(shopMap)) {
-        const qrShop = QrSepayService.buildQrCode(newPttMa, 'SHOP', gh_ma);
+        const qrShop = `TT${newPttMa}SH${gh_ma}`;
         await client.query(
           `INSERT INTO qr_thanh_toan (qr_ma, ptt_ma, qr_loai, gh_ma, qr_so_tien)
            VALUES ($1, $2, 'SHOP', $3, $4)`,
@@ -101,7 +105,7 @@ const TatToanModel = {
       }
 
       await client.query('COMMIT');
-      return { ptt_ma: newPttMa };
+      return { ptt_ma: newPttMa, tong_tien: tongTienTatToan };
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
@@ -110,112 +114,140 @@ const TatToanModel = {
     }
   },
 
-  // 3. Xử lý Webhook từ SePay
+  // 3. Xử lý Webhook của Sàn
   xuLyWebhook: async (payload) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
 
-      const logRes = await client.query(
-        `INSERT INTO sepay_webhook_log (sepay_id, payload_raw)
-         VALUES ($1, $2)
-         ON CONFLICT (sepay_id) DO NOTHING
-         RETURNING sepay_id`,
-        [payload.id, JSON.stringify(payload)]
-      );
-
-      if (logRes.rowCount === 0) {
-        await client.query('COMMIT');
-        return { skipped: true, reason: 'duplicate' };
-      }
-
-      if (payload.transferType !== 'in') {
-        await client.query('COMMIT');
-        return { skipped: true, reason: 'not_incoming' };
-      }
+      if (payload.transferType !== 'in') return { skipped: true, reason: 'not_incoming' };
 
       const noiDung = (payload.code || payload.content || '').toUpperCase();
+      console.log(`🔎 [MODEL SÀN] Đang tìm mã QR Sàn trong chuỗi: "${noiDung}"`);
       
-      // 🟢 TÌM MÃ QR: Ưu tiên mã dài nhất để tránh mã Sàn nuốt mã Shop
+      // 🟢 ĐÃ SỬA: Dùng Regex \y thay cho LIKE để chặn việc nhận nhầm mã của Shop
       const qrRes = await client.query(
         `SELECT * FROM qr_thanh_toan
-         WHERE $1 LIKE '%' || qr_ma || '%'
+         WHERE qr_loai = 'SAN'
+         AND $1 ~ ('\\y' || qr_ma || '\\y')
          AND qr_trang_thai = 'CHUA_THANH_TOAN'
-         ORDER BY LENGTH(qr_ma) DESC
-         LIMIT 1
-         FOR UPDATE`,
+         ORDER BY LENGTH(qr_ma) DESC LIMIT 1 FOR UPDATE`,
         [noiDung]
       );
 
       if (qrRes.rows.length === 0) {
-        await client.query(`UPDATE sepay_webhook_log SET da_xu_ly = TRUE WHERE sepay_id = $1`, [payload.id]);
+        console.log(`⚠️ [MODEL SÀN] Không tìm thấy mã QR Sàn nào khớp hoặc QR đã thanh toán rồi.`);
         await client.query('COMMIT');
         return { skipped: true, reason: 'no_match' };
       }
 
       const qr = qrRes.rows[0];
+      console.log(`✅ [MODEL SÀN] Tìm thấy QR: ${qr.qr_ma} | Cần thu: ${qr.qr_so_tien}`);
 
-      // 🟢 SO SÁNH TIỀN: Dùng Math.floor() để bỏ phần thập phân, tránh lỗi 0.5đ
-      const tienKhachTra = Math.floor(Number(payload.transferAmount));
-      const tienCanThu = Math.floor(Number(qr.qr_so_tien));
-
-      if (tienKhachTra < tienCanThu) {
-        console.log(`⚠️ Thiếu tiền: Khách trả ${tienKhachTra}đ, cần thu ${tienCanThu}đ`);
-        await client.query(`UPDATE sepay_webhook_log SET da_xu_ly = TRUE WHERE sepay_id = $1`, [payload.id]);
+      if (Math.floor(Number(payload.transferAmount)) < Math.floor(Number(qr.qr_so_tien))) {
+        console.log(`⚠️ [MODEL SÀN] Chuyển thiếu tiền!`);
         await client.query('COMMIT');
         return { skipped: true, reason: 'insufficient_amount' };
       }
 
-      // Đánh dấu QR hiện tại đã thanh toán
       await client.query(
-        `UPDATE qr_thanh_toan
-         SET qr_trang_thai = 'DA_THANH_TOAN',
-             qr_ma_giao_dich = $1,
-             qr_thoi_diem_tt = now()
-         WHERE qr_ma = $2`,
+        `UPDATE qr_thanh_toan SET qr_trang_thai = 'DA_THANH_TOAN', qr_ma_giao_dich = $1, qr_thoi_diem_tt = now() WHERE qr_ma = $2`,
         [String(payload.id), qr.qr_ma]
       );
 
-      // Đếm số lượng QR còn lại của phiếu này
       const conLai = await client.query(
-        `SELECT COUNT(*)::int AS so_con_lai
-         FROM qr_thanh_toan
-         WHERE ptt_ma = $1 AND qr_trang_thai = 'CHUA_THANH_TOAN'`,
+        `SELECT COUNT(*)::int AS so_con_lai FROM qr_thanh_toan WHERE ptt_ma = $1 AND qr_trang_thai = 'CHUA_THANH_TOAN'`,
         [qr.ptt_ma]
       );
 
-      const soLuongConLai = Number(conLai.rows[0].so_con_lai);
-      console.log(`👉 Nhận mã [${qr.qr_ma}] thanh toán thành công. Phiếu ${qr.ptt_ma} còn ${soLuongConLai} mã chưa trả.`);
-
-      if (soLuongConLai === 0) {
+      if (Number(conLai.rows[0].so_con_lai) === 0) {
         await client.query(
-          `UPDATE phieu_tat_toan
-           SET ptt_trang_thai_thanh_toan = 'DA_THANH_TOAN',
-               ptt_thoi_diem_hoan_tat = now(),
-               ptt_trang_thai = 'DA_THANH_TOAN'
-           WHERE ptt_ma = $1`,
+          `UPDATE phieu_tat_toan SET ptt_trang_thai_thanh_toan = 'DA_THANH_TOAN', ptt_thoi_diem_hoan_tat = now() WHERE ptt_ma = $1`,
           [qr.ptt_ma]
         );
-        console.log(`✅ CHÚC MỪNG: Phiếu ${qr.ptt_ma} đã được thanh toán toàn bộ!`);
+        console.log(`✅ CHÚC MỪNG: PHIẾU ${qr.ptt_ma} ĐÃ THU ĐỦ TIỀN TỪ TẤT CẢ CÁC BÊN!`);
       }
 
-      await client.query(`UPDATE sepay_webhook_log SET da_xu_ly = TRUE WHERE sepay_id = $1`, [payload.id]);
       await client.query('COMMIT');
-      return { success: true, qr_ma: qr.qr_ma, ptt_ma: qr.ptt_ma };
+      return { success: true, qr_ma: qr.qr_ma };
     } catch (error) {
       await client.query('ROLLBACK');
+      console.error('❌ [MODEL SÀN] Lỗi DB:', error);
       throw error;
     } finally {
       client.release();
     }
   },
 
-  // 4. Tự động dọn dẹp phiếu chờ quá 2 phút
+  // 4. Xử lý Webhook của Shop
+  xuLyWebhookCuaShop: async (gh_ma, payload) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      if (payload.transferType !== 'in') return { skipped: true, reason: 'not_incoming' };
+
+      const noiDung = (payload.code || payload.content || '').toUpperCase();
+      console.log(`🔎 [MODEL SHOP ${gh_ma}] Đang tìm mã QR trong chuỗi: "${noiDung}"`);
+      
+      // 🟢 ĐÃ SỬA: Dùng Regex \y thay cho LIKE
+      const qrRes = await client.query(
+        `SELECT * FROM qr_thanh_toan
+         WHERE gh_ma = $1 
+         AND $2 ~ ('\\y' || qr_ma || '\\y')
+         AND qr_trang_thai = 'CHUA_THANH_TOAN'
+         ORDER BY LENGTH(qr_ma) DESC LIMIT 1 FOR UPDATE`,
+        [gh_ma, noiDung]
+      );
+
+      if (qrRes.rows.length === 0) {
+        console.log(`⚠️ [MODEL SHOP ${gh_ma}] Không tìm thấy mã QR nào khớp với nội dung trên.`);
+        await client.query('COMMIT');
+        return { skipped: true, reason: 'no_match' };
+      }
+
+      const qr = qrRes.rows[0];
+      console.log(`✅ [MODEL SHOP ${gh_ma}] Tìm thấy QR: ${qr.qr_ma} | Cần thu: ${qr.qr_so_tien}`);
+
+      if (Math.floor(Number(payload.transferAmount)) < Math.floor(Number(qr.qr_so_tien))) {
+        console.log(`⚠️ [MODEL SHOP ${gh_ma}] Chuyển thiếu tiền!`);
+        await client.query('COMMIT');
+        return { skipped: true, reason: 'insufficient_amount' };
+      }
+
+      await client.query(
+        `UPDATE qr_thanh_toan SET qr_trang_thai = 'DA_THANH_TOAN', qr_ma_giao_dich = $1, qr_thoi_diem_tt = now() WHERE qr_ma = $2`,
+        [String(payload.id), qr.qr_ma]
+      );
+
+      const conLai = await client.query(
+        `SELECT COUNT(*)::int AS so_con_lai FROM qr_thanh_toan WHERE ptt_ma = $1 AND qr_trang_thai = 'CHUA_THANH_TOAN'`,
+        [qr.ptt_ma]
+      );
+
+      if (Number(conLai.rows[0].so_con_lai) === 0) {
+        await client.query(
+          `UPDATE phieu_tat_toan SET ptt_trang_thai_thanh_toan = 'DA_THANH_TOAN', ptt_thoi_diem_hoan_tat = now() WHERE ptt_ma = $1`,
+          [qr.ptt_ma]
+        );
+        console.log(`✅ CHÚC MỪNG: PHIẾU ${qr.ptt_ma} ĐÃ THU ĐỦ TIỀN TỪ TẤT CẢ CÁC BÊN!`);
+      }
+
+      await client.query('COMMIT');
+      return { success: true, qr_ma: qr.qr_ma };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      console.error(`❌ [MODEL SHOP ${gh_ma}] Lỗi DB:`, error);
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
+
+  // 5. Dọn dẹp phiếu quá hạn
   donDepPhieuQuaHan: async () => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      
       const expiredQuery = `
         SELECT ptt_ma FROM phieu_tat_toan 
         WHERE ptt_trang_thai_thanh_toan = 'CHO_THANH_TOAN' 
@@ -225,14 +257,11 @@ const TatToanModel = {
       
       if (expiredRes.rows.length > 0) {
         const pttIds = expiredRes.rows.map(r => r.ptt_ma);
-        
         await client.query(`DELETE FROM qr_thanh_toan WHERE ptt_ma = ANY($1)`, [pttIds]);
         await client.query(`DELETE FROM chitiet_tat_toan WHERE ptt_ma = ANY($1)`, [pttIds]);
         await client.query(`DELETE FROM phieu_tat_toan WHERE ptt_ma = ANY($1)`, [pttIds]);
-        
         console.log(`🧹 [TẤT TOÁN] Đã tự động hủy ${pttIds.length} phiếu nháp quá hạn 2 phút.`);
       }
-      
       await client.query('COMMIT');
     } catch (error) {
       await client.query('ROLLBACK');
@@ -241,33 +270,46 @@ const TatToanModel = {
       client.release();
     }
   },
-
-  // 5. Hàm xác nhận thủ công
-  xacNhanTatToan: async (kho_ma, data) => {
+    xuLyWebhookCuaDVVC: async (dvvc_ma, payload) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const pttRes = await client.query(`SELECT ptt_ma FROM phieu_tat_toan ORDER BY ptt_ma DESC LIMIT 1`);
-      let newPttMa = 'PTT0000001';
-      if (pttRes.rows.length > 0) {
-        const currentNum = parseInt(pttRes.rows[0].ptt_ma.replace('PTT', ''), 10);
-        newPttMa = 'PTT' + (currentNum + 1).toString().padStart(7, '0');
+      if (payload.transferType !== 'in') return { skipped: true };
+
+      const noiDung = (payload.code || payload.content || '').toUpperCase();
+      
+      // Tìm mã QR của Phiếu chi (VD: CCD0000001)
+      const qrRes = await client.query(
+        `SELECT q.*, p.dvvc_ma FROM qr_chi_dvvc q
+         JOIN phieu_chi_dvvc p ON q.pcd_ma = p.pcd_ma
+         WHERE p.dvvc_ma = $1 
+         AND $2 ~ ('\\y' || q.qr_ma || '\\y')
+         AND q.qr_trang_thai = 'CHUA_THANH_TOAN'
+         LIMIT 1 FOR UPDATE`,
+        [dvvc_ma, noiDung]
+      );
+
+      if (qrRes.rows.length === 0) {
+        await client.query('COMMIT');
+        return { skipped: true, reason: 'no_match' };
       }
 
-      await client.query(`
-        INSERT INTO phieu_tat_toan (ptt_ma, kho_ma, ptt_tong_tien_san, ptt_tong_tien_shop) 
-        VALUES ($1, $2, $3, $4)
-      `, [newPttMa, kho_ma, data.tongSan, data.tongShop]);
+      const qr = qrRes.rows[0];
+      
+      // Đánh dấu QR đã thanh toán
+      await client.query(
+        `UPDATE qr_chi_dvvc SET qr_trang_thai = 'DA_THANH_TOAN', qr_thoi_diem_tt = now() WHERE qr_ma = $1`,
+        [qr.qr_ma]
+      );
 
-      for (const item of data.chiTiet) {
-        await client.query(`
-          INSERT INTO chitiet_tat_toan (ptt_ma, dts_ma, ctt_tien_san, ctt_tien_shop) 
-          VALUES ($1, $2, $3, $4)
-        `, [newPttMa, item.dts_ma, item.tien_san, item.tien_shop]);
-      }
+      // Đánh dấu Phiếu chi hoàn tất
+      await client.query(
+        `UPDATE phieu_chi_dvvc SET pcd_trang_thai = 'DA_THANH_TOAN', pcd_ngay_hoan_tat = now() WHERE pcd_ma = $1`,
+        [qr.pcd_ma]
+      );
 
       await client.query('COMMIT');
-      return { message: "Xác nhận tất toán thành công!" };
+      return { success: true, pcd_ma: qr.pcd_ma };
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;

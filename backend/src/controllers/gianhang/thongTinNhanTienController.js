@@ -12,11 +12,12 @@ const ThongTinNhanTienController = {
     },
 
     // 2. Lưu thông tin (Thêm mới/Cập nhật)
+    // src/controllers/gianhang/thongTinNhanTienController.js
     save: async (req, res) => {
         try {
-            const { gh_ma, nh_ma, ttnt_gianhang_tentaikhoan, ttnt_gianhang_sotaikhoan } = req.body;
+            // 🟢 Lấy thêm sepay_webhook_secret từ req.body
+            const { gh_ma, nh_ma, ttnt_gianhang_tentaikhoan, ttnt_gianhang_sotaikhoan, sepay_webhook_secret } = req.body;
             
-            // Validate bắt buộc phải có đủ 4 trường
             if (!gh_ma || !nh_ma || !ttnt_gianhang_tentaikhoan || !ttnt_gianhang_sotaikhoan) {
                 return res.status(400).json({ message: 'Vui lòng nhập đầy đủ thông tin tài khoản.' });
             }
@@ -25,7 +26,8 @@ const ThongTinNhanTienController = {
                 gh_ma,
                 nh_ma,
                 ttnt_gianhang_tentaikhoan, 
-                ttnt_gianhang_sotaikhoan
+                ttnt_gianhang_sotaikhoan,
+                sepay_webhook_secret // 🟢 Truyền xuống Model
             });
             
             res.status(200).json({ message: 'Lưu thông tin nhận tiền thành công!', data: result });

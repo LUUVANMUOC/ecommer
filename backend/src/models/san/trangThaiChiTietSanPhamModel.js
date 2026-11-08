@@ -86,7 +86,7 @@ const TrangThaiChiTietSanPhamModel = {
             SELECT 
                 l.ctsp_ma, l.ttctsp_ma, l.ctttsp_thoidiem, l.ctttsp_yeucau, l.ctttsp_phanhoi,
                 ctsp.ctsp_ten, ctsp.ctsp_mota, ctsp.ctsp_soluongton,
-                ctsp.ctsp_chieudai, ctsp.ctsp_chieurong, ctsp.ctsp_khoiluong,
+                ctsp.ctsp_chieudai, ctsp.ctsp_chieurong, ctsp.ctsp_chieucao, ctsp.ctsp_khoiluong,
                 ctsp.sp_ma, ctsp.ctsp_gianban,
                 sp.sp_ten, sp.gh_ma, sp.sp_mota AS sp_mota_chung,
                 nh.nh_ten,
@@ -126,7 +126,7 @@ const TrangThaiChiTietSanPhamModel = {
         return result.rows;
     },
 
-    // Lấy TẤT CẢ sản phẩm của mọi gian hàng
+    // Lấy TẤT CẢ sản phẩm của mọi gian hàng (Đã bổ sung đầy đủ thuộc tính)
     getAllSanPham: async () => {
         const query = `
             WITH latest_status AS (
@@ -137,6 +137,9 @@ const TrangThaiChiTietSanPhamModel = {
             )
             SELECT 
                 ctsp.ctsp_ma, ctsp.ctsp_ten, ctsp.ctsp_gianban, ctsp.ctsp_soluongton,
+                ctsp.ctsp_chieudai, ctsp.ctsp_chieurong, ctsp.ctsp_chieucao, ctsp.ctsp_khoiluong,
+                ctsp.ctsp_ngaytao, ctsp.ctsp_luotxem, ctsp.ctsp_luotthich, ctsp.ctsp_luotmua,
+                ctsp.ctsp_diemdanhgiatrungbinh, ctsp.ctsp_mota,
                 sp.sp_ma, sp.sp_ten,
                 gh.gh_ma, gh.gh_ten,
                 ls.ttctsp_ma, tt.ttctsp_ten,
@@ -153,7 +156,8 @@ const TrangThaiChiTietSanPhamModel = {
         const result = await pool.query(query);
         return result.rows;
     },
-        // 🟢 THÊM HÀM NÀY ĐỂ GỬI DUYỆT HÀNG LOẠT
+
+    // Gửi duyệt hàng loạt
     submitAllByProduct: async (sp_ma) => {
         const client = await pool.connect();
         try {

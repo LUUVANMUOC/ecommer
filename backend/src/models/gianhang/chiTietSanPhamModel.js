@@ -5,15 +5,6 @@ const path = require('path');
 
 const UPLOAD_DIR = path.join(__dirname, '../../../public/uploads/products');
 
-/**
- * Tính ctsp_gianban = gb_gia × (1 + psck_phantram)
- * - ctsp_gianban = giá KHÁCH TRẢ (đã cộng phí sàn)
- * - Giá gốc shop nhận (gb_gia) đã lưu trong bảng giabangoc
- *
- * psck_phantram chấp nhận cả 2 dạng:
- *   - Nếu > 1 → coi là % (VD: 5 = 5%) → chia 100
- *   - Nếu <= 1 → coi là thập phân (VD: 0.05 = 5%) → dùng trực tiếp
- */
 const tinhGianBan = (gb_gia, psck_phantram) => {
     const giaGoc = Number(gb_gia) || 0;
     const psckRaw = Number(psck_phantram) || 0;
@@ -100,23 +91,22 @@ const ChiTietSanPhamModel = {
         try {
             await client.query('BEGIN');
 
-            // Tính ctsp_gianban trước khi INSERT
             const ctsp_gianban = tinhGianBan(data.gb_gia, data.psck_phantram);
 
+            // 🟢 Thêm ctsp_chieucao
             const insertCtspQuery = `
                 INSERT INTO chitietsanpham (
                     ctsp_ma, ctsp_ten, ctsp_mota, ctsp_soluongton, 
-                    ctsp_chieudai, ctsp_chieurong, ctsp_khoiluong, sp_ma, nh_ma,
+                    ctsp_chieudai, ctsp_chieurong, ctsp_chieucao, ctsp_khoiluong, sp_ma, nh_ma,
                     ctsp_gianban
-                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING *
+                ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING *
             `;
             await client.query(insertCtspQuery, [
                 data.ctsp_ma, data.ctsp_ten, data.ctsp_mota, data.ctsp_soluongton,
-                data.ctsp_chieudai, data.ctsp_chieurong, data.ctsp_khoiluong, data.sp_ma, data.nh_ma,
+                data.ctsp_chieudai, data.ctsp_chieurong, data.ctsp_chieucao, data.ctsp_khoiluong, data.sp_ma, data.nh_ma,
                 ctsp_gianban
             ]);
 
-            // Lưu giá gốc vào bảng giabangoc (source of truth)
             if (data.gb_gia !== undefined && data.gb_gia !== null) {
                 const gb_ma = 'GB' + Math.random().toString(36).substring(2, 10);
                 await client.query(
@@ -125,7 +115,6 @@ const ChiTietSanPhamModel = {
                 );
             }
 
-            // Ảnh
             if (data.images && data.images.length > 0) {
                 for (let i = 0; i < data.images.length; i++) {
                     const img = data.images[i];
@@ -137,7 +126,6 @@ const ChiTietSanPhamModel = {
                 }
             }
 
-            // Thuộc tính
             if (Array.isArray(data.thuoctinh) && data.thuoctinh.length > 0) {
                 const seen = new Set();
                 for (const tt of data.thuoctinh) {
@@ -165,24 +153,23 @@ const ChiTietSanPhamModel = {
         }
     },
 
-        updateFullDetail: async (id, data) => {
+    updateFullDetail: async (id, data) => {
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
 
-            // 1. Cập nhật thông tin
+            // 🟢 Thêm ctsp_chieucao
             const updateCtspQuery = `
                 UPDATE chitietsanpham 
                 SET ctsp_ten = $1, ctsp_mota = $2, ctsp_soluongton = $3, 
-                    ctsp_chieudai = $4, ctsp_chieurong = $5, ctsp_khoiluong = $6, nh_ma = $7
-                WHERE ctsp_ma = $8 RETURNING *
+                    ctsp_chieudai = $4, ctsp_chieurong = $5, ctsp_chieucao = $6, ctsp_khoiluong = $7, nh_ma = $8
+                WHERE ctsp_ma = $9 RETURNING *
             `;
             await client.query(updateCtspQuery, [
                 data.ctsp_ten, data.ctsp_mota, data.ctsp_soluongton,
-                data.ctsp_chieudai, data.ctsp_chieurong, data.ctsp_khoiluong, data.nh_ma, id
+                data.ctsp_chieudai, data.ctsp_chieurong, data.ctsp_chieucao, data.ctsp_khoiluong, data.nh_ma, id
             ]);
 
-            // 2. Giá gốc: chỉ thêm dòng lịch sử mới nếu giá thay đổi
             if (data.gb_gia !== undefined && data.gb_gia !== null) {
                 const currentPriceRes = await client.query(
                     `SELECT gb_gia FROM giabangoc WHERE ctsp_ma = $1 ORDER BY gb_thoidiem DESC LIMIT 1`,
@@ -200,7 +187,6 @@ const ChiTietSanPhamModel = {
                 }
             }
 
-            // 3. LUÔN tính lại ctsp_gianban từ giá mới nhất + phí sàn hiện tại
             const latestPriceRes = await client.query(
                 `SELECT gb_gia FROM giabangoc WHERE ctsp_ma = $1 ORDER BY gb_thoidiem DESC LIMIT 1`,
                 [id]
@@ -212,7 +198,6 @@ const ChiTietSanPhamModel = {
                 [ctsp_gianban, id]
             );
 
-            // 4. Ảnh (xóa cũ, giữ mới, thêm mới)
             const currentImgsRes = await client.query('SELECT hasp_ma, hasp_link FROM hinhanhsanpham WHERE ctsp_ma = $1', [id]);
             const currentImgs = currentImgsRes.rows;
             const keepImgs = data.images.filter(img => img.hasp_ma);
@@ -249,7 +234,6 @@ const ChiTietSanPhamModel = {
                 `, [hasp_ma, img.hasp_link, img.hasp_laanhchinh, img.hasp_thutu, id, img.hasp_mota]);
             }
 
-            // 5. Thuộc tính: xóa hết + insert lại
             await client.query('DELETE FROM giatrithuoctinh WHERE ctsp_ma = $1', [id]);
             if (Array.isArray(data.thuoctinh) && data.thuoctinh.length > 0) {
                 const seen = new Set();
@@ -268,7 +252,6 @@ const ChiTietSanPhamModel = {
                 }
             }
 
-            // 🟢 6. TỰ ĐỘNG CHUYỂN TRẠNG THÁI SANG CHỜ DUYỆT KHI SHOP SỬA
             const latestStatusRes = await client.query(
                 `SELECT ttctsp_ma FROM chitiettrangthaisanpham 
                  WHERE ctsp_ma = $1 ORDER BY ctttsp_thoidiem DESC LIMIT 1`,
@@ -276,9 +259,7 @@ const ChiTietSanPhamModel = {
             );
             const currentStatus = latestStatusRes.rows[0]?.ttctsp_ma;
 
-            // Nếu đang bán (0002) hoặc bị đình chỉ (0003) mà Shop sửa -> Đưa về Chờ duyệt (0001)
             if (currentStatus === 'TTCTSP0002' || currentStatus === 'TTCTSP0003') {
-                // Lấy mã sàn (stmdt_ma) giống hệt logic trong Controller bạn đã cung cấp
                 const stmdtRes = await client.query(
                     `SELECT stmdt_ma FROM san_thuong_mai_dien_tu ORDER BY stmdt_ma ASC LIMIT 1`
                 );
@@ -355,6 +336,7 @@ const ChiTietSanPhamModel = {
             client.release();
         }
     },
+    
     increaseView: async (ctsp_ma) => {
         const query = `
             UPDATE chitietsanpham 
@@ -366,10 +348,7 @@ const ChiTietSanPhamModel = {
         return result.rows[0];
     },
 
-    // ✅ Thêm hàm tăng/giảm lượt thích
     toggleLike: async (ctsp_ma, isLiked) => {
-        // Nếu isLiked = true (đang thích -> bấm hủy) => Trừ 1
-        // Nếu isLiked = false (chưa thích -> bấm thích) => Cộng 1
         const action = isLiked ? '- 1' : '+ 1';
         const query = `
             UPDATE chitietsanpham 

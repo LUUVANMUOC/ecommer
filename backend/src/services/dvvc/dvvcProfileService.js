@@ -17,7 +17,6 @@ const DvvcProfileService = {
         let hinhAnhPath = existing.DVVC_HinhAnh;
         if (file) {
             hinhAnhPath = `/uploads/dvvc/${file.filename}`;
-            // Xóa ảnh cũ nếu có
             if (existing.DVVC_HinhAnh && existing.DVVC_HinhAnh.startsWith('/uploads/')) {
                 const oldFilePath = path.join(__dirname, '../../../public', existing.DVVC_HinhAnh);
                 if (fs.existsSync(oldFilePath)) fs.unlinkSync(oldFilePath);
@@ -34,10 +33,20 @@ const DvvcProfileService = {
     },
 
     saveBankAccount: async (dvvc_ma, data) => {
+        // Kiểm tra các trường bắt buộc
         if (!data.NganHang_Ma || !data.TTNT_DVVC_SoTaiKhoan || !data.TTNT_DVVC_TenTaiKhoan) {
             throw new Error('Vui lòng nhập đầy đủ thông tin ngân hàng!');
         }
-        return await DvvcProfileModel.saveBankAccount(dvvc_ma, data);
+        
+        // 🟢 Chuẩn bị dữ liệu để gửi xuống Model (bao gồm cả sepay_webhook_secret)
+        const bankData = {
+            NganHang_Ma: data.NganHang_Ma,
+            TTNT_DVVC_SoTaiKhoan: data.TTNT_DVVC_SoTaiKhoan,
+            TTNT_DVVC_TenTaiKhoan: data.TTNT_DVVC_TenTaiKhoan,
+            sepay_webhook_secret: data.sepay_webhook_secret || null
+        };
+
+        return await DvvcProfileModel.saveBankAccount(dvvc_ma, bankData);
     },
 
     deleteBankAccount: async (dvvc_ma) => {

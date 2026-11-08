@@ -27,7 +27,16 @@ const TatToanController = {
     } catch (error) {
       res.status(400).json({ message: error.message });
     }
+  },
+  chiTienHangLoat: async (req, res) => {
+  try {
+    const ketQua = await SepayPayoutService.payoutChoShop();
+    const thanhCong = ketQua.filter(k => k.success).length;
+    res.status(200).json({ message: 'Hoàn tất', thanhCong, chiTiet: ketQua });
+  } catch (error) {
+    res.status(500).json({ message: error.message });
   }
+}
 };
 
 module.exports = TatToanController;

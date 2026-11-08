@@ -31,37 +31,43 @@ export const getBankBin = (bankName) => {
   if (name.includes("agribank") || name.includes("vba")) return "970405";
   if (name.includes("sacombank") || name.includes("stb")) return "970403";
   if (name.includes("tpbank") || name.includes("tpb")) return "970423";
-  if (name.includes("sacombank") || name.includes("stb")) return "970403";
   return "970436";
 };
 
 export const buildVietQrUrl = (bank, amount = 0, addInfo = "") => {
-  // Nếu không truyền data thì trả về chuỗi rỗng
   if (!bank) return "";
 
-  // ✅ Tự động nhận diện key của Sàn, Shop hoặc Khách hàng (cả viết hoa và viết thường)
+  // ✅ Đã bổ sung các key viết thường có dấu gạch dưới (so_tai_khoan) do Backend trả về
   const accountNo = 
     bank.TTNT_STMDT_SoTaiKhoan || 
     bank.ttnt_stmdt_sotaikhoan || 
     bank.so_taikhoan || 
+    bank.so_tai_khoan ||       // 🟢 Thêm key này cho ĐVVC
     bank.ttnt_gianhang_sotaikhoan || 
-    bank.ttnt_kh_sotaikhoan || "";
+    bank.ttnt_kh_sotaikhoan || 
+    bank.TTNT_DVVC_SoTaiKhoan ||   
+    bank.ttnt_dvvc_sotaikhoan || "";
 
   const accountName = 
     bank.TTNT_STMDT_TenTaiKhoan || 
     bank.ttnt_stmdt_tentaikhoan || 
     bank.ten_taikhoan || 
+    bank.ten_tai_khoan ||      // 🟢 Thêm key này cho ĐVVC
     bank.ttnt_gianhang_tentaikhoan || 
-    bank.ttnt_kh_tennguoinhan || "";
+    bank.ttnt_kh_tennguoinhan || 
+    bank.TTNT_DVVC_TenTaiKhoan ||  
+    bank.ttnt_dvvc_tentaikhoan || "";
   
   const bankName = 
     bank.NHG_Ten || 
     bank.nhg_ten || 
     bank.nganhang_ten || 
+    bank.ten_ngan_hang ||      // 🟢 Thêm key này cho ĐVVC
     bank.NganHang_Ma || 
-    bank.nganhang_ma || "";
+    bank.nganhang_ma || 
+    bank.ma_ngan_hang || "";   // 🟢 Thêm key này cho ĐVVC
 
-  // Nếu không có số tài khoản, trả về ảnh lỗi để dễ nhận biết thay vì chuỗi rỗng
+  // Nếu không có số tài khoản, trả về ảnh lỗi để dễ nhận biết
   if (!accountNo) {
     return `https://placehold.co/400x400?text=Thieu+So+Tai+Khoan`;
   }

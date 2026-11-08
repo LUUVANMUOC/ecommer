@@ -163,7 +163,6 @@ const ChiTietSanPhamKhachHang = () => {
 
     // 🟢 XỬ LÝ KHI BẤM NÚT "MUA NGAY"
     if (isBuyNow) {
-      // 1. Tạo object giả lập y hệt cấu trúc của một item trong Giỏ Hàng
       const buyNowItem = {
         gh_ma: product.gh_ma,
         gh_ten: product.gh_ten,
@@ -171,16 +170,14 @@ const ChiTietSanPhamKhachHang = () => {
         sp_ten: product.sp_ten,
         ctsp_ma: activeVariant.ctsp_ma,
         ctsp_ten: activeVariant.ctsp_ten,
-        image: activeVariant.images?.[0]?.hasp_link || "", // Lấy đường dẫn ảnh (không cần ghép Backend_URL)
+        image: activeVariant.images?.[0]?.hasp_link || "",
         ctsp_gianban: activeVariant.ctsp_gianban,
-        ctgh_soluong: quantity, // Số lượng bạn đã chọn bằng nút +/-
+        ctgh_soluong: quantity,
         ctsp_soluongton: activeVariant.ctsp_soluongton,
       };
 
-      // 2. Tính tổng tiền (để đề phòng trang Thanh Toán có dùng)
       const totalPrice = Number(activeVariant.ctsp_gianban) * quantity;
 
-      // 3. Chuyển thẳng sang trang Thanh Toán
       navigate("/khach-hang/thanh-toan", {
         state: {
           checkoutItems: [buyNowItem],
@@ -375,7 +372,6 @@ const ChiTietSanPhamKhachHang = () => {
                 <span className="w-24 text-sm font-semibold text-[#64748B]">
                   Số lượng:
                 </span>
-                {/* 🟢 CẬP NHẬT NÚT TĂNG GIẢM */}
                 <div className="flex items-center border border-[#E2E8F0] rounded-xl overflow-hidden bg-white">
                   <button
                     onClick={() => handleQuantityChange(-1)}
@@ -430,7 +426,6 @@ const ChiTietSanPhamKhachHang = () => {
         </div>
 
         <div className="bg-white rounded-3xl shadow-sm border border-[#E2E8F0] p-5 flex items-center justify-between mb-6">
-          {/* 🟢 ĐÃ BỌC LINK ĐỂ CHUYỂN SANG TRANG SHOP */}
           <Link
             to={`/shop/${product.gh_ma}`}
             className="flex items-center gap-4 cursor-pointer group"
@@ -464,12 +459,29 @@ const ChiTietSanPhamKhachHang = () => {
           <div className="flex gap-2">
             <button
               onClick={async () => {
-                if (!user) return navigate("/khach-hang/login");
-                const res = await theoDoiShopService.toggleFollow(
-                  user.kh_ma,
-                  product.gh_ma,
-                );
-                setIsFollowing(res.data.isFollowing);
+                if (!user || user.role !== "khachhang") {
+                  showToast(
+                    "Vui lòng đăng nhập bằng tài khoản khách hàng để theo dõi Shop!",
+                    "error",
+                  );
+                  return navigate("/khach-hang/login");
+                }
+
+                try {
+                  const res = await theoDoiShopService.toggleFollow(
+                    user.kh_ma,
+                    product.gh_ma,
+                  );
+                  setIsFollowing(res.data.isFollowing);
+                  showToast(
+                    res.data.isFollowing
+                      ? "Đã theo dõi Shop thành công!"
+                      : "Đã bỏ theo dõi Shop!",
+                    "success",
+                  );
+                } catch (error) {
+                  showToast("Có lỗi xảy ra, vui lòng thử lại!", "error");
+                }
               }}
               className={`px-5 py-2 text-sm font-bold rounded-xl flex items-center gap-1 border transition-colors ${isFollowing ? "bg-gray-100 border-[#E2E8F0] text-gray-600" : "border-[#2563EB] text-[#2563EB] bg-blue-50 hover:bg-blue-100"}`}
             >
@@ -481,6 +493,7 @@ const ChiTietSanPhamKhachHang = () => {
           </div>
         </div>
 
+        {/* 🟢 PHẦN CHI TIẾT SẢN PHẨM ĐÃ ĐƯỢC CẬP NHẬT THÊM THÔNG SỐ */}
         <div className="bg-white rounded-3xl shadow-sm border border-[#E2E8F0] p-6 lg:p-8">
           <h2 className="text-lg font-bold text-[#0F172A] bg-[#F8FAFC] p-3 rounded-xl mb-5 inline-block">
             Chi Tiết Sản Phẩm
@@ -488,6 +501,42 @@ const ChiTietSanPhamKhachHang = () => {
           <p className="text-sm text-[#334155] whitespace-pre-line leading-relaxed">
             {product.sp_mota}
           </p>
+
+          {/* 🟢 THÊM KHỐI THÔNG SỐ MẶC ĐỊNH CỦA PHÂN LOẠI */}
+          <div className="mt-8 pt-6 border-t border-[#E2E8F0]">
+            <h3 className="font-bold text-sm text-[#0F172A] mb-4">
+              Thông số sản phẩm:
+            </h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-3 gap-x-8 text-sm">
+              <div className="flex">
+                <span className="w-28 text-[#64748B]">Ngành hàng:</span>
+                <span className="font-medium text-[#0F172A]">
+                  {activeVariant?.nh_ten || "Chưa cập nhật"}
+                </span>
+              </div>
+              <div className="flex">
+                <span className="w-28 text-[#64748B]">Thương hiệu:</span>
+                <span className="font-medium text-[#0F172A]">
+                  {product.th_ten || "Chưa cập nhật"}
+                </span>
+              </div>
+              <div className="flex">
+                <span className="w-28 text-[#64748B]">Kích thước:</span>
+                <span className="font-medium text-[#0F172A]">
+                  {activeVariant?.ctsp_chieudai || 0} x{" "}
+                  {activeVariant?.ctsp_chieurong || 0} x{" "}
+                  {activeVariant?.ctsp_chieucao || 0} cm
+                </span>
+              </div>
+              <div className="flex">
+                <span className="w-28 text-[#64748B]">Khối lượng:</span>
+                <span className="font-medium text-[#0F172A]">
+                  {activeVariant?.ctsp_khoiluong || 0} kg
+                </span>
+              </div>
+            </div>
+          </div>
+
           {activeVariant?.thuoctinh?.length > 0 && (
             <div className="mt-8 pt-6 border-t border-[#E2E8F0]">
               <h3 className="font-bold text-sm text-[#0F172A] mb-3">

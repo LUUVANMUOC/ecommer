@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import sanPhamService from "../../services/gianhang/sanPhamService";
 import danhMucSanPhamService from "../../services/gianhang/danhMucSanPhamService";
 import chiTietSanPhamService from "../../services/gianhang/chiTietSanPhamService";
-import thuongHieuService from "../../services/san/thuongHieuService"; // 🟢 Thêm import này
+import thuongHieuService from "../../services/san/thuongHieuService";
 import CrudDrawer from "../common/Crud/CrudDrawer";
 
 export const BACKEND_URL =
@@ -80,10 +80,21 @@ export const fetchCovers = async (products) => {
     const prices = variants
       .map((v) => Number(v.gb_gia))
       .filter((p) => Number.isFinite(p) && p > 0);
+
+    // 🟢 TÍNH TOÁN TRẠNG THÁI TỔNG CỦA SẢN PHẨM DỰA VÀO CÁC PHÂN LOẠI
+    let status = "draft"; // Mặc định là chưa gửi duyệt
+    const statuses = variants.map((v) => v.trangthai_lichsu?.[0]?.ttctsp_ma);
+
+    // Ưu tiên: Đang bán > Chờ duyệt > Bị đình chỉ
+    if (statuses.includes("TTCTSP0002")) status = "active";
+    else if (statuses.includes("TTCTSP0001")) status = "pending";
+    else if (statuses.includes("TTCTSP0003")) status = "suspended";
+
     next[products[i].sp_ma] = {
       url: cover ? imgUrl(cover.hasp_link) : "",
       minPrice: prices.length ? Math.min(...prices) : null,
       maxPrice: prices.length ? Math.max(...prices) : null,
+      status: status, // 🟢 Trả về trạng thái
     };
   });
   return next;
@@ -294,24 +305,19 @@ export const SpecRow = ({ label, value }) => (
 );
 
 // 🟢 ĐÃ CẬP NHẬT: Ảnh lớn có mũi tên, tự động cuộn thanh thumbnail
-// 🟢 ĐÃ CẬP NHẬT: Thêm nút mũi tên cuộn thumbnail
 export const Gallery = ({ images, index, onIndex }) => {
   const total = images.length;
   const activeThumbRef = useRef(null);
-  const thumbContainerRef = useRef(null); // 🟢 Ref cho khung chứa thumbnail
+  const thumbContainerRef = useRef(null);
 
-  // Tự động cuộn thumbnail tới ảnh đang xem (chỉ cuộn trong khung, không cuộn trang)
   useEffect(() => {
     if (activeThumbRef.current && thumbContainerRef.current) {
       const container = thumbContainerRef.current;
       const activeEl = activeThumbRef.current;
-
-      // Tính toán vị trí để ảnh active nằm giữa khung
       const scrollLeft =
         activeEl.offsetLeft -
         container.offsetWidth / 2 +
         activeEl.offsetWidth / 2;
-
       container.scrollTo({ left: scrollLeft, behavior: "smooth" });
     }
   }, [index]);
@@ -376,9 +382,7 @@ export const Gallery = ({ images, index, onIndex }) => {
       </p>
 
       {total > 1 && (
-        // 🟢 KHUNG CHỨA THUMBNAIL VÀ 2 NÚT MŨI TÊN
         <div className="relative group/thumb">
-          {/* Nút cuộn trái */}
           <button
             onClick={() => {
               if (thumbContainerRef.current) {
@@ -395,7 +399,6 @@ export const Gallery = ({ images, index, onIndex }) => {
             </span>
           </button>
 
-          {/* Dãy ảnh thumbnail */}
           <div
             ref={thumbContainerRef}
             className="flex gap-2 overflow-x-auto pb-2 custom-scrollbar"
@@ -422,7 +425,6 @@ export const Gallery = ({ images, index, onIndex }) => {
             ))}
           </div>
 
-          {/* Nút cuộn phải */}
           <button
             onClick={() => {
               if (thumbContainerRef.current) {

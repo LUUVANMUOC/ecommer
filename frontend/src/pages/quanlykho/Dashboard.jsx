@@ -7,7 +7,6 @@ const QuanLyKhoDashboard = () => {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
 
-  // Cấu hình Menu cho Quản lý kho
   const menuConfig = [
     {
       title: "Quản lý kho",
@@ -28,6 +27,14 @@ const QuanLyKhoDashboard = () => {
       ],
     },
     {
+      title: "Nhập / Xuất kho",
+      children: [
+        // Đổi tên menu cho phù hợp
+        { title: "Quản lý phiếu kho", path: "/quan-ly-kho/phieu-kho" },
+        { title: "Lịch sử phiếu kho", path: "/quan-ly-kho/phieu-kho/lich-su" },
+      ],
+    },
+    {
       title: "Tài chính",
       children: [
         { title: "Thu tiền Shipper", path: "/quan-ly-kho/thu-tien-shipper" },
@@ -36,7 +43,6 @@ const QuanLyKhoDashboard = () => {
     },
   ];
 
-  // Cấu hình Màu sắc (Màu chàm Indigo nhận diện Quản lý kho)
   const theme = {
     sidebarBg: "#1e293b",
     sidebarText: "#e2e8f0",

@@ -31,6 +31,34 @@ const STATUS_MAP = {
   TTDH06: { label: "Đã Hủy", color: "text-red-600 bg-red-50 border-red-200" },
 };
 
+// Cấu hình Icon/Màu cho Lịch sử vận chuyển
+const EVENT_CONFIG = {
+  HE_THONG: {
+    icon: "receipt_long",
+    color: "text-gray-700",
+    bg: "bg-gray-50",
+    border: "border-gray-200",
+  },
+  DIEU_PHOI: {
+    icon: "assignment_ind",
+    color: "text-teal-700",
+    bg: "bg-teal-50",
+    border: "border-teal-200",
+  },
+  THU_KHO: {
+    icon: "warehouse",
+    color: "text-purple-700",
+    bg: "bg-purple-50",
+    border: "border-purple-200",
+  },
+  SHIPPER: {
+    icon: "local_shipping",
+    color: "text-blue-700",
+    bg: "bg-blue-50",
+    border: "border-blue-200",
+  },
+};
+
 const QuanLyDonHang = () => {
   const { user } = useContext(AuthContext);
   const gh_ma = user?.gh_ma || user?.GH_Ma || user?.id;
@@ -44,7 +72,6 @@ const QuanLyDonHang = () => {
   });
   const [confirmingId, setConfirmingId] = useState(null);
 
-  // State cho Modal Chi tiết
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [orderDetail, setOrderDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -200,32 +227,29 @@ const QuanLyDonHang = () => {
 
       {/* ✅ MODAL CHI TIẾT ĐƠN HÀNG */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-xl flex flex-col">
-            {/* Header Modal */}
-            <div className="p-6 border-b border-[#E2E8F0] flex justify-between items-center sticky top-0 bg-white z-10">
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-6xl max-h-[90vh] overflow-y-auto shadow-2xl flex flex-col custom-scrollbar">
+            <div className="p-6 border-b border-[#E2E8F0] flex justify-between items-center sticky top-0 bg-white z-10 rounded-t-3xl">
               <h3 className="text-xl font-bold text-[#0F172A]">
                 Chi Tiết Đơn Hàng {orderDetail?.DTS_Ma}
               </h3>
               <button
                 onClick={() => setIsModalOpen(false)}
-                className="text-gray-400 hover:text-red-500"
+                className="text-gray-400 hover:text-red-500 bg-gray-50 hover:bg-red-50 p-2 rounded-full transition-colors"
               >
                 <span className="material-symbols-outlined">close</span>
               </button>
             </div>
 
-            {/* Body Modal */}
             <div className="p-6 bg-[#F8FAFC] flex-1">
               {loadingDetail ? (
                 <div className="text-center py-10 text-[#2563EB] font-semibold animate-pulse">
                   Đang tải dữ liệu...
                 </div>
               ) : orderDetail ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Cột 1: Thông tin người nhận & Vận chuyển */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                  {/* CỘT TRÁI: THÔNG TIN CHUNG */}
                   <div className="space-y-6">
-                    {/* Box Người nhận */}
                     <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-sm">
                       <h4 className="font-bold text-[#0F172A] mb-3 flex items-center gap-2 border-b pb-2">
                         <span className="material-symbols-outlined text-[#2563EB]">
@@ -258,7 +282,6 @@ const QuanLyDonHang = () => {
                       </div>
                     </div>
 
-                    {/* Box Vận chuyển */}
                     <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-sm">
                       <h4 className="font-bold text-[#0F172A] mb-3 flex items-center gap-2 border-b pb-2">
                         <span className="material-symbols-outlined text-[#2563EB]">
@@ -290,50 +313,6 @@ const QuanLyDonHang = () => {
                       </div>
                     </div>
 
-                    {/* Box Voucher */}
-                    <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-sm">
-                      <h4 className="font-bold text-[#0F172A] mb-3 flex items-center gap-2 border-b pb-2">
-                        <span className="material-symbols-outlined text-[#2563EB]">
-                          local_activity
-                        </span>{" "}
-                        Voucher Đã Áp Dụng
-                      </h4>
-                      <div className="text-sm space-y-3">
-                        <div>
-                          <p className="text-gray-500 mb-1">Voucher Shop:</p>
-                          {orderDetail.TenVoucherShop ? (
-                            <p className="font-semibold text-emerald-600 bg-emerald-50 p-2 rounded-lg">
-                              {orderDetail.TenVoucherShop} (Giảm{" "}
-                              {orderDetail.PhanTramGiamShop}%)
-                            </p>
-                          ) : (
-                            <p className="text-gray-400 italic">
-                              Không sử dụng
-                            </p>
-                          )}
-                        </div>
-                        <div>
-                          <p className="text-gray-500 mb-1">
-                            Voucher Vận Chuyển:
-                          </p>
-                          {orderDetail.TenVoucherVC ? (
-                            <p className="font-semibold text-orange-600 bg-orange-50 p-2 rounded-lg">
-                              {orderDetail.TenVoucherVC} (Giảm{" "}
-                              {orderDetail.PhanTramGiamVC}%)
-                            </p>
-                          ) : (
-                            <p className="text-gray-400 italic">
-                              Không sử dụng
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Cột 2: Sản phẩm & Tài chính & Lịch sử */}
-                  <div className="space-y-6">
-                    {/* Box Sản phẩm */}
                     <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-sm">
                       <h4 className="font-bold text-[#0F172A] mb-3 flex items-center gap-2 border-b pb-2">
                         <span className="material-symbols-outlined text-[#2563EB]">
@@ -371,7 +350,7 @@ const QuanLyDonHang = () => {
                       </div>
                     </div>
 
-                    {/* Box Tài chính */}
+                    {/* 🟢 KHỐI THANH TOÁN CHI TIẾT */}
                     <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-sm">
                       <h4 className="font-bold text-[#0F172A] mb-3 flex items-center gap-2 border-b pb-2">
                         <span className="material-symbols-outlined text-[#2563EB]">
@@ -379,34 +358,71 @@ const QuanLyDonHang = () => {
                         </span>{" "}
                         Thanh Toán
                       </h4>
-                      <div className="text-sm space-y-1.5">
+                      <div className="text-sm space-y-2">
                         <div className="flex justify-between text-gray-600">
-                          <span>Tiền hàng:</span>{" "}
-                          <span>{formatVND(orderDetail.TongTienHang)}</span>
+                          <span>Tiền hàng (Gốc):</span>
+                          <span className="font-semibold text-gray-800">
+                            {formatVND(orderDetail.TongTienHang)}
+                          </span>
                         </div>
+
                         <div className="flex justify-between text-gray-600">
-                          <span>Phí vận chuyển:</span>{" "}
-                          <span>{formatVND(orderDetail.TienVanChuyen)}</span>
+                          <span>Phí vận chuyển (Gốc):</span>
+                          <span className="font-semibold text-gray-800">
+                            {formatVND(orderDetail.TienVanChuyen)}
+                          </span>
                         </div>
-                        <div className="flex justify-between text-emerald-600">
-                          <span>Tổng giảm giá:</span>{" "}
-                          <span>-{formatVND(orderDetail.TongTienGiamGia)}</span>
+
+                        {/* Nếu có giảm giá Shop */}
+                        {orderDetail.GiamGiaShop > 0 && (
+                          <div className="flex justify-between text-emerald-600">
+                            <span>Giảm giá từ Shop:</span>
+                            <span className="font-semibold">
+                              -{formatVND(Math.abs(orderDetail.GiamGiaShop))}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Nếu có giảm giá Vận chuyển */}
+                        {orderDetail.GiamGiaVanChuyen > 0 && (
+                          <div className="flex justify-between text-emerald-600">
+                            <span>Giảm giá Vận chuyển:</span>
+                            <span className="font-semibold">
+                              -
+                              {formatVND(
+                                Math.abs(orderDetail.GiamGiaVanChuyen),
+                              )}
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Tổng giảm giá */}
+                        <div className="flex justify-between text-emerald-600 border-t border-dashed pt-2">
+                          <span>Tổng giảm giá:</span>
+                          <span className="font-semibold">
+                            -{formatVND(Math.abs(orderDetail.TongTienGiamGia))}
+                          </span>
                         </div>
-                        <div className="flex justify-between text-red-500 font-bold border-t pt-2 mt-2">
-                          <span>Khách thanh toán:</span>{" "}
+
+                        <div className="flex justify-between text-red-500 font-bold text-base border-t pt-2 mt-2">
+                          <span>Khách thanh toán:</span>
                           <span>{formatVND(orderDetail.TongThanhToan)}</span>
                         </div>
-                        <div className="flex justify-between text-gray-500 text-xs pt-1">
-                          <span>Phí sàn:</span>{" "}
-                          <span>{formatVND(orderDetail.TongTienPhiSan)}</span>
+
+                        <div className="flex justify-between text-gray-500 text-xs pt-2">
+                          <span>Phí sàn (Hoa hồng):</span>
+                          <span className="text-gray-700">
+                            {formatVND(orderDetail.TongTienPhiSan)}
+                          </span>
                         </div>
-                        <div className="flex justify-between text-gray-500 text-xs">
-                          <span>Trạng thái TT:</span>{" "}
+
+                        <div className="flex justify-between text-gray-500 text-xs border-t pt-2 mt-2">
+                          <span>Trạng thái TT:</span>
                           <span
                             className={
                               orderDetail.TrangThaiThanhToan
                                 ? "text-green-600 font-bold"
-                                : "text-orange-500"
+                                : "text-orange-500 font-bold"
                             }
                           >
                             {orderDetail.TrangThaiThanhToan
@@ -416,16 +432,19 @@ const QuanLyDonHang = () => {
                         </div>
                       </div>
                     </div>
+                  </div>
 
-                    {/* Box Lịch sử */}
+                  {/* CỘT PHẢI: LỊCH SỬ TRẠNG THÁI & LỊCH SỬ VẬN CHUYỂN */}
+                  <div className="space-y-6">
+                    {/* 1. LỊCH SỬ TRẠNG THÁI */}
                     <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-sm">
-                      <h4 className="font-bold text-[#0F172A] mb-3 flex items-center gap-2 border-b pb-2">
+                      <h4 className="font-bold text-[#0F172A] mb-4 flex items-center gap-2 border-b pb-2">
                         <span className="material-symbols-outlined text-[#2563EB]">
                           history
                         </span>{" "}
                         Lịch Sử Trạng Thái
                       </h4>
-                      <div className="space-y-3">
+                      <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                         {orderDetail.lich_su_trang_thai?.map((log, index) => (
                           <div
                             key={index}
@@ -455,9 +474,152 @@ const QuanLyDonHang = () => {
                         ))}
                       </div>
                     </div>
+
+                    {/* 2. LỊCH SỬ VẬN CHUYỂN */}
+                    <div className="bg-white p-5 rounded-2xl border border-[#E2E8F0] shadow-sm">
+                      <h4 className="font-bold text-[#0F172A] mb-4 flex items-center gap-2 border-b pb-2">
+                        <span className="material-symbols-outlined text-[#2563EB]">
+                          local_shipping
+                        </span>{" "}
+                        Lịch Sử Vận Chuyển Chi Tiết
+                      </h4>
+
+                      <div className="relative border-l-2 border-indigo-200 ml-4 space-y-6 pb-4">
+                        {orderDetail.timeline?.map((item, index) => {
+                          const config =
+                            EVENT_CONFIG[item.LoaiSuKien] ||
+                            EVENT_CONFIG.HE_THONG;
+                          const isLatest =
+                            index === orderDetail.timeline.length - 1;
+
+                          return (
+                            <div key={index} className="relative pl-6">
+                              {/* Chấm tròn Timeline */}
+                              <div
+                                className={`absolute -left-[13px] top-1 w-6 h-6 rounded-full bg-white border-2 flex items-center justify-center shadow-sm z-10 ${isLatest ? "border-indigo-600 ring-4 ring-indigo-100" : "border-gray-300"}`}
+                              >
+                                <span
+                                  className={`material-symbols-outlined text-[12px] ${isLatest ? "text-indigo-600" : "text-gray-400"}`}
+                                >
+                                  {config.icon}
+                                </span>
+                              </div>
+
+                              {/* Nội dung */}
+                              <div
+                                className={`p-4 rounded-xl border ${isLatest ? "border-indigo-200 bg-indigo-50/30 shadow-md" : "border-gray-100 bg-white"}`}
+                              >
+                                <h5
+                                  className={`font-bold text-sm ${isLatest ? "text-indigo-700" : "text-[#0F172A]"}`}
+                                >
+                                  {item.HanhDong}
+                                </h5>
+                                <p className="text-xs text-gray-500 mt-1 flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-[14px]">
+                                    schedule
+                                  </span>
+                                  {new Date(item.ThoiGian).toLocaleString(
+                                    "vi-VN",
+                                  )}
+                                </p>
+                                <p className="text-xs text-gray-600 mt-1 flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-[14px]">
+                                    person
+                                  </span>
+                                  Thực hiện:{" "}
+                                  <b className={config.color}>
+                                    {item.NguoiThucHien}
+                                  </b>
+                                </p>
+
+                                {item.GhiChu && (
+                                  <p className="text-xs text-gray-600 italic mt-2 border-l-2 border-gray-300 pl-2">
+                                    "{item.GhiChu}"
+                                  </p>
+                                )}
+
+                                {/* Thông tin Kho / Shipper / Ảnh */}
+                                <div className="mt-3 flex flex-col gap-2">
+                                  {item.Shipper_Ma && (
+                                    <div
+                                      className={`flex items-center gap-2 p-2 rounded-lg border ${config.bg} ${config.border}`}
+                                    >
+                                      <img
+                                        src={
+                                          item.Shipper_HinhAnh
+                                            ? `${BACKEND_URL}${item.Shipper_HinhAnh}`
+                                            : `https://ui-avatars.com/api/?name=${item.Shipper_Ten}&background=random&color=fff`
+                                        }
+                                        className="w-8 h-8 rounded-full object-cover border border-white shadow-sm"
+                                        alt=""
+                                      />
+                                      <div>
+                                        <p
+                                          className={`text-xs font-bold ${config.color}`}
+                                        >
+                                          {item.Shipper_Ten}
+                                        </p>
+                                        <p className="text-[10px] opacity-80">
+                                          SĐT: {item.Shipper_SDT}
+                                        </p>
+                                      </div>
+                                    </div>
+                                  )}
+
+                                  {item.Kho_Ma && (
+                                    <div className="bg-gray-50 border border-gray-100 p-2 rounded-lg text-xs">
+                                      <span className="text-gray-500">
+                                        Kho xử lý:{" "}
+                                      </span>
+                                      <b className="text-indigo-700">
+                                        {item.Kho_Ten}
+                                      </b>
+                                      {item.Kho_Den_Ten && (
+                                        <>
+                                          <span className="material-symbols-outlined text-[12px] align-middle mx-1">
+                                            trending_flat
+                                          </span>
+                                          <b className="text-indigo-700">
+                                            {item.Kho_Den_Ten}
+                                          </b>
+                                        </>
+                                      )}
+                                    </div>
+                                  )}
+
+                                  {item.HinhAnh && (
+                                    <div className="mt-1">
+                                      <a
+                                        href={`${BACKEND_URL}${item.HinhAnh}`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                      >
+                                        <img
+                                          src={`${BACKEND_URL}${item.HinhAnh}`}
+                                          alt="Minh chứng"
+                                          className="w-16 h-16 object-cover rounded-lg border border-gray-200 hover:opacity-80"
+                                        />
+                                      </a>
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
                   </div>
                 </div>
               ) : null}
+            </div>
+            <div className="p-4 border-t bg-gray-50 flex justify-end rounded-b-3xl">
+              <button
+                onClick={() => setIsModalOpen(false)}
+                className="px-6 py-2 bg-gray-800 text-white font-bold rounded-xl hover:bg-gray-900"
+              >
+                Đóng
+              </button>
             </div>
           </div>
         </div>

@@ -2,7 +2,6 @@ import { Routes, Route } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";
 import QuanLyKhoDashboard from "../pages/quanlykho/Dashboard";
 
-// Import các trang chức năng
 import QuanLyShipper from "../pages/quanlykho/QuanLyShipper";
 import PhanCongShipper from "../pages/quanlykho/PhanCongShipper";
 import GuiTrungChuyen from "../pages/quanlykho/GuiTrungChuyen";
@@ -11,12 +10,17 @@ import PhanCongGiaoHang from "../pages/quanlykho/PhanCongGiaoHang";
 import LichSuKho from "../pages/quanlykho/LichSuKho";
 import ThuTienShipper from "../pages/quanlykho/ThuTienShipper";
 import TatToan from "../pages/quanlykho/TatToan";
+
+// Import file mới thay thế NhapKhoChoXacNhan
+import QuanLyPhieuKho from "../pages/quanlykho/QuanLyPhieuKho";
+import LichSuPhieuKho from "../pages/quanlykho/LichSuPhieuKho";
+import ChiTietPhieuKho from "../pages/quanlykho/ChiTietPhieuKho";
+
 const QuanLyKhoRoutes = () => {
   return (
     <Routes>
       <Route element={<ProtectedRoute allowedRoles={["quanlykho"]} />}>
         <Route path="/" element={<QuanLyKhoDashboard />}>
-          {/* Trang mặc định khi vào /quan-ly-kho */}
           <Route
             index
             element={
@@ -35,8 +39,6 @@ const QuanLyKhoRoutes = () => {
               </div>
             }
           />
-
-          {/* Các Route chức năng */}
           <Route path="quan-ly-shipper" element={<QuanLyShipper />} />
           <Route path="phan-cong-shipper" element={<PhanCongShipper />} />
           <Route path="gui-trung-chuyen" element={<GuiTrungChuyen />} />
@@ -45,6 +47,11 @@ const QuanLyKhoRoutes = () => {
           <Route path="lich-su" element={<LichSuKho />} />
           <Route path="thu-tien-shipper" element={<ThuTienShipper />} />
           <Route path="tat-toan" element={<TatToan />} />
+
+          {/* Route Phiếu Kho mới */}
+          <Route path="phieu-kho" element={<QuanLyPhieuKho />} />
+          <Route path="phieu-kho/lich-su" element={<LichSuPhieuKho />} />
+          <Route path="phieu-kho/:pk_ma" element={<ChiTietPhieuKho />} />
         </Route>
       </Route>
     </Routes>

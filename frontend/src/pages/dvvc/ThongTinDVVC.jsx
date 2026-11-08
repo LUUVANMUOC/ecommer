@@ -1,3 +1,4 @@
+// src/pages/dvvc/ThongTinDVVC.jsx
 import { useState, useEffect, useContext, useCallback } from "react";
 import { AuthContext } from "../../contexts/AuthContext";
 import axiosClient from "../../config/axiosClient";
@@ -14,6 +15,7 @@ const EMPTY_BANK_FORM = {
   NganHang_Ma: "",
   TTNT_DVVC_SoTaiKhoan: "",
   TTNT_DVVC_TenTaiKhoan: "",
+  sepay_webhook_secret: "",
 };
 
 const ThongTinDVVC = () => {
@@ -29,7 +31,6 @@ const ThongTinDVVC = () => {
   });
   const [activeTab, setActiveTab] = useState("ho-so");
 
-  // State Profile
   const [profileData, setProfileData] = useState({
     DVVC_Ten: "",
     DVVC_Email: "",
@@ -38,7 +39,6 @@ const ThongTinDVVC = () => {
   });
   const [selectedFile, setSelectedFile] = useState(null);
 
-  // State Ngân hàng
   const [banks, setBanks] = useState([]);
   const [linkedBank, setLinkedBank] = useState(null);
   const [bankForm, setBankForm] = useState(EMPTY_BANK_FORM);
@@ -56,7 +56,6 @@ const ThongTinDVVC = () => {
   const fetchData = useCallback(async () => {
     if (!DVVC_Ma) {
       setLoading(false);
-      console.error("LỖI: Không tìm thấy DVVC_Ma trong AuthContext!");
       return;
     }
     try {
@@ -84,8 +83,9 @@ const ThongTinDVVC = () => {
         });
         setBankForm({
           NganHang_Ma: data.NganHang_Ma,
-          TTNT_DVVC_SoTaiKhoan: data.TTNT_DVVC_SoTaiKhoan,
+          TTNT_DVVC_SoTaiKhoan: data.TTNT_DVVC_SoTaiKhoan || "",
           TTNT_DVVC_TenTaiKhoan: data.TTNT_DVVC_TenTaiKhoan || "",
+          sepay_webhook_secret: data.sepay_webhook_secret || "",
         });
       }
     } catch (err) {
@@ -140,13 +140,13 @@ const ThongTinDVVC = () => {
   };
 
   const handleSaveBank = async (e) => {
-    e.preventDefault();
+    if (e) e.preventDefault();
     if (
       !bankForm.NganHang_Ma ||
       !bankForm.TTNT_DVVC_SoTaiKhoan ||
       !bankForm.TTNT_DVVC_TenTaiKhoan
     )
-      return showToast("Vui lòng nhập đủ thông tin!", "error");
+      return showToast("Vui lòng nhập đủ thông tin ngân hàng!", "error");
 
     setSavingBank(true);
     try {
@@ -173,6 +173,12 @@ const ThongTinDVVC = () => {
     }
   };
 
+  const handleCopyWebhook = () => {
+    const webhookUrl = `${import.meta.env.VITE_BACKEND_URL || "http://localhost:8080"}/api/webhook/sepay/dvvc/${DVVC_Ma}`;
+    navigator.clipboard.writeText(webhookUrl);
+    showToast("Đã copy Link Webhook!");
+  };
+
   if (loading)
     return (
       <div className="min-h-screen bg-[#F8FAFC] flex items-center justify-center text-[#64748B] font-medium">
@@ -188,7 +194,6 @@ const ThongTinDVVC = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16 font-sans">
-      {/* ✅ ĐÃ SỬA: Bỏ sticky top-0 z-20, thay bằng relative để không bị đè bởi Header tổng */}
       <header className="bg-white shadow-sm mb-6 relative">
         <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
           <a
@@ -336,19 +341,99 @@ const ThongTinDVVC = () => {
               <p className="text-sm font-medium text-[#64748B] mb-8 border-b border-[#F1F5F9] pb-4">
                 Dùng để nhận thanh toán phí vận chuyển từ Sàn
               </p>
+
               <div className="max-w-4xl">
                 <BankAccountSection
                   linkedBank={linkedBank}
                   banks={banks}
-                  bankForm={bankForm}
-                  onBankFormChange={(patch) =>
-                    setBankForm((prev) => ({ ...prev, ...patch }))
-                  }
+                  bankForm={{
+                    nh_ma: bankForm.NganHang_Ma,
+                    ttnt_gianhang_sotaikhoan: bankForm.TTNT_DVVC_SoTaiKhoan,
+                    ttnt_gianhang_tentaikhoan: bankForm.TTNT_DVVC_TenTaiKhoan,
+                  }}
+                  // 🟢 SỬA LỖI TẠI ĐÂY: Code mapping thật thay vì comment
+                  onBankFormChange={(patch) => {
+                    setBankForm((prev) => {
+                      const newState = { ...prev, ...patch };
+                      if (patch.nh_ma !== undefined)
+                        newState.NganHang_Ma = patch.nh_ma;
+                      if (patch.ttnt_gianhang_sotaikhoan !== undefined)
+                        newState.TTNT_DVVC_SoTaiKhoan =
+                          patch.ttnt_gianhang_sotaikhoan;
+                      if (patch.ttnt_gianhang_tentaikhoan !== undefined)
+                        newState.TTNT_DVVC_TenTaiKhoan =
+                          patch.ttnt_gianhang_tentaikhoan;
+                      return newState;
+                    });
+                  }}
                   onSubmit={handleSaveBank}
                   onDelete={handleDeleteBank}
-                  onShowQR={setQrBank}
+                  onShowQR={setQrBank} // 🟢 Đã sửa: Truyền trực tiếp setQrBank
                   saving={savingBank}
                 />
+
+                <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-2xl">
+                  <h3 className="text-lg font-bold text-blue-900 mb-2 flex items-center gap-2">
+                    <span className="material-symbols-outlined">webhook</span>
+                    Cấu hình nhận tiền tự động (SePay)
+                  </h3>
+                  <p className="text-sm text-blue-700 mb-4">
+                    Để tự động xác nhận khi Sàn thanh toán tiền ship, bạn cần
+                    cấu hình Webhook trên SePay.
+                  </p>
+
+                  <div className="flex flex-col md:flex-row items-center gap-3 mb-5">
+                    <div className="w-full">
+                      <label className="block text-sm font-semibold text-blue-900 mb-1">
+                        1. Đường link Webhook của bạn
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={`${import.meta.env.VITE_BACKEND_URL || "http://localhost:8080"}/api/webhook/sepay/dvvc/${DVVC_Ma}`}
+                        className="w-full px-4 py-3 rounded-xl border border-blue-300 bg-white text-blue-800 font-mono text-sm outline-none"
+                      />
+                    </div>
+                    <button
+                      onClick={handleCopyWebhook}
+                      type="button"
+                      className="mt-6 md:mt-0 px-4 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 whitespace-nowrap"
+                    >
+                      Copy Link
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-blue-900 mb-1">
+                      2. Mã bảo mật (Webhook Secret)
+                    </label>
+                    <input
+                      type="text"
+                      value={bankForm.sepay_webhook_secret || ""}
+                      onChange={(e) =>
+                        setBankForm({
+                          ...bankForm,
+                          sepay_webhook_secret: e.target.value,
+                        })
+                      }
+                      placeholder="Dán mã Secret lấy từ SePay vào đây..."
+                      className="w-full px-4 py-3 rounded-xl border border-blue-300 outline-none focus:border-blue-500"
+                    />
+                    <p className="text-xs text-blue-600 mt-2">
+                      * Mã này giúp chống kẻ gian spam tín hiệu thanh toán ảo.
+                    </p>
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t border-blue-200 flex justify-end">
+                    <button
+                      onClick={handleSaveBank}
+                      disabled={savingBank}
+                      className="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 shadow-md transition-all"
+                    >
+                      {savingBank ? "Đang lưu..." : "Lưu toàn bộ thông tin"}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -371,6 +456,7 @@ const ThongTinDVVC = () => {
           )}
         </div>
       </div>
+
       {qrBank && <BankQRModal bank={qrBank} onClose={() => setQrBank(null)} />}
       <ToastNotification toast={toast} />
     </div>

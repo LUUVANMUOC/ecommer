@@ -520,18 +520,30 @@ const ThanhToan = () => {
                   {formatVND(totalItemsPrice)}
                 </span>
               </div>
+
+              {/* 🟢 Tách riêng Giảm giá Shop */}
               <div className="flex justify-between text-[#64748B] text-base">
                 <span>Giảm giá Voucher Shop:</span>
                 <span className="font-semibold text-[#10B981]">
                   -{formatVND(totalShopDiscount)}
                 </span>
               </div>
+
+              {/* 🟢 Tách riêng Giảm giá Vận chuyển */}
               <div className="flex justify-between text-[#64748B] text-base">
-                <span>Tổng phí vận chuyển:</span>
-                <span className="font-semibold text-[#0F172A]">
-                  {formatVND(totalFinalShipping)}
+                <span>Giảm giá Vận chuyển:</span>
+                <span className="font-semibold text-[#10B981]">
+                  -{formatVND(totalShippingDiscount)}
                 </span>
               </div>
+
+              <div className="flex justify-between text-[#64748B] text-base">
+                <span>Phí vận chuyển gốc:</span>
+                <span className="font-semibold text-[#0F172A]">
+                  {formatVND(totalOriginalShipping)}
+                </span>
+              </div>
+
               <div className="flex justify-between items-center border-t border-[#F1F5F9] pt-4 mt-4">
                 <span className="font-bold text-[#0F172A] text-lg">
                   Tổng thanh toán:

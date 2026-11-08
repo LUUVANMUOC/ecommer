@@ -9,15 +9,19 @@ import {
 } from "./AccountLayout";
 
 const BankAccountCard = ({ bank, onShowQR, onDelete }) => {
-  // ✅ Fallback cho cả key của Sàn, Shop và Khách hàng
+  // ✅ Fallback cho Sàn, Shop, Khách hàng và ĐVVC
   const soTaiKhoan =
     bank.ttnt_gianhang_sotaikhoan ||
     bank.ttnt_kh_sotaikhoan ||
-    bank.TTNT_STMDT_SoTaiKhoan;
+    bank.TTNT_STMDT_SoTaiKhoan ||
+    bank.ttnt_dvvc_sotaikhoan ||
+    bank.TTNT_DVVC_SoTaiKhoan;
   const tenChuTaiKhoan =
     bank.ttnt_gianhang_tentaikhoan ||
     bank.ttnt_kh_tennguoinhan ||
-    bank.TTNT_STMDT_TenTaiKhoan;
+    bank.TTNT_STMDT_TenTaiKhoan ||
+    bank.ttnt_dvvc_tentaikhoan ||
+    bank.TTNT_DVVC_TenTaiKhoan;
 
   return (
     <div className="rounded-2xl border border-[#E2DED3] bg-[#FBFAF7] p-5">
@@ -78,18 +82,22 @@ const BankAccountCard = ({ bank, onShowQR, onDelete }) => {
 };
 
 const BankAccountForm = ({ banks, value, onChange, onSubmit, saving }) => {
-  // ✅ Fallback nhận diện key an toàn cho cả 3 role (Sàn, Shop, Khách)
+  // ✅ Fallback nhận diện key an toàn
   const selectedBank =
     value.NganHang_Ma || value.nh_ma || value.nganhang_ma || "";
   const tenTaiKhoan =
     value.TTNT_STMDT_TenTaiKhoan ||
     value.ttnt_gianhang_tentaikhoan ||
     value.ttnt_kh_tennguoinhan ||
+    value.TTNT_DVVC_TenTaiKhoan ||
+    value.ttnt_dvvc_tentaikhoan ||
     "";
   const soTaiKhoan =
     value.TTNT_STMDT_SoTaiKhoan ||
     value.ttnt_gianhang_sotaikhoan ||
     value.ttnt_kh_sotaikhoan ||
+    value.TTNT_DVVC_SoTaiKhoan ||
+    value.ttnt_dvvc_sotaikhoan ||
     "";
 
   return (
@@ -98,7 +106,6 @@ const BankAccountForm = ({ banks, value, onChange, onSubmit, saving }) => {
         <select
           value={selectedBank}
           onChange={(e) =>
-            // Cập nhật đồng thời cả 3 key
             onChange({
               NganHang_Ma: e.target.value,
               nh_ma: e.target.value,
@@ -129,11 +136,12 @@ const BankAccountForm = ({ banks, value, onChange, onSubmit, saving }) => {
           type="text"
           value={tenTaiKhoan}
           onChange={(e) =>
-            // Cập nhật đồng thời cả 3 key
             onChange({
               TTNT_STMDT_TenTaiKhoan: e.target.value.toUpperCase(),
               ttnt_gianhang_tentaikhoan: e.target.value.toUpperCase(),
               ttnt_kh_tennguoinhan: e.target.value.toUpperCase(),
+              TTNT_DVVC_TenTaiKhoan: e.target.value.toUpperCase(),
+              ttnt_dvvc_tentaikhoan: e.target.value.toUpperCase(),
             })
           }
           className={`${fieldBase} uppercase`}
@@ -149,11 +157,12 @@ const BankAccountForm = ({ banks, value, onChange, onSubmit, saving }) => {
           maxLength={14}
           value={soTaiKhoan}
           onChange={(e) =>
-            // Cập nhật đồng thời cả 3 key
             onChange({
               TTNT_STMDT_SoTaiKhoan: e.target.value,
               ttnt_gianhang_sotaikhoan: e.target.value,
               ttnt_kh_sotaikhoan: e.target.value,
+              TTNT_DVVC_SoTaiKhoan: e.target.value,
+              ttnt_dvvc_sotaikhoan: e.target.value,
             })
           }
           className={`${fieldBase} font-mono tabular-nums`}
@@ -223,14 +232,19 @@ export const BankQRModal = ({ bank, onClose }) => {
     return () => window.removeEventListener("keydown", handleKey);
   }, [onClose]);
 
+  // 🟢 Thêm fallback cho ĐVVC
   const soTaiKhoan =
     bank.ttnt_gianhang_sotaikhoan ||
     bank.ttnt_kh_sotaikhoan ||
-    bank.TTNT_STMDT_SoTaiKhoan;
+    bank.TTNT_STMDT_SoTaiKhoan ||
+    bank.ttnt_dvvc_sotaikhoan ||
+    bank.TTNT_DVVC_SoTaiKhoan;
   const tenChuTaiKhoan =
     bank.ttnt_gianhang_tentaikhoan ||
     bank.ttnt_kh_tennguoinhan ||
-    bank.TTNT_STMDT_TenTaiKhoan;
+    bank.TTNT_STMDT_TenTaiKhoan ||
+    bank.ttnt_dvvc_tentaikhoan ||
+    bank.TTNT_DVVC_TenTaiKhoan;
 
   return (
     <div

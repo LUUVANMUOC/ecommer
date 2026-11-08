@@ -1,3 +1,4 @@
+// backend/src/services/khachhang/phiVanChuyenService.js
 const pool = require('../../config/db');
 
 const PhiVanChuyenService = {
@@ -26,9 +27,10 @@ const PhiVanChuyenService = {
                 // Kích thước (cm) - Tự động fallback về 0 nếu không có cột
                 const d = prod.ctsp_chieudai ? Number(prod.ctsp_chieudai) : 0;
                 const r = prod.ctsp_chieurong ? Number(prod.ctsp_chieurong) : 0;
+                const c = prod.ctsp_chieucao ? Number(prod.ctsp_chieucao) : 0; // 🟢 Lấy chiều cao
                 
-                // Chỉ tính Dài x Rộng / 6000
-                const volumeWeight = (d * r) / 6000;
+                // 🟢 CẬP NHẬT: Tính Dài x Rộng x Cao / 6000
+                const volumeWeight = (d * r * c) / 600;
                 
                 // Lấy MAX giữa thực tế và thể tích
                 const finalItemWeight = Math.max(actualWeight, volumeWeight);
@@ -37,8 +39,8 @@ const PhiVanChuyenService = {
                 
                 console.log(`   - Món: ${prod.ctsp_ten} (SL: ${item.soluong})`);
                 console.log(`     + KL Thực tế: ${actualWeight} kg`);
-                console.log(`     + Kích thước: ${d} x ${r} cm`);
-                console.log(`     + KL Thể tích: (${d} * ${r}) / 6000 = ${volumeWeight.toFixed(4)} kg`);
+                console.log(`     + Kích thước: ${d} x ${r} x ${c} cm`); // 🟢 Log 3 chiều
+                console.log(`     + KL Thể tích: (${d} * ${r} * ${c}) / 600 = ${volumeWeight.toFixed(4)} kg`);
                 console.log(`     + KL Áp dụng (Max): ${finalItemWeight.toFixed(2)} kg`);
                 console.log(`     + Tổng món này: ${finalItemWeight.toFixed(2)} * ${item.soluong} = ${(finalItemWeight * item.soluong).toFixed(2)} kg`);
             }
