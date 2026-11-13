@@ -14,7 +14,6 @@ export const imgUrl = (link) => `${BACKEND_URL}${link}`;
 export const formatVND = (n) =>
   n || n === 0 ? `${Number(n).toLocaleString("vi-VN")} đ` : "Chưa có giá";
 
-// Khoảng giá: "Giá từ MIN - MAX", hoặc một giá nếu MIN = MAX
 export const formatPriceRange = (info) => {
   if (!info || info.minPrice == null) return "Chưa có giá";
   if (info.minPrice === info.maxPrice) return formatVND(info.minPrice);
@@ -30,40 +29,221 @@ export const getCurrentShopId = () => {
   return userStr ? JSON.parse(userStr).GH_Ma || "GH01" : "";
 };
 
-/* ---------- Ngành hàng: dựng cây rồi lấy các nút lá ---------- */
+/* ============================================================
+   NGÀNH HÀNG — chuẩn hoá field name + dựng cây + lấy lá
+   ============================================================ */
+const LOG_NH = "[SanPhamShared::NganhHang]";
+
+// 🟢 Chuẩn hoá item thô từ API: chấp nhận nhiều alias field name
+//    (snake_case / PascalCase / camelCase / viết tắt)
+const NH_MA_ALIASES = [
+  "nh_ma",
+  "nh_Ma",
+  "NH_Ma",
+  "NH_MA",
+  "NganhHang_Ma",
+  "nganhHangMa",
+  "ma",
+  "ma_nganh_hang",
+  "maNganhHang",
+  "id",
+];
+const NH_TEN_ALIASES = [
+  "nh_ten",
+  "nh_Ten",
+  "NH_Ten",
+  "NH_TEN",
+  "NganhHang_Ten",
+  "nganhHangTen",
+  "ten",
+  "ten_nganh_hang",
+  "tenNganhHang",
+  "name",
+];
+const NH_CHA_ALIASES = [
+  "nh_cha",
+  "nh_Cha",
+  "NH_Cha",
+  "NH_CHA",
+  "NganhHang_Cha",
+  "nganhHangCha",
+  "cha",
+  "ma_nganh_hang_cha",
+  "maNganhHangCha",
+  "parent_id",
+  "parentId",
+  "parent",
+];
+
+const pick = (obj, aliases) => {
+  for (const key of aliases) {
+    if (obj[key] !== undefined && obj[key] !== null && obj[key] !== "") {
+      return obj[key];
+    }
+  }
+  return undefined;
+};
+
+const normalizeNganhHang = (raw, idx) => {
+  if (!raw || typeof raw !== "object") {
+    console.warn(`${LOG_NH} normalize: item #${idx} không phải object`, raw);
+    return null;
+  }
+  const nh_ma = pick(raw, NH_MA_ALIASES);
+  const nh_ten = pick(raw, NH_TEN_ALIASES);
+  const nh_chaRaw = pick(raw, NH_CHA_ALIASES);
+
+  if (nh_ma === undefined || nh_ten === undefined) {
+    console.warn(`${LOG_NH} ⚠ normalize: item #${idx} KHÔNG map được field.`, {
+      keys: Object.keys(raw),
+      raw,
+    });
+  }
+
+  return {
+    ...raw,
+    nh_ma,
+    nh_ten,
+    nh_cha: nh_chaRaw || null,
+  };
+};
+
 export const buildNganhHangTree = (items) => {
-  if (!Array.isArray(items) || items.length === 0) return [];
+  console.log(`${LOG_NH} buildNganhHangTree CALLED`, {
+    isArray: Array.isArray(items),
+    count: items?.length ?? "n/a",
+  });
+
+  if (!Array.isArray(items) || items.length === 0) {
+    console.log(`${LOG_NH} buildNganhHangTree EMPTY -> return []`);
+    return [];
+  }
+
+  // Log key thực của item đầu để phát hiện schema thật của API
+  console.log(
+    `${LOG_NH} RAW sample keys =`,
+    Object.keys(items[0] || {}),
+    "| full sample =",
+    items[0],
+  );
+
+  // 1) Normalize
+  const normalized = items
+    .map((it, i) => normalizeNganhHang(it, i))
+    .filter(Boolean)
+    .filter((it) => it.nh_ma !== undefined && it.nh_ma !== null);
+
+  console.log(
+    `${LOG_NH} after normalize: ${normalized.length}/${items.length} item có nh_ma`,
+  );
+
+  if (normalized.length === 0) {
+    console.error(
+      `${LOG_NH} ❌ Toàn bộ item đều thiếu nh_ma. Kiểm tra field name API /nganh-hang!`,
+    );
+    return [];
+  }
+
+  // 2) Dedupe theo nh_ma
+  const deduped = Array.from(
+    normalized
+      .reduce((acc, it) => {
+        if (!acc.has(it.nh_ma)) acc.set(it.nh_ma, it);
+        return acc;
+      }, new Map())
+      .values(),
+  );
+  if (deduped.length !== normalized.length) {
+    console.warn(
+      `${LOG_NH} đã loại ${normalized.length - deduped.length} item trùng nh_ma`,
+    );
+  }
+
+  // 3) Build map + nối cây
   const map = {};
   const roots = [];
-  items.forEach((item) => {
-    map[item.nh_ma] = { ...item, children: [] };
+  deduped.forEach((it) => {
+    map[it.nh_ma] = { ...it, children: [] };
   });
-  items.forEach((item) => {
-    const node = map[item.nh_ma];
-    if (item.nh_cha && map[item.nh_cha]) {
-      map[item.nh_cha].children.push(node);
+
+  const missingParent = [];
+  deduped.forEach((it) => {
+    const node = map[it.nh_ma];
+    if (it.nh_cha && map[it.nh_cha]) {
+      map[it.nh_cha].children.push(node);
     } else {
+      if (it.nh_cha && !map[it.nh_cha]) {
+        missingParent.push({ nh_ma: it.nh_ma, nh_cha: it.nh_cha });
+      }
       roots.push(node);
     }
   });
+  if (missingParent.length) {
+    console.warn(
+      `${LOG_NH} ⚠ ${missingParent.length} node có nh_cha không tồn tại -> đẩy thành root:`,
+      missingParent,
+    );
+  }
+
+  console.log(`${LOG_NH} buildNganhHangTree OUTPUT`, {
+    rootsCount: roots.length,
+    roots: roots.map((r) => ({
+      nh_ma: r.nh_ma,
+      nh_ten: r.nh_ten,
+      childrenCount: r.children.length,
+      childIds: r.children.map((c) => c.nh_ma),
+    })),
+  });
+
   return roots;
 };
 
 export const getLeafNganhHangs = (nodes, path = []) => {
   const result = [];
   (nodes || []).forEach((node) => {
-    const currentPath = [...path, node.nh_ten];
+    // 🟢 fallback: nếu thiếu nh_ten thì dùng nh_ma, nếu vẫn thiếu dùng placeholder
+    const ten = node.nh_ten || node.nh_ma || "(chưa đặt tên)";
+    const currentPath = [...path, ten];
+
     if (!node.children || node.children.length === 0) {
       result.push({
         nh_ma: node.nh_ma,
-        nh_ten: node.nh_ten,
+        nh_ten: node.nh_ten || node.nh_ma,
         path: currentPath.join(" > "),
       });
     } else {
       result.push(...getLeafNganhHangs(node.children, currentPath));
     }
   });
-  return result;
+
+  // 🟢 Dedupe lần cuối (cho chắc) + bỏ leaf không có nh_ma
+  const seen = new Set();
+  const unique = result.filter((l) => {
+    if (l.nh_ma === undefined || l.nh_ma === null) return false;
+    if (seen.has(l.nh_ma)) return false;
+    seen.add(l.nh_ma);
+    return true;
+  });
+
+  if (unique.length !== result.length) {
+    console.warn(
+      `${LOG_NH} getLeafNganhHangs: đã loại ${result.length - unique.length} leaf trùng / không có nh_ma`,
+    );
+  }
+
+  // Log chi tiết kết quả cuối khi đây là lần gọi gốc
+  if (path.length === 0) {
+    console.log(`${LOG_NH} LEAVES FINAL`, {
+      count: unique.length,
+      items: unique.map((l) => ({
+        nh_ma: l.nh_ma,
+        nh_ten: l.nh_ten,
+        path: l.path,
+      })),
+    });
+  }
+
+  return unique;
 };
 
 /* ---------- Ảnh bìa + khoảng giá cho danh sách ---------- */
@@ -81,11 +261,8 @@ export const fetchCovers = async (products) => {
       .map((v) => Number(v.gb_gia))
       .filter((p) => Number.isFinite(p) && p > 0);
 
-    // 🟢 TÍNH TOÁN TRẠNG THÁI TỔNG CỦA SẢN PHẨM DỰA VÀO CÁC PHÂN LOẠI
-    let status = "draft"; // Mặc định là chưa gửi duyệt
+    let status = "draft";
     const statuses = variants.map((v) => v.trangthai_lichsu?.[0]?.ttctsp_ma);
-
-    // Ưu tiên: Đang bán > Chờ duyệt > Bị đình chỉ
     if (statuses.includes("TTCTSP0002")) status = "active";
     else if (statuses.includes("TTCTSP0001")) status = "pending";
     else if (statuses.includes("TTCTSP0003")) status = "suspended";
@@ -94,7 +271,7 @@ export const fetchCovers = async (products) => {
       url: cover ? imgUrl(cover.hasp_link) : "",
       minPrice: prices.length ? Math.min(...prices) : null,
       maxPrice: prices.length ? Math.max(...prices) : null,
-      status: status, // 🟢 Trả về trạng thái
+      status: status,
     };
   });
   return next;
@@ -304,7 +481,6 @@ export const SpecRow = ({ label, value }) => (
   </div>
 );
 
-// 🟢 ĐÃ CẬP NHẬT: Ảnh lớn có mũi tên, tự động cuộn thanh thumbnail
 export const Gallery = ({ images, index, onIndex }) => {
   const total = images.length;
   const activeThumbRef = useRef(null);
@@ -446,7 +622,6 @@ export const Gallery = ({ images, index, onIndex }) => {
   );
 };
 
-// Lưới toàn bộ ảnh, mô tả hiển thị sẵn
 export const AllImagesGrid = ({ images, onPick }) => (
   <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
     {images.map((img, i) => (
@@ -484,7 +659,6 @@ export const AllImagesGrid = ({ images, onPick }) => (
   </div>
 );
 
-// Chip thuộc tính của phân loại
 export const AttributeChips = ({ attributes }) => {
   if (!attributes || attributes.length === 0) return null;
   return (
@@ -512,7 +686,7 @@ export const AttributeChips = ({ attributes }) => {
   );
 };
 
-/* ---------- Drawer thêm/sửa SẢN PHẨM (dùng ở danh sách và chi tiết) ---------- */
+/* ---------- Drawer thêm/sửa SẢN PHẨM ---------- */
 const EMPTY_SP = { sp_ten: "", sp_mota: "", th_ma: "", dmsp_ma: "" };
 
 export const SanPhamFormDrawer = ({
@@ -652,7 +826,6 @@ export const SanPhamFormDrawer = ({
   );
 };
 
-// Tải thương hiệu và danh mục của gian hàng (dùng cho form sản phẩm)
 export const loadProductOptions = async (shopId) => {
   const [resB, resC] = await Promise.all([
     thuongHieuService.getByShop(shopId),

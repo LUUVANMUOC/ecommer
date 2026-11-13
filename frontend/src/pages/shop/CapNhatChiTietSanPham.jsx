@@ -15,8 +15,8 @@ import {
 } from "../../components/shop/SanPhamShared";
 
 const LIST_PATH = "/shop/san-pham";
+const LOG = "[CapNhatChiTietSanPham]";
 
-// 🟢 Thêm ctsp_chieucao vào EMPTY_FORM
 const EMPTY_FORM = {
   ctsp_ten: "",
   ctsp_mota: "",
@@ -31,6 +31,7 @@ const EMPTY_FORM = {
 };
 
 const CapNhatChiTietSanPham = () => {
+  console.log(`${LOG} render start`);
   const { sp_ma, ctsp_ma } = useParams();
   const isEdit = Boolean(ctsp_ma);
   const navigate = useNavigate();
@@ -46,16 +47,33 @@ const CapNhatChiTietSanPham = () => {
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
 
+  console.log(`${LOG} params`, { sp_ma, ctsp_ma, isEdit, detailPath });
+
   const leafNganhHangs = getLeafNganhHangs(buildNganhHangTree(nganhHangs));
   const currentNganhHangIsInvalidLeaf =
     !!formData.nh_ma && !leafNganhHangs.some((l) => l.nh_ma === formData.nh_ma);
 
+  console.log(`${LOG} derived`, {
+    leafNganhHangsCount: leafNganhHangs.length,
+    currentNh: formData.nh_ma,
+    currentNganhHangIsInvalidLeaf,
+    leafNganhHangs: leafNganhHangs.map((l) => ({
+      nh_ma: l.nh_ma,
+      nh_ten: l.nh_ten,
+      path: l.path,
+    })),
+  });
+
   useEffect(() => {
     const init = async () => {
+      console.log(`${LOG} init() START`, { sp_ma, ctsp_ma, isEdit });
       setLoading(true);
       setError("");
       try {
         const shopId = getCurrentShopId();
+        console.log(`${LOG} shopId =`, shopId);
+        console.log(`${LOG} fetching products, variants, attrs, nganh-hang...`);
+
         const [resProducts, resVariants, resAttrs, resNh] = await Promise.all([
           sanPhamService.getByGianHang(shopId),
           chiTietSanPhamService.getBySanPham(sp_ma),
@@ -63,24 +81,42 @@ const CapNhatChiTietSanPham = () => {
           axiosClient.get("/nganh-hang"),
         ]);
 
+        console.log(`${LOG} fetch results`, {
+          productsCount: (resProducts?.data || []).length,
+          variantsCount: (resVariants?.data || []).length,
+          attrsCount: (resAttrs?.data || []).length,
+          nganhHangsCount: (resNh?.data || []).length,
+        });
+
+        // Log raw ngành hàng — quan trọng để thấy schema thực tế
+        console.log(
+          `${LOG} RAW nganh-hang sample keys =`,
+          resNh?.data?.[0] ? Object.keys(resNh.data[0]) : null,
+        );
+        console.log(`${LOG} RAW nganh-hang data =`, resNh?.data);
+
         const product = resProducts.data.find((p) => p.sp_ma === sp_ma);
+        console.log(`${LOG} product matched`, product);
         setProductName(product?.sp_ten || "");
         setAllAttributes(resAttrs.data || []);
         setNganhHangs(resNh.data || []);
 
         if (isEdit) {
+          console.log(`${LOG} EDIT mode — looking for variant`, ctsp_ma);
           const ct = resVariants.data.find((v) => v.ctsp_ma === ctsp_ma);
+          console.log(`${LOG} variant found =`, ct);
           if (!ct) {
+            console.warn(`${LOG} variant NOT FOUND -> setNotFound(true)`);
             setNotFound(true);
           } else {
-            setFormData({
+            const mappedForm = {
               ctsp_ten: ct.ctsp_ten,
               ctsp_mota: ct.ctsp_mota || "",
               nh_ma: ct.nh_ma || "",
               ctsp_soluongton: ct.ctsp_soluongton,
               ctsp_chieudai: ct.ctsp_chieudai,
               ctsp_chieurong: ct.ctsp_chieurong,
-              ctsp_chieucao: ct.ctsp_chieucao || 10, // 🟢 Load chiều cao
+              ctsp_chieucao: ct.ctsp_chieucao || 10,
               ctsp_khoiluong: ct.ctsp_khoiluong,
               gb_gia: ct.gb_gia || 0,
               thuoctinh: (ct.thuoctinh || []).map((tt) => ({
@@ -92,33 +128,59 @@ const CapNhatChiTietSanPham = () => {
                     ? ""
                     : String(tt.gttt_giatridinhluong),
               })),
-            });
-            setImages(
-              (ct.images || []).map((img) => ({
-                hasp_ma: img.hasp_ma,
-                hasp_link: img.hasp_link,
-                preview: imgUrl(img.hasp_link),
-                mota: img.hasp_mota || "",
-                laanhchinh: img.hasp_laanhchinh,
-              })),
-            );
+            };
+            console.log(`${LOG} setFormData (edit)`, mappedForm);
+            setFormData(mappedForm);
+
+            const mappedImages = (ct.images || []).map((img) => ({
+              hasp_ma: img.hasp_ma,
+              hasp_link: img.hasp_link,
+              preview: imgUrl(img.hasp_link),
+              mota: img.hasp_mota || "",
+              laanhchinh: img.hasp_laanhchinh,
+            }));
+            console.log(`${LOG} setImages (edit) count=${mappedImages.length}`);
+            setImages(mappedImages);
           }
         } else {
+          console.log(`${LOG} CREATE mode — reset form & images`);
           setFormData(EMPTY_FORM);
           setImages([]);
         }
       } catch (err) {
-        console.error(err);
+        console.error(`${LOG} init() ERROR`, err);
+        console.error(`${LOG} error response =`, err?.response?.data);
         setError("Không tải được dữ liệu. Vui lòng thử lại.");
       } finally {
+        console.log(`${LOG} init() DONE -> setLoading(false)`);
         setLoading(false);
       }
     };
     init();
   }, [sp_ma, ctsp_ma]);
 
+  // Log khi nganhHangs thay đổi + kiểm tra formData.nh_ma có trong raw không
+  useEffect(() => {
+    if (nganhHangs.length === 0) return;
+    console.log(`${LOG} nganhHangs state CHANGED count=${nganhHangs.length}`);
+    if (formData.nh_ma) {
+      const rawMatch = nganhHangs.find(
+        (nh) => (nh.nh_ma ?? nh.NH_Ma ?? nh.ma) === formData.nh_ma,
+      );
+      console.log(`${LOG} formData.nh_ma có trong raw nganhHangs không?`, {
+        formData_nh_ma: formData.nh_ma,
+        foundInRaw: Boolean(rawMatch),
+        rawMatch: rawMatch || null,
+      });
+    }
+  }, [nganhHangs]);
+
   const handleSelectImages = (e) => {
     const files = Array.from(e.target.files);
+    console.log(
+      `${LOG} handleSelectImages files=${files.length}`,
+      files.map((f) => ({ name: f.name, size: f.size, type: f.type })),
+    );
     const newImages = files.map((file) => ({
       file,
       preview: URL.createObjectURL(file),
@@ -126,20 +188,33 @@ const CapNhatChiTietSanPham = () => {
       laanhchinh: false,
       hasp_ma: null,
     }));
-    setImages((prev) => [...prev, ...newImages]);
+    setImages((prev) => {
+      const next = [...prev, ...newImages];
+      console.log(
+        `${LOG} images after select: ${prev.length} -> ${next.length}`,
+      );
+      return next;
+    });
     e.target.value = "";
   };
 
   const handleRemoveImage = (index) => {
+    console.log(`${LOG} handleRemoveImage index=${index}`);
     setImages((prev) => {
       const target = prev[index];
+      console.log(`${LOG} removing image`, target);
       if (target?.preview?.startsWith("blob:"))
         URL.revokeObjectURL(target.preview);
-      return prev.filter((_, i) => i !== index);
+      const next = prev.filter((_, i) => i !== index);
+      console.log(
+        `${LOG} images after remove: ${prev.length} -> ${next.length}`,
+      );
+      return next;
     });
   };
 
   const handleUpdateImageInfo = (index, field, value) => {
+    console.log(`${LOG} handleUpdateImageInfo`, { index, field, value });
     setImages((prev) => {
       const next = prev.map((img) => ({ ...img }));
       if (field === "laanhchinh" && value === true) {
@@ -152,23 +227,35 @@ const CapNhatChiTietSanPham = () => {
 
   const handleMoveImage = (index, direction) => {
     const target = index + direction;
-    if (target < 0 || target >= images.length) return;
+    console.log(`${LOG} handleMoveImage`, { index, direction, target });
+    if (target < 0 || target >= images.length) {
+      console.warn(`${LOG} move image OUT OF RANGE`);
+      return;
+    }
     const next = [...images];
     [next[index], next[target]] = [next[target], next[index]];
     setImages(next);
   };
 
   const handleAddAttrRow = () => {
-    setFormData((prev) => ({
-      ...prev,
-      thuoctinh: [
-        ...prev.thuoctinh,
-        { ttsp_ma: "", gttt_giatridinhtinh: "", gttt_giatridinhluong: "" },
-      ],
-    }));
+    console.log(`${LOG} handleAddAttrRow`);
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        thuoctinh: [
+          ...prev.thuoctinh,
+          { ttsp_ma: "", gttt_giatridinhtinh: "", gttt_giatridinhluong: "" },
+        ],
+      };
+      console.log(
+        `${LOG} attrs count: ${prev.thuoctinh.length} -> ${next.thuoctinh.length}`,
+      );
+      return next;
+    });
   };
 
   const handleUpdateAttrRow = (index, field, value) => {
+    console.log(`${LOG} handleUpdateAttrRow`, { index, field, value });
     setFormData((prev) => {
       const next = prev.thuoctinh.map((r) => ({ ...r }));
       next[index][field] = value;
@@ -177,24 +264,43 @@ const CapNhatChiTietSanPham = () => {
   };
 
   const handleRemoveAttrRow = (index) => {
-    setFormData((prev) => ({
-      ...prev,
-      thuoctinh: prev.thuoctinh.filter((_, i) => i !== index),
-    }));
+    console.log(`${LOG} handleRemoveAttrRow index=${index}`);
+    setFormData((prev) => {
+      const next = {
+        ...prev,
+        thuoctinh: prev.thuoctinh.filter((_, i) => i !== index),
+      };
+      console.log(
+        `${LOG} attrs count: ${prev.thuoctinh.length} -> ${next.thuoctinh.length}`,
+      );
+      return next;
+    });
   };
 
   const handleSave = async (e) => {
     e.preventDefault();
-    if (!formData.ctsp_ten) return setError("Vui lòng nhập tên phân loại.");
-    if (!formData.nh_ma)
+    console.log(`${LOG} handleSave START`, { isEdit, sp_ma, ctsp_ma });
+
+    if (!formData.ctsp_ten) {
+      console.warn(`${LOG} validation FAILED: empty ctsp_ten`);
+      return setError("Vui lòng nhập tên phân loại.");
+    }
+    if (!formData.nh_ma) {
+      console.warn(`${LOG} validation FAILED: empty nh_ma`);
       return setError("Vui lòng chọn ngành hàng con cuối cùng cho phân loại.");
-    if (currentNganhHangIsInvalidLeaf)
+    }
+    if (currentNganhHangIsInvalidLeaf) {
+      console.warn(`${LOG} validation FAILED: nh_ma is not a leaf`, {
+        nh_ma: formData.nh_ma,
+      });
       return setError(
         "Ngành hàng hiện tại là ngành cha (có ngành con). Vui lòng chọn lại ngành hàng con cuối cùng.",
       );
+    }
 
     setSaving(true);
     setError("");
+    console.log(`${LOG} validation OK -> building FormData`);
     try {
       const dataToSend = new FormData();
       dataToSend.append("sp_ma", sp_ma);
@@ -204,9 +310,21 @@ const CapNhatChiTietSanPham = () => {
       dataToSend.append("ctsp_soluongton", formData.ctsp_soluongton);
       dataToSend.append("ctsp_chieudai", formData.ctsp_chieudai);
       dataToSend.append("ctsp_chieurong", formData.ctsp_chieurong);
-      dataToSend.append("ctsp_chieucao", formData.ctsp_chieucao); // 🟢 Gửi chiều cao
+      dataToSend.append("ctsp_chieucao", formData.ctsp_chieucao);
       dataToSend.append("ctsp_khoiluong", formData.ctsp_khoiluong);
       dataToSend.append("gb_gia", formData.gb_gia);
+
+      console.log(`${LOG} base fields appended`, {
+        sp_ma,
+        ctsp_ten: formData.ctsp_ten,
+        nh_ma: formData.nh_ma,
+        ctsp_soluongton: formData.ctsp_soluongton,
+        ctsp_chieudai: formData.ctsp_chieudai,
+        ctsp_chieurong: formData.ctsp_chieurong,
+        ctsp_chieucao: formData.ctsp_chieucao,
+        ctsp_khoiluong: formData.ctsp_khoiluong,
+        gb_gia: formData.gb_gia,
+      });
 
       const imageMetas = images.map((img, index) => ({
         hasp_ma: img.hasp_ma || null,
@@ -216,9 +334,15 @@ const CapNhatChiTietSanPham = () => {
         thutu: index + 1,
       }));
       dataToSend.append("image_metas", JSON.stringify(imageMetas));
+      console.log(`${LOG} image_metas count=${imageMetas.length}`);
 
-      images.forEach((img) => {
-        if (img.file) dataToSend.append("hinhanh", img.file);
+      images.forEach((img, i) => {
+        if (img.file) {
+          console.log(
+            `${LOG} append file #${i}: ${img.file.name} (${img.file.size}B)`,
+          );
+          dataToSend.append("hinhanh", img.file);
+        }
       });
 
       const cleanAttrs = formData.thuoctinh
@@ -234,28 +358,35 @@ const CapNhatChiTietSanPham = () => {
               : Number(tt.gttt_giatridinhluong),
         }));
       dataToSend.append("thuoctinh", JSON.stringify(cleanAttrs));
+      console.log(`${LOG} attrs in payload count=${cleanAttrs.length}`);
 
       if (isEdit) {
+        console.log(`${LOG} calling chiTietSanPhamService.update(${ctsp_ma})`);
         await chiTietSanPhamService.update(ctsp_ma, dataToSend);
+        console.log(`${LOG} update SUCCESS`);
       } else {
+        console.log(`${LOG} calling chiTietSanPhamService.create()`);
         await chiTietSanPhamService.create(dataToSend);
+        console.log(`${LOG} create SUCCESS`);
       }
 
-      navigate(detailPath, {
-        state: {
-          toast: isEdit
-            ? "Cập nhật phân loại thành công!"
-            : "Thêm phân loại thành công!",
-        },
-      });
+      const toast = isEdit
+        ? "Cập nhật phân loại thành công!"
+        : "Thêm phân loại thành công!";
+      console.log(`${LOG} navigating to ${detailPath}`, { toast });
+      navigate(detailPath, { state: { toast } });
     } catch (err) {
+      console.error(`${LOG} handleSave ERROR`, err);
+      console.error(`${LOG} error response`, err?.response?.data);
       setError(err.response?.data?.message || "Lỗi khi lưu phân loại");
     } finally {
+      console.log(`${LOG} handleSave FINALLY -> setSaving(false)`);
       setSaving(false);
     }
   };
 
   if (loading) {
+    console.log(`${LOG} render LOADING state`);
     return (
       <div className="flex h-64 items-center justify-center text-[#7A857F]">
         Đang tải...
@@ -264,6 +395,7 @@ const CapNhatChiTietSanPham = () => {
   }
 
   if (notFound) {
+    console.log(`${LOG} render NOT FOUND state`);
     return (
       <div className="flex flex-col items-center gap-3 py-16 text-center">
         <p className="text-[#5B6661]">Không tìm thấy phân loại này.</p>
@@ -276,6 +408,17 @@ const CapNhatChiTietSanPham = () => {
       </div>
     );
   }
+
+  console.log(`${LOG} render MAIN form`, {
+    isEdit,
+    productName,
+    imagesCount: images.length,
+    attrsCount: formData.thuoctinh.length,
+    hasError: Boolean(error),
+    saving,
+    rawNhCount: nganhHangs.length,
+    leafCount: leafNganhHangs.length,
+  });
 
   return (
     <div className="w-full space-y-6">
@@ -302,7 +445,10 @@ const CapNhatChiTietSanPham = () => {
         <div className="flex shrink-0 items-center gap-2">
           <button
             type="button"
-            onClick={() => navigate(detailPath)}
+            onClick={() => {
+              console.log(`${LOG} click Hủy bỏ -> navigate ${detailPath}`);
+              navigate(detailPath);
+            }}
             className="rounded-lg border px-5 py-2.5 font-medium text-gray-600 transition-colors hover:bg-gray-50"
           >
             Hủy bỏ
@@ -354,9 +500,10 @@ const CapNhatChiTietSanPham = () => {
                   type="text"
                   required
                   value={formData.ctsp_ten}
-                  onChange={(e) =>
-                    setFormData({ ...formData, ctsp_ten: e.target.value })
-                  }
+                  onChange={(e) => {
+                    console.log(`${LOG} input ctsp_ten =`, e.target.value);
+                    setFormData({ ...formData, ctsp_ten: e.target.value });
+                  }}
                   className={fieldClass}
                   placeholder="VD: Màu đỏ, Size L..."
                 />
@@ -368,32 +515,44 @@ const CapNhatChiTietSanPham = () => {
                 <select
                   required
                   value={formData.nh_ma}
-                  onChange={(e) =>
-                    setFormData({ ...formData, nh_ma: e.target.value })
-                  }
+                  onChange={(e) => {
+                    console.log(`${LOG} select nh_ma =`, e.target.value);
+                    setFormData({ ...formData, nh_ma: e.target.value });
+                  }}
                   className={fieldClass}
                 >
                   <option value="">-- Chọn ngành hàng --</option>
                   {currentNganhHangIsInvalidLeaf && (
                     <option value={formData.nh_ma} disabled>
-                      ⚠ Ngành hàng cũ không hợp lệ — vui lòng chọn lại
+                      ⚠ Ngành hàng cũ ({formData.nh_ma}) không còn hợp lệ — vui
+                      lòng chọn lại
                     </option>
                   )}
                   {leafNganhHangs.map((nh) => (
                     <option key={nh.nh_ma} value={nh.nh_ma}>
-                      {nh.path}
+                      {nh.path || nh.nh_ten || nh.nh_ma}
                     </option>
                   ))}
                 </select>
+                <span className="block text-[10px] leading-tight text-[#9AA39E]">
+                  Debug: raw={nganhHangs.length} · leaf={leafNganhHangs.length}
+                  {currentNganhHangIsInvalidLeaf
+                    ? ` · "${formData.nh_ma}" không phải leaf`
+                    : ""}
+                </span>
               </label>
               <label className="block space-y-1.5 md:col-span-2">
                 <span className={labelClass}>Mô tả phân loại</span>
                 <textarea
                   rows="3"
                   value={formData.ctsp_mota}
-                  onChange={(e) =>
-                    setFormData({ ...formData, ctsp_mota: e.target.value })
-                  }
+                  onChange={(e) => {
+                    console.log(
+                      `${LOG} input ctsp_mota length =`,
+                      e.target.value.length,
+                    );
+                    setFormData({ ...formData, ctsp_mota: e.target.value });
+                  }}
                   className={`${fieldClass} resize-y`}
                   placeholder="Mô tả ngắn cho phân loại này..."
                 />
@@ -428,9 +587,10 @@ const CapNhatChiTietSanPham = () => {
                   min="0"
                   step="1000"
                   value={formData.gb_gia}
-                  onChange={(e) =>
-                    setFormData({ ...formData, gb_gia: e.target.value })
-                  }
+                  onChange={(e) => {
+                    console.log(`${LOG} input gb_gia =`, e.target.value);
+                    setFormData({ ...formData, gb_gia: e.target.value });
+                  }}
                   className={fieldClass}
                   placeholder="VD: 150000"
                 />
@@ -444,12 +604,16 @@ const CapNhatChiTietSanPham = () => {
                   type="number"
                   min="0"
                   value={formData.ctsp_soluongton}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    console.log(
+                      `${LOG} input ctsp_soluongton =`,
+                      e.target.value,
+                    );
                     setFormData({
                       ...formData,
                       ctsp_soluongton: e.target.value,
-                    })
-                  }
+                    });
+                  }}
                   className={fieldClass}
                 />
               </label>
@@ -466,7 +630,6 @@ const CapNhatChiTietSanPham = () => {
             )}
           </section>
 
-          {/* 🟢 Cập nhật phần Kích thước & khối lượng (chia 4 cột) */}
           <section className="space-y-4 border-t border-[#EFEBE2] pt-6">
             <h2 className="text-sm font-bold text-[#14201C]">
               Kích thước & khối lượng
@@ -479,9 +642,10 @@ const CapNhatChiTietSanPham = () => {
                   step="0.1"
                   min="0.1"
                   value={formData.ctsp_chieudai}
-                  onChange={(e) =>
-                    setFormData({ ...formData, ctsp_chieudai: e.target.value })
-                  }
+                  onChange={(e) => {
+                    console.log(`${LOG} input ctsp_chieudai =`, e.target.value);
+                    setFormData({ ...formData, ctsp_chieudai: e.target.value });
+                  }}
                   className={fieldClass}
                 />
               </label>
@@ -492,13 +656,19 @@ const CapNhatChiTietSanPham = () => {
                   step="0.1"
                   min="0.1"
                   value={formData.ctsp_chieurong}
-                  onChange={(e) =>
-                    setFormData({ ...formData, ctsp_chieurong: e.target.value })
-                  }
+                  onChange={(e) => {
+                    console.log(
+                      `${LOG} input ctsp_chieurong =`,
+                      e.target.value,
+                    );
+                    setFormData({
+                      ...formData,
+                      ctsp_chieurong: e.target.value,
+                    });
+                  }}
                   className={fieldClass}
                 />
               </label>
-              {/* 🟢 Ô nhập Chiều cao */}
               <label className="block space-y-1.5">
                 <span className={labelClass}>Cao (cm)</span>
                 <input
@@ -506,9 +676,10 @@ const CapNhatChiTietSanPham = () => {
                   step="0.1"
                   min="0.1"
                   value={formData.ctsp_chieucao}
-                  onChange={(e) =>
-                    setFormData({ ...formData, ctsp_chieucao: e.target.value })
-                  }
+                  onChange={(e) => {
+                    console.log(`${LOG} input ctsp_chieucao =`, e.target.value);
+                    setFormData({ ...formData, ctsp_chieucao: e.target.value });
+                  }}
                   className={fieldClass}
                 />
               </label>
@@ -519,9 +690,16 @@ const CapNhatChiTietSanPham = () => {
                   step="0.1"
                   min="0.1"
                   value={formData.ctsp_khoiluong}
-                  onChange={(e) =>
-                    setFormData({ ...formData, ctsp_khoiluong: e.target.value })
-                  }
+                  onChange={(e) => {
+                    console.log(
+                      `${LOG} input ctsp_khoiluong =`,
+                      e.target.value,
+                    );
+                    setFormData({
+                      ...formData,
+                      ctsp_khoiluong: e.target.value,
+                    });
+                  }}
                   className={fieldClass}
                 />
               </label>

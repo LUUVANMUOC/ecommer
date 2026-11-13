@@ -1,0 +1,89 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+
+  // =====================================================================
+  //  MỤC TIÊU
+  //  - ĐỌC / TRA CỨU: mặc định ĐƯỢC PHÉP toàn bộ, không hỏi.
+  //  - CHỈNH SỬA: mặc định KHÔNG ĐƯỢC PHÉP, không hỏi.
+  //
+  //  QUY TẮC MATCH: luật ĐỨNG SAU thắng (last match wins).
+  //  => Luật chặn tổng quát đứng trước, luật cho phép cụ thể đứng sau.
+  // =====================================================================
+  "permissions": [
+    // ─────────────────────────────────────────────────────────────────
+    // 1. CHẶN TOÀN BỘ CHỈNH SỬA FILE
+    //    "edit" áp dụng cho cả edit, write và patch trên mọi đường dẫn.
+    //    "deny" = từ chối luôn, không hiện hỏi xác nhận.
+    // ─────────────────────────────────────────────────────────────────
+    { "action": "edit", "resource": "*", "effect": "deny" },
+
+    // ─────────────────────────────────────────────────────────────────
+    // 2. CHO PHÉP ĐỌC / TRA CỨU KHÔNG GIỚI HẠN
+    // ─────────────────────────────────────────────────────────────────
+    // Đọc file trong project
+    { "action": "read", "resource": "*", "effect": "allow" },
+
+    // Đọc file .env (mặc định hệ thống hay hỏi; ở đây cho phép luôn)
+    { "action": "read", "resource": "*.env", "effect": "allow" },
+    { "action": "read", "resource": "*.env.*", "effect": "allow" },
+
+    // Tìm file / tìm nội dung
+    { "action": "glob", "resource": "*", "effect": "allow" },
+    { "action": "grep", "resource": "*", "effect": "allow" },
+
+    // Truy cập web
+    { "action": "webfetch", "resource": "*", "effect": "allow" },
+    { "action": "websearch", "resource": "*", "effect": "allow" },
+
+    // Skill / hỏi đáp / gọi subagent
+    { "action": "skill", "resource": "*", "effect": "allow" },
+    { "action": "question", "resource": "*", "effect": "allow" },
+    { "action": "subagent", "resource": "*", "effect": "allow" },
+
+    // Đọc ngoài thư mục project: cho phép.
+    // (Luật "edit" phía trên vẫn chặn mọi thao tác ghi ra ngoài.)
+    { "action": "external_directory", "resource": "*", "effect": "allow" },
+
+    // ─────────────────────────────────────────────────────────────────
+    // 3. SHELL: CHẶN MẶC ĐỊNH, CHỈ MỞ LỆNH CHỈ ĐỌC
+    //    Mọi lệnh không nằm trong danh sách dưới đây bị từ chối,
+    //    kể cả rm, del, mv, cp, npm install, git commit, git push...
+    // ─────────────────────────────────────────────────────────────────
+    { "action": "shell", "resource": "*", "effect": "deny" },
+
+    // Git chỉ đọc
+    { "action": "shell", "resource": "git status *", "effect": "allow" },
+    { "action": "shell", "resource": "git diff *", "effect": "allow" },
+    { "action": "shell", "resource": "git log *", "effect": "allow" },
+    { "action": "shell", "resource": "git show *", "effect": "allow" },
+    { "action": "shell", "resource": "git rev-parse *", "effect": "allow" },
+    { "action": "shell", "resource": "git ls-files *", "effect": "allow" },
+
+    // PowerShell chỉ đọc
+    { "action": "shell", "resource": "Get-ChildItem *", "effect": "allow" },
+    { "action": "shell", "resource": "Get-Content *", "effect": "allow" },
+    { "action": "shell", "resource": "Get-Item *", "effect": "allow" },
+    { "action": "shell", "resource": "Get-Command *", "effect": "allow" },
+    { "action": "shell", "resource": "Get-Location *", "effect": "allow" },
+    { "action": "shell", "resource": "Test-Path *", "effect": "allow" },
+    { "action": "shell", "resource": "Resolve-Path *", "effect": "allow" },
+    { "action": "shell", "resource": "Select-String *", "effect": "allow" },
+    { "action": "shell", "resource": "Measure-Object *", "effect": "allow" },
+    { "action": "shell", "resource": "Get-FileHash *", "effect": "allow" },
+
+    // Lệnh quen thuộc trên Windows / cross-platform, chỉ đọc
+    { "action": "shell", "resource": "dir *", "effect": "allow" },
+    { "action": "shell", "resource": "type *", "effect": "allow" },
+    { "action": "shell", "resource": "findstr *", "effect": "allow" },
+    { "action": "shell", "resource": "where *", "effect": "allow" },
+    { "action": "shell", "resource": "rg *", "effect": "allow" },
+    { "action": "shell", "resource": "cat *", "effect": "allow" },
+    { "action": "shell", "resource": "ls *", "effect": "allow" },
+    { "action": "shell", "resource": "pwd", "effect": "allow" },
+
+    // Kiểm tra phiên bản (không sửa gì)
+    { "action": "shell", "resource": "node --version", "effect": "allow" },
+    { "action": "shell", "resource": "npm --version", "effect": "allow" },
+    { "action": "shell", "resource": "npm list *", "effect": "allow" }
+  ]
+}
