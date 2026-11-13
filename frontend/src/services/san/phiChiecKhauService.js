@@ -5,9 +5,15 @@ const phiChiecKhauService = {
   getTableData: (stmdt_ma) => axiosClient.get(`/phi-chiec-khau?stmdt_ma=${stmdt_ma}`),
   updateFee: (data) => axiosClient.post("/phi-chiec-khau", data),
 
-  // --- PHẦN CRUD NGÀNH HÀNG (Đã trỏ sang API mới) ---
-  createCategory: (data) => axiosClient.post("/nganh-hang", data),
-  updateCategory: (id, data) => axiosClient.put(`/nganh-hang/${id}`, data),
+  // --- PHẦN CRUD NGÀNH HÀNG (multipart để gửi kèm icon) ---
+  createCategory: (data) =>
+    axiosClient.post("/nganh-hang", data, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
+  updateCategory: (id, data) =>
+    axiosClient.put(`/nganh-hang/${id}`, data, {
+      headers: { "Content-Type": "multipart/form-data" },
+    }),
   deleteCategory: (id) => axiosClient.delete(`/nganh-hang/${id}`),
 };
 

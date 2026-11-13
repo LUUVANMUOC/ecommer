@@ -3,8 +3,10 @@ import phiChiecKhauService from "../../services/san/phiChiecKhauService";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
 import CrudDrawer from "../../components/common/Crud/CrudDrawer";
 import EditableCell from "../../components/common/EditableCell";
-// 1. Import Component Drawer xem chi tiết
+import ImageUpload from "../../components/common/ImageUpload";
 import NganhDichVuDetailDrawer from "../../components/common/NganhDichVuDetailDrawer";
+
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
 // ==========================================
 // HÀM DỰNG BẢNG (chuyển cây thành các hàng lá)
@@ -89,7 +91,11 @@ const PhiChiecKhauCRUD = () => {
   });
   const [formError, setFormError] = useState("");
 
-  // 2. Thêm State cho Drawer Xem Chi Tiết
+  // State cho ảnh icon
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [currentIcon, setCurrentIcon] = useState("");
+
+  // State cho Drawer Xem Chi Tiết
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState(null);
 
@@ -97,7 +103,6 @@ const PhiChiecKhauCRUD = () => {
     const userStr = localStorage.getItem("user");
     if (userStr) {
       const user = JSON.parse(userStr);
-      // Dùng STMDT_Ma (in hoa) để khớp với localStorage
       setCurrentMerchantId(user.STMDT_Ma || user.maSan || "SAN_MAC_DINH");
     }
   }, []);
@@ -125,7 +130,6 @@ const PhiChiecKhauCRUD = () => {
 
   // === CẬP NHẬT PHÍ ===
   const handleUpdateFee = async (rowId, phiMoi) => {
-    // Ép kiểu về số, nếu rỗng thì gán bằng 0
     const soPhi = phiMoi === "" || phiMoi === null ? 0 : parseFloat(phiMoi);
 
     if (isNaN(soPhi) || soPhi < 0 || soPhi > 100) {
@@ -133,7 +137,6 @@ const PhiChiecKhauCRUD = () => {
     }
 
     try {
-      // SỬA LỖI TẠI ĐÂY: Đổi thành psck_phantram (chữ thường)
       await phiChiecKhauService.updateFee({
         nh_ma: rowId,
         stmdt_ma: currentMerchantId,
@@ -142,7 +145,6 @@ const PhiChiecKhauCRUD = () => {
 
       setData((prev) =>
         prev.map((item) =>
-          // SỬA LỖI TẠI ĐÂY: Đổi thành psck_phantram (chữ thường)
           item.nh_ma === rowId ? { ...item, psck_phantram: soPhi } : item,
         ),
       );
@@ -165,6 +167,8 @@ const PhiChiecKhauCRUD = () => {
       nh_mota: "",
       nh_cha: parentId || "",
     });
+    setSelectedFile(null);
+    setCurrentIcon("");
     setFormError("");
     setIsDrawerOpen(true);
   };
@@ -177,25 +181,34 @@ const PhiChiecKhauCRUD = () => {
       nh_mota: category.nh_mota || "",
       nh_cha: category.nh_cha || "",
     });
+    setSelectedFile(null);
+    setCurrentIcon(
+      category.nh_hinhanh ? `${BACKEND_URL}${category.nh_hinhanh}` : "",
+    );
     setFormError("");
     setIsDrawerOpen(true);
   };
 
-  // 3. Hàm xử lý Mở xem chi tiết
   const handleOpenDetail = (category) => {
-    console.log("Dữ liệu ngành hàng được chọn:", category);
     setSelectedCategory(category);
     setIsDetailOpen(true);
   };
 
   const handleDeleteCategory = async (id, name) => {
-    if (window.confirm(`Bạn có chắc chắn muốn xóa danh mục "${name}"?`)) {
+    if (
+      window.confirm(
+        `Bạn có chắc chắn muốn xóa danh mục "${name}"?\n\nToàn bộ ngành hàng con và phí chiết khấu của chúng cũng sẽ bị xóa theo.`,
+      )
+    ) {
       try {
-        await phiChiecKhauService.deleteCategory(id);
-        showToast("Xóa danh mục thành công!");
+        const res = await phiChiecKhauService.deleteCategory(id);
+        showToast(res.data?.message || "Xóa danh mục thành công!");
         fetchData();
       } catch (error) {
-        showToast("Lỗi khi xóa danh mục", "error");
+        showToast(
+          error.response?.data?.message || "Lỗi khi xóa danh mục",
+          "error",
+        );
       }
     }
   };
@@ -205,14 +218,20 @@ const PhiChiecKhauCRUD = () => {
     if (!formData.nh_ten) return setFormError("Vui lòng nhập tên danh mục.");
 
     try {
+      const payload = new FormData();
+      payload.append("nh_ten", formData.nh_ten);
+      payload.append("nh_mota", formData.nh_mota || "");
+      payload.append("nh_cha", formData.nh_cha || "");
+      if (selectedFile) payload.append("icon", selectedFile);
+
       if (editingCategory) {
         await phiChiecKhauService.updateCategory(
           editingCategory.nh_ma,
-          formData,
+          payload,
         );
         showToast("Cập nhật danh mục thành công!");
       } else {
-        await phiChiecKhauService.createCategory(formData);
+        await phiChiecKhauService.createCategory(payload);
         showToast("Thêm danh mục thành công!");
       }
       setIsDrawerOpen(false);
@@ -241,17 +260,30 @@ const PhiChiecKhauCRUD = () => {
         className="px-4 py-3 border border-outline-variant/60 align-top bg-surface-container-lowest group/cell"
       >
         <div className="flex items-start justify-between gap-2">
-          <span
-            className={
-              item.level === 1
-                ? "font-semibold text-primary pt-1"
-                : "font-medium pt-1"
-            }
-          >
-            {item.nh_ten}
-          </span>
+          <div className="flex items-center gap-2 min-w-0">
+            {item.nh_hinhanh ? (
+              <img
+                src={`${BACKEND_URL}${item.nh_hinhanh}`}
+                alt={item.nh_ten}
+                className="w-6 h-6 object-contain rounded border border-outline-variant/40 bg-white shrink-0"
+              />
+            ) : (
+              <span className="material-symbols-outlined text-[18px] text-outline shrink-0">
+                category
+              </span>
+            )}
+            <span
+              className={
+                item.level === 1
+                  ? "font-semibold text-primary pt-1"
+                  : "font-medium pt-1"
+              }
+            >
+              {item.nh_ten}
+            </span>
+          </div>
+
           <div className="flex items-center gap-1 opacity-0 group-hover/cell:opacity-100 transition-opacity shrink-0">
-            {/* 4. THÊM NÚT XEM CHI TIẾT (Icon con mắt) */}
             <button
               onClick={() => handleOpenDetail(item)}
               title="Xem chi tiết"
@@ -367,7 +399,6 @@ const PhiChiecKhauCRUD = () => {
                       key={tableRow.key}
                       className="hover:bg-surface-container-low/30 text-body-sm border-b border-outline-variant/60 transition-colors group"
                     >
-                      {/* CÁC Ô TÊN NGÀNH HÀNG (cha có rowSpan, lá có colSpan) */}
                       {tableRow.cells.map((cell) =>
                         renderNameCell(data[cell.index], {
                           rowSpan: cell.rowSpan,
@@ -376,10 +407,8 @@ const PhiChiecKhauCRUD = () => {
                         }),
                       )}
 
-                      {/* CỘT PHÍ CỐ ĐỊNH - CHỈ HIỂN THỊ Ở NODE LÁ */}
                       <td className="px-2 py-2 border border-outline-variant/60 align-top text-center bg-green-50/20">
                         <EditableCell
-                          // SỬA LỖI TẠI ĐÂY: Đổi thành leaf.psck_phantram (chữ thường)
                           value={leaf.psck_phantram}
                           onSave={(val) => handleUpdateFee(leaf.nh_ma, val)}
                         />
@@ -427,6 +456,7 @@ const PhiChiecKhauCRUD = () => {
               placeholder="Nhập tên ngành hàng..."
             />
           </div>
+
           <div>
             <label className="text-label-md font-label-md block mb-1.5">
               Thuộc Danh Mục Cha
@@ -437,6 +467,7 @@ const PhiChiecKhauCRUD = () => {
               className="w-full bg-surface-container-high border border-outline-variant rounded-lg px-3 py-2 cursor-not-allowed text-outline italic"
             />
           </div>
+
           <div>
             <label className="text-label-md font-label-md block mb-1.5">
               Mô tả
@@ -450,10 +481,17 @@ const PhiChiecKhauCRUD = () => {
               placeholder="Mô tả chi tiết..."
             ></textarea>
           </div>
+
+          <ImageUpload
+            label="Icon Ngành Hàng"
+            hint="JPG, PNG hoặc WEBP (tối đa 2MB, tỷ lệ 1:1)"
+            currentImage={currentIcon}
+            onFileSelect={(file) => setSelectedFile(file)}
+          />
         </div>
       </CrudDrawer>
 
-      {/* 5. THÊM DRAWER XEM CHI TIẾT */}
+      {/* DRAWER XEM CHI TIẾT */}
       <NganhDichVuDetailDrawer
         isOpen={isDetailOpen}
         onClose={() => setIsDetailOpen(false)}
