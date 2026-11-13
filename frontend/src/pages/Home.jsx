@@ -1,7 +1,28 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
+
+const MODAL_CONTENT = {
+  help: {
+    title: "Hướng dẫn sử dụng",
+    body: "Chọn vai trò phù hợp bên dưới để đăng nhập vào bảng điều khiển tương ứng, hoặc bấm 'Mua sắm ngay' để xem danh sách sản phẩm công khai mà không cần đăng nhập.",
+  },
+  terms: {
+    title: "Điều khoản sử dụng",
+    body: "Nền tảng thương mại điện tử đa bên CT255 kết nối Khách hàng, Gian hàng, Đơn vị vận chuyển, Quản lý kho và Shipper trên cùng một hệ thống thống nhất.",
+  },
+  privacy: {
+    title: "Chính sách bảo mật",
+    body: "Thông tin tài khoản, địa chỉ nhận hàng và giao dịch được xác thực bằng JWT và mã hóa an toàn trên hệ thống.",
+  },
+  contact: {
+    title: "Liên hệ hỗ trợ",
+    body: "Mọi thắc mắc hoặc kiến nghị từ Gian hàng và Khách hàng vui lòng gửi trực tiếp qua mục Kiến nghị trong bảng điều khiển hoặc liên hệ quản trị viên sàn.",
+  },
+};
 
 const Home = () => {
   const navigate = useNavigate();
+  const [activeModal, setActiveModal] = useState(null);
 
   // Danh sách các vai trò và đường dẫn tương ứng
   const roles = [
@@ -123,6 +144,7 @@ const Home = () => {
 
           <button
             type="button"
+            onClick={() => setActiveModal("help")}
             className="hidden md:inline-flex items-center gap-2 px-4 py-2 rounded-full border border-outline-variant text-on-surface-variant text-body-sm hover:border-primary hover:text-primary transition-colors"
           >
             <span className="material-symbols-outlined text-[18px]">help</span>
@@ -163,8 +185,8 @@ const Home = () => {
             </button>
           </div>
 
-          {/* Role cards grid — đổi lg:grid-cols-4 → md:2 / lg:3 / xl:5 (đủ 5 card) */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 w-full mt-8">
+          {/* Role cards grid — 6 vai trò chia 2 hàng x 3 cột trên desktop */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 w-full mt-8">
             {roles.map((role, index) => (
               <button
                 key={role.id}
@@ -243,18 +265,67 @@ const Home = () => {
         <footer className="w-full max-w-7xl mx-auto py-6 mt-12 border-t border-outline-variant/40 flex flex-col md:flex-row items-center justify-between gap-3 text-body-sm text-on-surface-variant">
           <div>© 2025 CT255 E-Commerce Platform. Bảo lưu mọi quyền.</div>
           <div className="flex items-center gap-6">
-            <a href="#" className="hover:text-primary transition-colors">
+            <button
+              type="button"
+              onClick={() => setActiveModal("terms")}
+              className="hover:text-primary transition-colors"
+            >
               Điều khoản
-            </a>
-            <a href="#" className="hover:text-primary transition-colors">
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveModal("privacy")}
+              className="hover:text-primary transition-colors"
+            >
               Bảo mật
-            </a>
-            <a href="#" className="hover:text-primary transition-colors">
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveModal("contact")}
+              className="hover:text-primary transition-colors"
+            >
               Liên hệ
-            </a>
+            </button>
           </div>
         </footer>
       </div>
+
+      {activeModal && MODAL_CONTENT[activeModal] && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4"
+          onClick={() => setActiveModal(null)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl bg-surface-container-lowest border border-outline-variant p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-headline-sm font-bold text-on-surface">
+                {MODAL_CONTENT[activeModal].title}
+              </h3>
+              <button
+                type="button"
+                onClick={() => setActiveModal(null)}
+                className="p-1 rounded-lg text-on-surface-variant hover:bg-surface-container-low"
+              >
+                <span className="material-symbols-outlined text-[20px]">close</span>
+              </button>
+            </div>
+            <p className="text-body-sm text-on-surface-variant leading-relaxed">
+              {MODAL_CONTENT[activeModal].body}
+            </p>
+            <div className="mt-5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setActiveModal(null)}
+                className="px-4 py-2 rounded-xl bg-primary text-on-primary text-sm font-semibold hover:opacity-90 transition-opacity"
+              >
+                Đã hiểu
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Keyframes */}
       <style>{`

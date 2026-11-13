@@ -6,12 +6,13 @@ const PublicSanPhamController = {
   // Hàm này giờ đảm nhận cả việc Lấy danh sách và Tìm kiếm (Deep Search)
   getAll: async (req, res) => {
     try {
-      const { page, limit, search, brand, sort } = req.query;
+      const { page, limit, search, brand, category, sort } = req.query;
       const data = await PublicSanPhamModel.getAllActive({ 
         page: parseInt(page) || 1, 
         limit: parseInt(limit) || 50, 
         search: search || "", 
         brand: brand || "", 
+        category: category || "",
         sort: sort || "newest" 
       });
       res.status(200).json(data);

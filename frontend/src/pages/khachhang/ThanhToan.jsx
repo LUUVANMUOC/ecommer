@@ -1,6 +1,6 @@
 // src/pages/khachhang/ThanhToan.jsx
 import { useState, useEffect, useContext, useMemo } from "react";
-import { useLocation, useNavigate, Link } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../contexts/AuthContext";
 import axiosClient from "../../config/axiosClient";
 import thongTinNhanHangService from "../../services/khachhang/thongTinNhanHangService";
@@ -9,6 +9,7 @@ import maGiamGiaVanChuyenService from "../../services/khachhang/maGiamGiaVanChuy
 import maGiamGiaShopService from "../../services/khachhang/maGiamGiaShopService";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import CustomerHeader from "../../components/common/CustomerHeader";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
@@ -360,22 +361,7 @@ const ThanhToan = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16 font-sans">
-      <header className="bg-white shadow-sm mb-6 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link
-            to="/"
-            className="text-2xl font-bold text-[#2563EB] flex items-center gap-2"
-          >
-            <span className="material-symbols-outlined text-3xl">
-              storefront
-            </span>{" "}
-            CT255 Shop
-          </Link>
-          <div className="text-sm font-semibold text-[#0F172A]">
-            Thanh Toán Đơn Hàng
-          </div>
-        </div>
-      </header>
+      <CustomerHeader pageLabel="Thanh Toán Đơn Hàng" showCart={false} />
 
       <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">

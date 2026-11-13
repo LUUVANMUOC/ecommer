@@ -2,14 +2,14 @@
 const pool = require('../../config/db');
 
 const PublicSanPhamModel = {
-  getAllActive: async ({ page = 1, limit = 50, search = "", brand = "", sort = "newest" }) => {
+  getAllActive: async ({ page = 1, limit = 50, search = "", brand = "", category = "", sort = "newest" }) => {
     const offset = (page - 1) * limit;
     const params = [];
     let paramIndex = 1;
 
     let query = `
       WITH approved_variants AS (
-        SELECT ctsp.sp_ma, ctsp.ctsp_ma, ctsp.ctsp_gianban, ctsp.ctsp_ten, ctsp.ctsp_soluongton,
+        SELECT ctsp.sp_ma, ctsp.ctsp_ma, ctsp.ctsp_gianban, ctsp.ctsp_ten, ctsp.ctsp_soluongton, ctsp.nh_ma,
                (SELECT hasp_link FROM hinhanhsanpham WHERE ctsp_ma = ctsp.ctsp_ma ORDER BY hasp_laanhchinh DESC LIMIT 1) AS image
         FROM chitietsanpham ctsp
         JOIN LATERAL (
@@ -27,6 +27,7 @@ const PublicSanPhamModel = {
         MIN(av.ctsp_ma) AS first_variant_id 
       FROM sanpham sp
       JOIN approved_variants av ON sp.sp_ma = av.sp_ma
+      LEFT JOIN nganhhang nh ON av.nh_ma = nh.nh_ma
       LEFT JOIN thuonghieu th ON sp.th_ma = th.th_ma
       LEFT JOIN danhmucsanpham dm ON sp.dmsp_ma = dm.dmsp_ma
       WHERE 1=1
@@ -45,6 +46,12 @@ const PublicSanPhamModel = {
       paramIndex++;
     }
 
+    if (category) {
+      query += ` AND (nh.nh_ma = $${paramIndex} OR nh.nh_cha = $${paramIndex})`;
+      params.push(category);
+      paramIndex++;
+    }
+
     query += `
       GROUP BY 
         sp.sp_ma, sp.sp_ten, sp.sp_mota, sp.sp_luotmua, sp.sp_diemdanhgiatrungbinh,
@@ -54,7 +61,7 @@ const PublicSanPhamModel = {
     if (sort === "price_asc") query += ` ORDER BY min_price ASC `;
     else if (sort === "price_desc") query += ` ORDER BY max_price DESC `;
     else if (sort === "popular") query += ` ORDER BY sp.sp_luotmua DESC `;
-    else query += ` ORDER BY sp.sp_ma DESC `; 
+    else query += ` ORDER BY CASE WHEN sp.sp_ma ~ '^SP[0-9]+$' THEN CAST(SUBSTRING(sp.sp_ma FROM 3) AS INTEGER) ELSE 0 END DESC, sp.sp_ma DESC `; 
 
     query += ` LIMIT $${paramIndex} OFFSET $${paramIndex + 1}`;
     params.push(limit, offset);
@@ -63,13 +70,14 @@ const PublicSanPhamModel = {
     
     let countQuery = `
       WITH approved_variants AS (
-        SELECT ctsp.sp_ma FROM chitietsanpham ctsp
+        SELECT ctsp.sp_ma, ctsp.nh_ma FROM chitietsanpham ctsp
         JOIN LATERAL (
             SELECT ttctsp_ma FROM chitiettrangthaisanpham WHERE ctsp_ma = ctsp.ctsp_ma ORDER BY ctttsp_thoidiem DESC LIMIT 1
         ) status ON true WHERE status.ttctsp_ma = 'TTCTSP0002' AND ctsp.ctsp_soluongton > 0
       )
       SELECT COUNT(DISTINCT sp.sp_ma) FROM sanpham sp
       JOIN approved_variants av ON sp.sp_ma = av.sp_ma
+      LEFT JOIN nganhhang nh ON av.nh_ma = nh.nh_ma
       LEFT JOIN thuonghieu th ON sp.th_ma = th.th_ma
       LEFT JOIN danhmucsanpham dm ON sp.dmsp_ma = dm.dmsp_ma
       WHERE 1=1
@@ -85,6 +93,11 @@ const PublicSanPhamModel = {
     if (brand) {
       countQuery += ` AND th.th_ma = $${countIndex}`;
       countParams.push(brand);
+      countIndex++;
+    }
+    if (category) {
+      countQuery += ` AND (nh.nh_ma = $${countIndex} OR nh.nh_cha = $${countIndex})`;
+      countParams.push(category);
     }
 
     const countRes = await pool.query(countQuery, countParams);

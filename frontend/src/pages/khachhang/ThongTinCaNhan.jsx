@@ -17,6 +17,7 @@ import {
 import { DiaChiNhanHangSection } from "../../components/account/DiaChiNhanHangSection";
 import { toAssetUrl } from "../../utils/accountUtils";
 import { formatVND } from "../../components/shop/SanPhamShared";
+import CustomerHeader from "../../components/common/CustomerHeader";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
@@ -511,22 +512,7 @@ const ThongTinCaNhan = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16 font-sans">
-      <header className="bg-white shadow-sm mb-6 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <a
-            href="/"
-            className="text-2xl font-bold text-[#2563EB] flex items-center gap-2"
-          >
-            <span className="material-symbols-outlined text-3xl">
-              storefront
-            </span>{" "}
-            CT255 Shop
-          </a>
-          <div className="text-sm font-semibold text-[#0F172A]">
-            {user?.kh_ten}
-          </div>
-        </div>
-      </header>
+      <CustomerHeader pageLabel="Thông Tin Cá Nhân" />
 
       <div className="max-w-7xl mx-auto px-6 grid grid-cols-1 md:grid-cols-[280px_1fr] gap-6">
         <div className="bg-white rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col overflow-hidden self-start">

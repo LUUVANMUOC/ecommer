@@ -5,6 +5,7 @@ import { AuthContext } from "../../contexts/AuthContext";
 import donHangService from "../../services/khachhang/donHangService";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import CustomerHeader from "../../components/common/CustomerHeader";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
@@ -206,22 +207,7 @@ const TheoDoiDonHang = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16 font-sans">
-      <header className="bg-white shadow-sm mb-6 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link
-            to="/"
-            className="text-2xl font-bold text-[#2563EB] flex items-center gap-2"
-          >
-            <span className="material-symbols-outlined text-3xl">
-              storefront
-            </span>{" "}
-            CT255 Shop
-          </Link>
-          <div className="text-sm font-semibold text-[#0F172A]">
-            Theo Dõi Đơn Hàng
-          </div>
-        </div>
-      </header>
+      <CustomerHeader pageLabel="Theo Dõi Đơn Hàng" />
 
       <div className="max-w-5xl mx-auto px-6 space-y-6">
         <div className="flex overflow-x-auto whitespace-nowrap border-b border-gray-200 bg-white rounded-t-2xl shadow-sm px-4">

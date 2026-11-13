@@ -1,7 +1,7 @@
 // src/layouts/Header.jsx
-import { LogOut } from "lucide-react";
+import { LogOut, Menu } from "lucide-react";
 
-const Header = ({ userName = "", onLogout }) => {
+const Header = ({ userName = "", onLogout, onMenuClick }) => {
   const initial = (userName || "?").trim().charAt(0).toUpperCase();
 
   const dateLabel = new Intl.DateTimeFormat("vi-VN", {
@@ -12,10 +12,22 @@ const Header = ({ userName = "", onLogout }) => {
   }).format(new Date());
 
   return (
-    <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-[#DDD9CE] bg-[#F4F2EC]/90 px-6 backdrop-blur md:px-10">
-      <p className="hidden text-sm capitalize text-[#5B6661] md:block">
-        {dateLabel}
-      </p>
+    <header className="sticky top-0 z-10 flex h-16 items-center justify-between border-b border-[#DDD9CE] bg-[#F4F2EC]/90 px-4 backdrop-blur md:px-10">
+      <div className="flex items-center gap-3">
+        {onMenuClick && (
+          <button
+            type="button"
+            onClick={onMenuClick}
+            aria-label="Mở menu"
+            className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-[#DDD9CE] bg-white text-[#14201C] transition-colors hover:bg-[#FAF8F3] md:hidden"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
+        )}
+        <p className="hidden text-sm capitalize text-[#5B6661] md:block">
+          {dateLabel}
+        </p>
+      </div>
 
       <div className="ml-auto flex items-center gap-3">
         <div className="flex items-center gap-3 rounded-full border border-[#DDD9CE] bg-white py-1.5 pl-1.5 pr-4">

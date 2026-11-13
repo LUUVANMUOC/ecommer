@@ -136,7 +136,7 @@ app.use('/api/ngan-hang', nganHangRoutes);
 app.use('/api/thuong-hieu', thuongHieuRoutes);
 app.use('/api/thuoc-tinh-san-pham', thuocTinhSanPhamRoutes);
 app.use('/api/phi-chiec-khau', phiChiecKhauRoutes);
-app.use('/api/nganh-hang', nganHangRoutes);
+app.use('/api/nganh-hang', nganhHangRoutes);
 app.use('/api/kien-nghi', gianHangKienNghiRoutes);
 app.use('/api/loai-shipper', loaiShipperRoutes);
 app.use('/api/admin/don-hang', adminDonHangRoutes);

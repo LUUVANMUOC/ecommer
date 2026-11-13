@@ -11,6 +11,7 @@ import {
 import ToastNotification from "../../components/common/Crud/ToastNotification";
 import { toAssetUrl } from "../../utils/accountUtils";
 import CustomerVoucherCard from "../../components/common/Voucher/CustomerVoucherCard";
+import CustomerHeader from "../../components/common/CustomerHeader";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 const ITEMS_PER_PAGE = 20; // Số sản phẩm tải mỗi lần
@@ -173,27 +174,7 @@ const ShopProfile = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16 font-sans">
-      <header className="bg-white shadow-sm mb-6 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link
-            to="/"
-            className="text-2xl font-bold text-[#2563EB] flex items-center gap-2"
-          >
-            <span className="material-symbols-outlined text-3xl">
-              storefront
-            </span>{" "}
-            CT255 Shop
-          </Link>
-          <div className="flex items-center gap-4">
-            <Link
-              to="/san-pham"
-              className="text-sm font-semibold text-[#334155] hover:text-[#2563EB]"
-            >
-              Về trang sản phẩm
-            </Link>
-          </div>
-        </div>
-      </header>
+      <CustomerHeader pageLabel={shopInfo?.gh_ten || "Hồ Sơ Cửa Hàng"} />
 
       <div className="max-w-7xl mx-auto px-6">
         {/* ... (Phần Header Shop Info & Voucher giữ nguyên) ... */}

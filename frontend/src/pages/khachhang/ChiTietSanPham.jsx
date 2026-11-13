@@ -16,6 +16,7 @@ import {
   AttributeChips,
   formatVND,
 } from "../../components/shop/SanPhamShared";
+import CustomerHeader from "../../components/common/CustomerHeader";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
@@ -218,48 +219,7 @@ const ChiTietSanPhamKhachHang = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16 font-sans">
-      <header className="bg-white shadow-sm mb-6 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link
-            to="/"
-            className="text-2xl font-bold text-[#2563EB] flex items-center gap-2"
-          >
-            <span className="material-symbols-outlined text-3xl">
-              storefront
-            </span>{" "}
-            CT255 Shop
-          </Link>
-          <div className="flex items-center gap-5 text-sm font-semibold">
-            <Link
-              to="/khach-hang/gio-hang"
-              className="relative text-[#334155] hover:text-[#2563EB] transition-colors"
-            >
-              <span className="material-symbols-outlined text-[24px]">
-                shopping_cart
-              </span>
-              {cartCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-[#DC2626] text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full border-2 border-white shadow-sm">
-                  {cartCount}
-                </span>
-              )}
-            </Link>
-            <div className="w-px h-5 bg-[#E2E8F0]"></div>
-            {user ? (
-              <Link
-                to="/khach-hang/thong-tin-ca-nhan"
-                className="flex items-center gap-2 hover:text-[#2563EB] transition-colors"
-              >
-                <div className="w-8 h-8 rounded-full bg-[#2563EB] text-white flex items-center justify-center text-xs">
-                  {user.kh_ten?.charAt(0).toUpperCase()}
-                </div>
-                {user.kh_ten}
-              </Link>
-            ) : (
-              <Link to="/khach-hang/login">Đăng nhập</Link>
-            )}
-          </div>
-        </div>
-      </header>
+      <CustomerHeader cartCount={cartCount} />
 
       <div className="max-w-7xl mx-auto px-6">
         <div className="text-sm font-medium text-[#64748B] mb-6 flex gap-2 items-center">

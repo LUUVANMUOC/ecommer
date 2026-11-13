@@ -1,7 +1,6 @@
 import { Navigate, Outlet } from "react-router-dom";
 
 const ProtectedRoute = ({ allowedRole, allowedRoles }) => {
-  const token = localStorage.getItem("token");
   const userStr = localStorage.getItem("user");
 
   // Chuẩn hóa quyền được phép truy cập thành 1 mảng

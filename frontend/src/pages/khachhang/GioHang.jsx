@@ -5,11 +5,12 @@ import { AuthContext } from "../../contexts/AuthContext";
 import gioHangService from "../../services/khachhang/gioHangService";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import CustomerHeader from "../../components/common/CustomerHeader";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
 const GioHang = () => {
-  const { user, logout } = useContext(AuthContext);
+  const { user } = useContext(AuthContext);
   const navigate = useNavigate();
   const [cartItems, setCartItems] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -150,27 +151,7 @@ const GioHang = () => {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-24 font-sans">
-      <header className="bg-white shadow-sm mb-6 sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link
-            to="/"
-            className="text-2xl font-bold text-[#2563EB] flex items-center gap-2"
-          >
-            <span className="material-symbols-outlined text-3xl">
-              storefront
-            </span>{" "}
-            CT255 Shop
-          </Link>
-          <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-[#2563EB] text-white flex items-center justify-center text-xs font-bold">
-              {user?.kh_ten?.charAt(0).toUpperCase()}
-            </div>
-            <span className="text-sm font-semibold text-[#0F172A]">
-              {user?.kh_ten}
-            </span>
-          </div>
-        </div>
-      </header>
+      <CustomerHeader pageLabel="Giỏ Hàng" showCart={false} />
 
       <div className="max-w-7xl mx-auto px-6">
         <h1 className="text-2xl font-bold text-[#0F172A] mb-6 flex items-center gap-2">

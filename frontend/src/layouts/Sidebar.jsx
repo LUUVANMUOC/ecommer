@@ -1,8 +1,13 @@
 import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { ChevronDown, Dot, LayoutDashboard } from "lucide-react";
+import { ChevronDown, Dot, LayoutDashboard, X } from "lucide-react";
 
-const Sidebar = ({ title = "Dashboard", menuConfig = [] }) => {
+const Sidebar = ({
+  title = "Dashboard",
+  menuConfig = [],
+  isOpen = false,
+  onClose,
+}) => {
   const location = useLocation();
   const [openSubmenu, setOpenSubmenu] = useState(null);
 
@@ -28,16 +33,39 @@ const Sidebar = ({ title = "Dashboard", menuConfig = [] }) => {
   };
 
   return (
-    <aside className="sticky top-0 flex h-screen w-72 shrink-0 select-none flex-col bg-[#14201C] text-[#A9B8B1]">
-      {/* Header Sidebar */}
-      <div className="flex h-16 items-center gap-3 border-b border-white/5 px-6">
-        <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#F2A93B] text-[#14201C]">
-          <LayoutDashboard className="h-5 w-5" />
+    <>
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-30 bg-black/50 backdrop-blur-xs md:hidden"
+          onClick={onClose}
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 flex h-screen w-72 shrink-0 select-none flex-col bg-[#14201C] text-[#A9B8B1] transition-transform duration-200 md:sticky md:top-0 md:translate-x-0 ${
+          isOpen ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        {/* Header Sidebar */}
+        <div className="flex h-16 items-center justify-between gap-3 border-b border-white/5 px-6">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#F2A93B] text-[#14201C]">
+              <LayoutDashboard className="h-5 w-5" />
+            </div>
+            <h2 className="truncate text-[15px] font-semibold tracking-tight text-white">
+              {title}
+            </h2>
+          </div>
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Đóng menu"
+              className="rounded-lg p-1.5 text-[#A9B8B1] hover:bg-white/10 hover:text-white md:hidden"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
         </div>
-        <h2 className="truncate text-[15px] font-semibold tracking-tight text-white">
-          {title}
-        </h2>
-      </div>
 
       {/* Navigation Menu */}
       <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-5">
@@ -54,6 +82,7 @@ const Sidebar = ({ title = "Dashboard", menuConfig = [] }) => {
               <NavLink
                 key={parent.title}
                 to={parent.path}
+                onClick={onClose}
                 className={({ isActive }) =>
                   `relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
                     isActive
@@ -113,6 +142,7 @@ const Sidebar = ({ title = "Dashboard", menuConfig = [] }) => {
                       <NavLink
                         key={child.title}
                         to={child.path}
+                        onClick={onClose}
                         className={({ isActive }) =>
                           `flex items-center gap-2.5 rounded-md px-3 py-2 text-sm transition-colors ${
                             isActive
@@ -133,6 +163,7 @@ const Sidebar = ({ title = "Dashboard", menuConfig = [] }) => {
         })}
       </nav>
     </aside>
+    </>
   );
 };
 

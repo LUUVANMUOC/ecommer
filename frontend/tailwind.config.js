@@ -61,6 +61,15 @@ export default {
         "lg": "0.5rem",
         "xl": "0.75rem",
         "full": "9999px"
+      },
+      fontSize: {
+        "display-lg": ["clamp(2.25rem, 4vw, 3.5rem)", { lineHeight: "1.15", letterSpacing: "-0.02em" }],
+        "headline-lg": ["2rem", { lineHeight: "1.25", letterSpacing: "-0.015em" }],
+        "headline-md": ["1.5rem", { lineHeight: "1.3" }],
+        "headline-sm": ["1.25rem", { lineHeight: "1.35" }],
+        "body-lg": ["1.125rem", { lineHeight: "1.6" }],
+        "body-sm": ["0.875rem", { lineHeight: "1.45" }],
+        "label-sm": ["0.75rem", { lineHeight: "1.35", letterSpacing: "0.02em" }]
       }
     },
   },

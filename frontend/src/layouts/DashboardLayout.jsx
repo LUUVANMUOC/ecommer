@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Link, useOutlet } from "react-router-dom";
 import { LayoutDashboard } from "lucide-react";
 import Sidebar from "./Sidebar";
@@ -72,6 +73,7 @@ const Welcome = ({ menuConfig }) => (
 const DashboardLayout = ({ title, menuConfig = [], userName, onLogout }) => {
   // Nếu không có route con đang hiển thị, dùng trang chào mừng
   const outlet = useOutlet();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
     <div
@@ -81,12 +83,21 @@ const DashboardLayout = ({ title, menuConfig = [], userName, onLogout }) => {
       <style>{FONT_IMPORT}</style>
 
       {/* SIDEBAR */}
-      <Sidebar title={title} menuConfig={menuConfig} />
+      <Sidebar
+        title={title}
+        menuConfig={menuConfig}
+        isOpen={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
+      />
 
       {/* KHU VỰC NỘI DUNG CHÍNH */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* HEADER */}
-        <Header userName={userName} onLogout={onLogout} />
+        <Header
+          userName={userName}
+          onLogout={onLogout}
+          onMenuClick={() => setMobileMenuOpen(true)}
+        />
 
         {/* BODY */}
         <main className="flex-1 overflow-y-auto">

@@ -59,9 +59,11 @@ const AdminRoutes = () => {
             path="lich-su-van-chuyen"
             element={<LichSuThanhToanVanChuyen />}
           />
+          <Route
+            path="quan-ly-phi-van-chuyen"
+            element={<QuanLyPhiVanChuyen />}
+          />
         </Route>
-        // Route
-        <Route path="quan-ly-phi-van-chuyen" element={<QuanLyPhiVanChuyen />} />
       </Route>
     </Routes>
   );
