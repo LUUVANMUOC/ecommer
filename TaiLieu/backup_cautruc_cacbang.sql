@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict VvZp20FN8UVCRaHYLGm4m0tq0VJhgg7PTdwTksKtmDAF5bEUhIlnUUtbPIfjz5S
+\restrict v9ONX7bRq3GI8QEpPuhO2yWsi2zO5dX3HAfeNbttMDAq9ePQBB4k9RnG2Wt5u2w
 
 -- Dumped from database version 18.6
 -- Dumped by pg_dump version 18.6
@@ -1172,6 +1172,28 @@ CREATE TABLE public.thanhphan_giaodien (
 ALTER TABLE public.thanhphan_giaodien OWNER TO postgres;
 
 --
+-- Name: thongbao; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.thongbao (
+    tb_ma bigint NOT NULL,
+    tb_tieude character varying(200) NOT NULL,
+    tb_noidung text NOT NULL,
+    tb_loai character varying(30) NOT NULL,
+    tb_nguon character varying(20) NOT NULL,
+    tb_nguon_ma character varying(20),
+    tb_doituong_loai character varying(20),
+    tb_doituong_ma character varying(20),
+    tb_link text,
+    tb_tepdinhlieu jsonb DEFAULT '[]'::jsonb NOT NULL,
+    tb_nhom character varying(40),
+    tb_thoidiemtao timestamp with time zone DEFAULT now() NOT NULL
+);
+
+
+ALTER TABLE public.thongbao OWNER TO postgres;
+
+--
 -- Name: thongbao_gianhang; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -1208,6 +1230,21 @@ CREATE TABLE public.thongbao_khachhang (
 ALTER TABLE public.thongbao_khachhang OWNER TO postgres;
 
 --
+-- Name: thongbao_nguoinhan; Type: TABLE; Schema: public; Owner: postgres
+--
+
+CREATE TABLE public.thongbao_nguoinhan (
+    tb_ma bigint NOT NULL,
+    nn_loai character varying(20) NOT NULL,
+    nn_ma character varying(20) NOT NULL,
+    nn_dadoc boolean DEFAULT false NOT NULL,
+    nn_thoidiemdoc timestamp with time zone
+);
+
+
+ALTER TABLE public.thongbao_nguoinhan OWNER TO postgres;
+
+--
 -- Name: thongbao_san; Type: TABLE; Schema: public; Owner: postgres
 --
 
@@ -1224,6 +1261,27 @@ CREATE TABLE public.thongbao_san (
 
 
 ALTER TABLE public.thongbao_san OWNER TO postgres;
+
+--
+-- Name: thongbao_tb_ma_seq; Type: SEQUENCE; Schema: public; Owner: postgres
+--
+
+CREATE SEQUENCE public.thongbao_tb_ma_seq
+    START WITH 1
+    INCREMENT BY 1
+    NO MINVALUE
+    NO MAXVALUE
+    CACHE 1;
+
+
+ALTER SEQUENCE public.thongbao_tb_ma_seq OWNER TO postgres;
+
+--
+-- Name: thongbao_tb_ma_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: postgres
+--
+
+ALTER SEQUENCE public.thongbao_tb_ma_seq OWNED BY public.thongbao.tb_ma;
+
 
 --
 -- Name: thongtingiaohang; Type: TABLE; Schema: public; Owner: postgres
@@ -1271,7 +1329,8 @@ CREATE TABLE public.thongtinnhanhang (
     ttnh_sdt character varying(15) NOT NULL,
     ttnh_ghichu text,
     ttnh_diachisnapshot text NOT NULL,
-    ttnh_lamacdinh boolean DEFAULT false NOT NULL
+    ttnh_lamacdinh boolean DEFAULT false NOT NULL,
+    ttnh_luu_tru boolean DEFAULT false NOT NULL
 );
 
 
@@ -1520,6 +1579,13 @@ ALTER TABLE ONLY public.lich_su_chi_tra ALTER COLUMN id SET DEFAULT nextval('pub
 --
 
 ALTER TABLE ONLY public.so_du_noi_bo ALTER COLUMN id SET DEFAULT nextval('public.so_du_noi_bo_id_seq'::regclass);
+
+
+--
+-- Name: thongbao tb_ma; Type: DEFAULT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.thongbao ALTER COLUMN tb_ma SET DEFAULT nextval('public.thongbao_tb_ma_seq'::regclass);
 
 
 --
@@ -2067,6 +2133,22 @@ ALTER TABLE ONLY public.thongbao_khachhang
 
 
 --
+-- Name: thongbao_nguoinhan thongbao_nguoinhan_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.thongbao_nguoinhan
+    ADD CONSTRAINT thongbao_nguoinhan_pkey PRIMARY KEY (tb_ma, nn_loai, nn_ma);
+
+
+--
+-- Name: thongbao thongbao_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.thongbao
+    ADD CONSTRAINT thongbao_pkey PRIMARY KEY (tb_ma);
+
+
+--
 -- Name: thongbao_san thongbao_san_pkey; Type: CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -2227,6 +2309,20 @@ ALTER TABLE ONLY public.yeucauxulysuco
 
 
 --
+-- Name: idx_ctcd_dts; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_ctcd_dts ON public.chitiet_chi_dvvc USING btree (dts_ma);
+
+
+--
+-- Name: idx_ctcd_pcd; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_ctcd_pcd ON public.chitiet_chi_dvvc USING btree (pcd_ma);
+
+
+--
 -- Name: idx_ctdh_ctsp; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -2269,6 +2365,13 @@ CREATE INDEX idx_cttdh_dts_thoidiem ON public.chitiettrangthaidonhang USING btre
 
 
 --
+-- Name: idx_cttt_dts; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_cttt_dts ON public.chitiet_tat_toan USING btree (dts_ma);
+
+
+--
 -- Name: idx_ctttdh_dts_thoidiem; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -2290,6 +2393,13 @@ CREATE INDEX idx_dh_dvvc_ngaylap ON public.donhangtheoshop USING btree (dvvc_ma,
 
 
 --
+-- Name: idx_dh_dvvc_tt; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_dh_dvvc_tt ON public.donhangtheoshop USING btree (dvvc_ma, dts_trangthaithanhtoan);
+
+
+--
 -- Name: idx_dh_gh; Type: INDEX; Schema: public; Owner: postgres
 --
 
@@ -2308,6 +2418,13 @@ CREATE INDEX idx_dh_ngaylap_voucher ON public.donhangtheoshop USING btree (dts_n
 --
 
 CREATE INDEX idx_dts_gh ON public.donhangtheoshop USING btree (gh_ma);
+
+
+--
+-- Name: idx_kho_dvvc; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_kho_dvvc ON public.kho USING btree (dvvc_ma);
 
 
 --
@@ -2336,6 +2453,13 @@ CREATE INDEX idx_nganhhang_cha ON public.nganhhang USING btree (nh_cha);
 --
 
 CREATE INDEX idx_nh_cha ON public.nganhhang USING btree (nh_cha);
+
+
+--
+-- Name: idx_pcd_dvvc_trangthai_hoantat; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_pcd_dvvc_trangthai_hoantat ON public.phieu_chi_dvvc USING btree (dvvc_ma, pcd_trang_thai, pcd_ngay_hoan_tat);
 
 
 --
@@ -2381,10 +2505,24 @@ CREATE INDEX idx_ptt_kho_hoantat ON public.phieu_tat_toan USING btree (kho_ma, p
 
 
 --
+-- Name: idx_ptt_kho_trangthai_hoantat; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_ptt_kho_trangthai_hoantat ON public.phieu_tat_toan USING btree (kho_ma, ptt_trang_thai_thanh_toan, ptt_thoi_diem_hoan_tat);
+
+
+--
 -- Name: idx_qr_ma_giao_dich; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_qr_ma_giao_dich ON public.qr_thanh_toan USING btree (qr_ma_giao_dich);
+
+
+--
+-- Name: idx_qr_pcd; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_qr_pcd ON public.qr_chi_dvvc USING btree (pcd_ma);
 
 
 --
@@ -2409,10 +2547,45 @@ CREATE INDEX idx_sp_gh ON public.sanpham USING btree (gh_ma);
 
 
 --
+-- Name: idx_tb_tao; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_tb_tao ON public.thongbao USING btree (tb_thoidiemtao DESC);
+
+
+--
+-- Name: idx_tbnn_hopthu; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_tbnn_hopthu ON public.thongbao_nguoinhan USING btree (nn_loai, nn_ma, nn_dadoc);
+
+
+--
+-- Name: idx_tbnn_tb_ma; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_tbnn_tb_ma ON public.thongbao_nguoinhan USING btree (tb_ma);
+
+
+--
 -- Name: idx_tpg_sapxep; Type: INDEX; Schema: public; Owner: postgres
 --
 
 CREATE INDEX idx_tpg_sapxep ON public.thanhphan_giaodien USING btree (kvg_ma, tpg_thutu);
+
+
+--
+-- Name: idx_ttgh_chon; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_ttgh_chon ON public.thongtingiaohang USING btree (dts_ma, ttgh_da_nop_tien DESC, ttgh_thoidiem_nop DESC NULLS LAST, ttgh_thoidiem DESC);
+
+
+--
+-- Name: idx_ttgh_dts; Type: INDEX; Schema: public; Owner: postgres
+--
+
+CREATE INDEX idx_ttgh_dts ON public.thongtingiaohang USING btree (dts_ma);
 
 
 --
@@ -3158,6 +3331,14 @@ ALTER TABLE ONLY public.thongbao_khachhang
 
 
 --
+-- Name: thongbao_nguoinhan thongbao_nguoinhan_tb_ma_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
+--
+
+ALTER TABLE ONLY public.thongbao_nguoinhan
+    ADD CONSTRAINT thongbao_nguoinhan_tb_ma_fkey FOREIGN KEY (tb_ma) REFERENCES public.thongbao(tb_ma) ON DELETE CASCADE;
+
+
+--
 -- Name: thongbao_san thongbao_san_stmdt_ma_fkey; Type: FK CONSTRAINT; Schema: public; Owner: postgres
 --
 
@@ -3393,5 +3574,5 @@ ALTER TABLE ONLY public.yeucauxulysuco
 -- PostgreSQL database dump complete
 --
 
-\unrestrict VvZp20FN8UVCRaHYLGm4m0tq0VJhgg7PTdwTksKtmDAF5bEUhIlnUUtbPIfjz5S
+\unrestrict v9ONX7bRq3GI8QEpPuhO2yWsi2zO5dX3HAfeNbttMDAq9ePQBB4k9RnG2Wt5u2w
 

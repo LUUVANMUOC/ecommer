@@ -10,7 +10,7 @@ import PhanCongShipper from "../pages/dvvc/PhanCongShipper";
 import TheoDoiDonHang from "../pages/dvvc/TheoDoiDonHang";
 import LichSuNhanTienShip from "../pages/dvvc/LichSuNhanTienShip";
 // Thêm vào <Routes>
-
+import HopThuThongBao from "../pages/common/HopThuThongBao";
 const DVVCRoutes = () => {
   return (
     <Routes>
@@ -32,7 +32,7 @@ const DVVCRoutes = () => {
               </div>
             }
           />
-
+          <Route path="thong-bao" element={<HopThuThongBao />} />
           {/* ✅ ĐÃ DI CHUYỂN VÀO TRONG NÀY ĐỂ CÓ SIDEBAR */}
           <Route path="bang-gia-van-chuyen" element={<BangGiaVanChuyen />} />
           <Route path="thong-tin" element={<ThongTinDVVC />} />

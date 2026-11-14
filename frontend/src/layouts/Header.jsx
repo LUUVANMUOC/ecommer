@@ -1,5 +1,6 @@
 // src/layouts/Header.jsx
 import { LogOut } from "lucide-react";
+import NotificationBell from "../pages/common/NotificationBell"; // ✅ sửa: components/common → pages/common
 
 const Header = ({ userName = "", onLogout }) => {
   const initial = (userName || "?").trim().charAt(0).toUpperCase();
@@ -18,6 +19,8 @@ const Header = ({ userName = "", onLogout }) => {
       </p>
 
       <div className="ml-auto flex items-center gap-3">
+        <NotificationBell />
+
         <div className="flex items-center gap-3 rounded-full border border-[#DDD9CE] bg-white py-1.5 pl-1.5 pr-4">
           <span className="grid h-8 w-8 place-items-center rounded-full bg-[#1E3A34] text-sm font-semibold text-[#F2A93B]">
             {initial}

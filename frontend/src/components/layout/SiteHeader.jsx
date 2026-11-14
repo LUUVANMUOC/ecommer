@@ -2,6 +2,7 @@
 import { Link } from "react-router-dom";
 import useGiaoDien from "../../hooks/useGiaoDien";
 import SiteBlock from "./SiteBlock";
+import NotificationBell from "../../pages/common/NotificationBell"; // ✅ sửa: ../common → ../../pages/common
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
@@ -188,6 +189,7 @@ const SiteHeader = ({
 
   const utilitiesNode = showUtilities ? (
     <div className="flex items-center gap-4 text-sm font-semibold">
+      {user && !editable && <NotificationBell />}
       <SafeLink
         to="/khach-hang/gio-hang"
         editable={editable}

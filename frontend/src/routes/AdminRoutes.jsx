@@ -4,7 +4,8 @@ import ProtectedRoute from "./ProtectedRoute";
 import AdminDashboard from "../pages/admin/Dashboard";
 import QuanLyPhiVanChuyen from "../pages/admin/QuanLyPhiVanChuyen";
 import ThongKeNganhHang from "../pages/admin/ThongKeNganhHang";
-
+import HopThuThongBao from "../pages/common/HopThuThongBao";
+import GuiThongBaoShop from "../pages/admin/GuiThongBaoShop";
 import MaGiamGiaSanCRUD from "../pages/admin/MaGiamGiaSanCRUD";
 import PhiChiecKhauCRUD from "../pages/admin/PhiChiecKhauCRUD";
 import ThuongHieuCRUD from "../pages/admin/ThuongHieuCRUD";
@@ -62,7 +63,8 @@ const AdminRoutes = () => {
             path="lich-su-van-chuyen"
             element={<LichSuThanhToanVanChuyen />}
           />
-
+          <Route path="thong-bao" element={<HopThuThongBao />} />
+          <Route path="gui-thong-bao" element={<GuiThongBaoShop />} />
           {/* 2 route này phải nằm trong layout Dashboard để có sidebar */}
           <Route
             path="quan-ly-phi-van-chuyen"

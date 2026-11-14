@@ -684,22 +684,6 @@ const ThanhToan = () => {
                   </span>
                 </div>
               </label>
-              <label
-                className={`flex items-center gap-3 p-3 border-2 rounded-xl cursor-pointer transition-colors ${paymentMethod === "BANK" ? "border-[#2563EB] bg-blue-50" : "border-[#E2E8F0]"}`}
-              >
-                <input
-                  type="radio"
-                  value="BANK"
-                  checked={paymentMethod === "BANK"}
-                  onChange={() => setPaymentMethod("BANK")}
-                  className="w-4 h-4 accent-[#2563EB]"
-                />
-                <div className="flex-1">
-                  <span className="block font-bold text-[#0F172A] text-sm">
-                    Chuyển khoản ngân hàng
-                  </span>
-                </div>
-              </label>
             </div>
           </div>
 

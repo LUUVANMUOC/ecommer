@@ -5,7 +5,7 @@ import GioHang from "../pages/khachhang/GioHang";
 import ThongTinCaNhan from "../pages/khachhang/ThongTinCaNhan"; // ✅ Thêm import này
 import ThanhToan from "../pages/khachhang/ThanhToan";
 import DanhGiaSanPham from "../pages/khachhang/DanhGiaSanPham";
-
+import HopThuKhachHang from "../pages/khachhang/HopThuKhachHang";
 const KhachHangRoutes = () => {
   return (
     <Routes>
@@ -16,6 +16,7 @@ const KhachHangRoutes = () => {
         <Route path="thong-tin-ca-nhan" element={<ThongTinCaNhan />} />
         <Route path="thanh-toan" element={<ThanhToan />} />
         <Route path="danh-gia/:dts_ma" element={<DanhGiaSanPham />} />
+        <Route path="thong-bao" element={<HopThuKhachHang />} />
       </Route>
     </Routes>
   );

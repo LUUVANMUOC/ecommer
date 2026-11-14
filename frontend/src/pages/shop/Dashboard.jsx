@@ -67,6 +67,13 @@ const ShopDashboard = () => {
         },
       ],
     },
+    {
+      title: "Thông báo",
+      children: [
+        { title: "Hộp thư thông báo", path: "/nguoi-ban/thong-bao" },
+        { title: "Gửi thông báo cho khách", path: "/nguoi-ban/gui-thong-bao" },
+      ],
+    },
   ];
 
   // 2. Cấu hình Màu sắc riêng cho Shop (Màu cam đất, tối giản)

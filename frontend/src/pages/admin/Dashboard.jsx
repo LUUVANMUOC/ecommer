@@ -54,6 +54,13 @@ const AdminDashboard = () => {
         },
       ],
     },
+    {
+      title: "Thông báo",
+      children: [
+        { title: "Hộp thư thông báo", path: "/admin/thong-bao" },
+        { title: "Gửi thông báo cho Shop", path: "/admin/gui-thong-bao" },
+      ],
+    },
   ];
 
   // 2. Cấu hình Màu sắc riêng cho Admin

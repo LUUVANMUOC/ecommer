@@ -54,7 +54,11 @@ const DVVCDashboard = () => {
         },
       ],
     },
-    { title: "Lịch sử trả phí Ship", path: "/dvvc/lich-su-nhan-tien" },
+    {
+      title: "Dòng tiền & tiền đang giữ",
+      path: "/dvvc/lich-su-nhan-tien",
+    },
+    { title: "Hộp thư thông báo", path: "/dvvc/thong-bao" },
   ];
 
   // 2. Cấu hình Màu sắc riêng cho Shop (Màu cam đất, tối giản)
