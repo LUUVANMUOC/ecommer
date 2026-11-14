@@ -30,6 +30,7 @@ const DongTienModel = {
         dts.dts_tongtienphisan AS phi_san,
         (dts.dts_tongtienhang - COALESCE(dts.dts_tonggiamgiashop, 0)) AS tien_shop_nhan,
         ptt.ptt_ma,
+        ptt.ptt_ngay_tat_toan AS ngay_tat_toan,
         ptt.ptt_trang_thai_thanh_toan,
         qr.qr_trang_thai AS trang_thai_qr
       FROM donhangtheoshop dts
@@ -37,7 +38,7 @@ const DongTienModel = {
       JOIN phieu_tat_toan ptt ON ctt.ptt_ma = ptt.ptt_ma
       LEFT JOIN qr_thanh_toan qr ON qr.ptt_ma = ptt.ptt_ma AND qr.gh_ma = dts.gh_ma
       WHERE dts.gh_ma = $1
-      ORDER BY dts.dts_ngaylap DESC
+      ORDER BY COALESCE(ptt.ptt_ngay_tat_toan, dts.dts_ngaylap) DESC
     `;
     const result = await pool.query(query, [gh_ma]);
     return result.rows;

@@ -11,9 +11,8 @@ import MaGiamGiaShopCRUD from "../pages/shop/MaGiamGiaShopCRUD";
 import KienNghiShop from "../pages/shop/KienNghiShop";
 import QuanLyVanChuyen from "../pages/shop/QuanLyVanChuyen";
 import QuanLyDonHang from "../pages/shop/QuanLyDonHang";
-
-// 🟢 Thêm import trang lịch sử dòng tiền của Shop
 import LichSuDongTien from "../pages/shop/LichSuDongTien";
+import ThongKeDoanhThu from "../pages/shop/ThongKeDoanhThu";
 
 const ShopRoutes = () => {
   return (
@@ -54,8 +53,9 @@ const ShopRoutes = () => {
             element={<CapNhatChiTietSanPham />}
           />
 
-          {/* 🟢 Thêm Route cho trang Lịch sử nhận tiền */}
+          {/* Báo cáo & thống kê */}
           <Route path="lich-su-dong-tien" element={<LichSuDongTien />} />
+          <Route path="thong-ke-doanh-thu" element={<ThongKeDoanhThu />} />
         </Route>
       </Route>
     </Routes>

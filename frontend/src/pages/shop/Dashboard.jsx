@@ -30,10 +30,6 @@ const ShopDashboard = () => {
           path: "/nguoi-ban/ma-giam-gia-shop",
         },
         // 🟢 Thêm mục Lịch sử nhận tiền vào đây
-        {
-          title: "Lịch sử nhận tiền",
-          path: "/nguoi-ban/lich-su-dong-tien",
-        },
       ],
     },
     {
@@ -55,6 +51,19 @@ const ShopDashboard = () => {
         {
           title: "Vận chuyển",
           path: "/nguoi-ban/van-chuyen",
+        },
+      ],
+    },
+    {
+      title: "Báo cáo và Thống kê",
+      children: [
+        {
+          title: "Lịch sử nhận tiền",
+          path: "/nguoi-ban/lich-su-dong-tien",
+        },
+        {
+          title: "Thống kê doanh thu",
+          path: "/nguoi-ban/thong-ke-doanh-thu",
         },
       ],
     },

@@ -82,6 +82,8 @@ const datHangRoutes = require('./src/routes/khachhang/datHangRoutes');
 const donHangRoutes = require('./src/routes/khachhang/donHangRoutes');
 const thongKeNganhHangRoutes = require('./src/routes/san/thongKeNganhHangRoutes');
 
+const thongKeShopRoutes = require('./src/routes/gianhang/thongKeShopRoutes');
+
 
 // Khác
 const trangThaiDonHangRoutes = require('./src/routes/san/trangThaiDonHangRoutes');
@@ -157,6 +159,8 @@ app.use('/api/nguoi-ban/chi-tiet-san-pham', chiTietSanPhamRoutes);
 app.use('/api/trang-thai-chi-tiet', trangThaiChiTietSanPhamRoutes);
 app.use('/api/nguoi-ban/van-chuyen', vanChuyenShopRoutes);
 app.use('/api/nguoi-ban/don-hang', donHangShopRoutes);
+app.use('/api/nguoi-ban/thong-ke-doanh-thu', thongKeShopRoutes);
+
 app.use('/api/san-pham', publicSanPhamRoutes);
 app.use('/api/admin/thanh-toan-van-chuyen', thanhToanVanChuyenRoutes);
 

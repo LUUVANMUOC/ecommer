@@ -5,7 +5,11 @@ const CrudToolbar = ({
   onAdd,
   addButtonText = "Thêm mới",
   searchPlaceholder = "Tìm kiếm...",
+  searchValue = "",
+  onSearchChange,
 }) => {
+  const searchable = typeof onSearchChange === "function";
+
   return (
     <section className="mb-6 rounded-2xl border border-[#E2DED3] bg-white p-6 shadow-[0_1px_0_rgba(20,32,28,0.04)]">
       <div className="mb-5 flex flex-wrap items-start justify-between gap-4">
@@ -44,8 +48,26 @@ const CrudToolbar = ({
             type="text"
             placeholder={searchPlaceholder}
             aria-label={searchPlaceholder}
-            className="w-full rounded-xl border border-[#D9D4C7] bg-[#FBFAF7] py-2.5 pl-10 pr-4 text-sm text-[#14201C] transition-all placeholder:text-[#9AA39E] focus:border-[#F2A93B] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#F2A93B]/20"
+            {...(searchable
+              ? {
+                  value: searchValue,
+                  onChange: (e) => onSearchChange(e.target.value),
+                }
+              : {})}
+            className="w-full rounded-xl border border-[#D9D4C7] bg-[#FBFAF7] py-2.5 pl-10 pr-10 text-sm text-[#14201C] transition-all placeholder:text-[#9AA39E] focus:border-[#F2A93B] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#F2A93B]/20"
           />
+          {searchable && searchValue ? (
+            <button
+              type="button"
+              onClick={() => onSearchChange("")}
+              title="Xóa từ khóa"
+              className="absolute right-2 top-1/2 grid h-7 w-7 -translate-y-1/2 place-items-center rounded-full text-[#7A857F] transition-colors hover:bg-[#F1EEE6] hover:text-[#B42318]"
+            >
+              <span className="material-symbols-outlined text-[18px]">
+                close
+              </span>
+            </button>
+          ) : null}
         </div>
       </div>
     </section>
