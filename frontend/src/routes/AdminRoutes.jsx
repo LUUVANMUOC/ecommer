@@ -18,11 +18,15 @@ import QuanLyDonHangAdmin from "../pages/admin/QuanLyDonHangAdmin";
 import LichSuThanhToanVanChuyen from "../pages/admin/LichSuThanhToanVanChuyen";
 import QuanLyDongTien from "../pages/admin/QuanLyDongTien";
 import ThanhToanVanChuyen from "../pages/admin/ThanhToanVanChuyen";
+import GiaoDienCRUD from "../pages/admin/GiaoDienCRUD";
 
 const AdminRoutes = () => {
   return (
     <Routes>
       <Route element={<ProtectedRoute allowedRoles={["admin"]} />}>
+        {/* Trang Giao diện: full màn hình, KHÔNG có sidebar/topbar Dashboard */}
+        <Route path="giao-dien" element={<GiaoDienCRUD />} />
+
         <Route path="/" element={<AdminDashboard />}>
           <Route
             index

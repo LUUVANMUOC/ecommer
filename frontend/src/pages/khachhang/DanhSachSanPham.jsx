@@ -1,73 +1,528 @@
 // src/pages/khachhang/DanhSachSanPham.jsx
-import { useState, useEffect, useMemo, useContext } from "react";
+import {
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+  useContext,
+  memo,
+} from "react";
 import { Link, useNavigate } from "react-router-dom";
 import publicSanPhamService from "../../services/san/publicSanPhamService";
+import thuongHieuService from "../../services/san/thuongHieuService";
 import gioHangService from "../../services/khachhang/gioHangService";
 import { AuthContext } from "../../contexts/AuthContext";
 import { formatPriceRange } from "../../components/shop/SanPhamShared";
+import ToastNotification from "../../components/common/Crud/ToastNotification";
+import SiteHeader from "../../components/layout/SiteHeader";
+import SiteFooter from "../../components/layout/SiteFooter";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
-const ITEMS_PER_PAGE = 20; // Bạn có thể đổi thành 20, 30, 50 tùy thích
+const ITEMS_PER_PAGE = 20;
+const TOP_LIMIT = 10;
+const SEARCH_DEBOUNCE = 350; // ms
+
+const imgUrl = (link) => (link ? `${BACKEND_URL}${link}` : "");
+
+const money = (v) => {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return "—";
+  return `${n.toLocaleString("vi-VN")} đ`;
+};
+
+const fmtDate = (v) => {
+  if (!v) return "Không giới hạn";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("vi-VN");
+};
+
+/* =====================================================================
+ * CACHE CẤP MODULE
+ * - listCache: cache từng trang sản phẩm (stale-while-revalidate)
+ * - noiBatCache: 3 khối nổi bật chỉ tải 1 lần / phiên
+ * ===================================================================== */
+const listCache = new Map();
+let noiBatCache = null;
+
+const buildKey = (page, search, brand, sort) =>
+  `${page}|${ITEMS_PER_PAGE}|${search}|${brand}|${sort}`;
+
+const parseListResponse = (payload) => {
+  const data = Array.isArray(payload?.data) ? payload.data : [];
+  const total = Number(payload?.total ?? data.length);
+  const totalPages = payload?.totalPages
+    ? Number(payload.totalPages)
+    : Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+
+  return { data, total, totalPages };
+};
+
+/* ---------- Khối cuộn ngang dùng chung ---------- */
+const SectionRow = ({
+  icon,
+  title,
+  subtitle,
+  loading,
+  empty,
+  emptyText,
+  children,
+}) => (
+  <section className="rounded-2xl border border-[#E2E8F0] bg-white p-5 shadow-sm">
+    <div className="mb-4 flex items-start gap-3">
+      <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-[#EFF6FF] text-[#2563EB]">
+        <span className="material-symbols-outlined text-[20px]">{icon}</span>
+      </span>
+      <div className="min-w-0">
+        <h2 className="text-base font-bold text-[#0F172A]">{title}</h2>
+        {subtitle && (
+          <p className="mt-0.5 text-xs text-[#64748B]">{subtitle}</p>
+        )}
+      </div>
+    </div>
+
+    {loading ? (
+      <div className="flex gap-3 overflow-hidden">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            className="h-[148px] w-[168px] shrink-0 animate-pulse rounded-xl bg-[#F1F5F9]"
+          />
+        ))}
+      </div>
+    ) : empty ? (
+      <p className="py-8 text-center text-sm text-[#94A3B8]">{emptyText}</p>
+    ) : (
+      <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2">
+        {children}
+      </div>
+    )}
+  </section>
+);
+
+/* ---------- Thẻ thương hiệu (KHÔNG hiển thị doanh thu) ---------- */
+const BrandCard = ({ brand, onPick }) => (
+  <button
+    type="button"
+    onClick={() => onPick(brand.th_ma)}
+    title={`Xem sản phẩm của ${brand.th_ten}`}
+    className="group w-[168px] shrink-0 snap-start rounded-xl border border-[#E2E8F0] bg-white p-3 text-left transition-all hover:-translate-y-0.5 hover:border-[#2563EB] hover:shadow-md"
+  >
+    <div className="mb-2 flex h-16 items-center justify-center overflow-hidden rounded-lg bg-[#F8FAFC]">
+      {brand.th_hinhanh ? (
+        <img
+          src={imgUrl(brand.th_hinhanh)}
+          alt={brand.th_ten}
+          loading="lazy"
+          className="h-full w-full object-contain p-2 transition-transform duration-300 group-hover:scale-105"
+        />
+      ) : (
+        <span className="material-symbols-outlined text-3xl text-gray-300">
+          sell
+        </span>
+      )}
+    </div>
+    <p className="line-clamp-1 text-sm font-semibold text-[#0F172A] group-hover:text-[#2563EB]">
+      {brand.th_ten}
+    </p>
+    <p className="mt-1 text-[11px] text-[#64748B]">
+      {Number(brand.so_don || 0)} đơn · {Number(brand.so_san_pham || 0)} SP
+    </p>
+  </button>
+);
+
+/* ---------- Thẻ gian hàng ---------- */
+const ShopCard = ({ shop }) => {
+  const diem = Number(shop.gh_danhgia || 0);
+
+  return (
+    <Link
+      to={`/shop/${shop.gh_ma}`}
+      className="group flex w-[236px] shrink-0 snap-start gap-3 rounded-xl border border-[#E2E8F0] bg-white p-3 transition-all hover:-translate-y-0.5 hover:border-[#2563EB] hover:shadow-md"
+    >
+      <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full border border-[#E2E8F0] bg-[#F8FAFC]">
+        {shop.gh_hinhanh ? (
+          <img
+            src={imgUrl(shop.gh_hinhanh)}
+            alt={shop.gh_ten}
+            loading="lazy"
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          <span className="material-symbols-outlined text-2xl text-gray-300">
+            storefront
+          </span>
+        )}
+      </div>
+
+      <div className="min-w-0">
+        <p className="line-clamp-1 text-sm font-semibold text-[#0F172A] group-hover:text-[#2563EB]">
+          {shop.gh_ten}
+        </p>
+
+        <div className="mt-1 flex items-center gap-1 text-xs">
+          <span
+            className="material-symbols-outlined text-[15px] text-[#F59E0B]"
+            style={{ fontVariationSettings: "'FILL' 1" }}
+          >
+            star
+          </span>
+          {diem > 0 ? (
+            <span className="font-bold text-[#0F172A]">{diem.toFixed(1)}</span>
+          ) : (
+            <span className="text-[#94A3B8]">Chưa có đánh giá</span>
+          )}
+        </div>
+
+        <p className="mt-1 text-[11px] text-[#64748B]">
+          {Number(shop.so_san_pham || 0)} sản phẩm ·{" "}
+          {Number(shop.gh_theodoi || 0)} theo dõi
+        </p>
+      </div>
+    </Link>
+  );
+};
+
+/* ---------- Thẻ voucher ---------- */
+const VoucherCard = ({ voucher, onCopy }) => (
+  <button
+    type="button"
+    onClick={() => onCopy(voucher.mgg_shop_ma)}
+    title="Bấm để sao chép mã"
+    className="group w-[268px] shrink-0 snap-start overflow-hidden rounded-xl border border-[#E2E8F0] bg-white text-left transition-all hover:-translate-y-0.5 hover:border-[#2563EB] hover:shadow-md"
+  >
+    <div className="flex items-stretch">
+      <div className="flex w-[74px] shrink-0 flex-col items-center justify-center bg-gradient-to-br from-[#2563EB] to-[#1D4ED8] px-2 py-3 text-white">
+        <span className="text-xl font-bold leading-none">
+          {Number(voucher.mgg_shop_phantramgiam || 0)}%
+        </span>
+        <span className="mt-1 text-[10px] font-semibold uppercase tracking-wide">
+          giảm
+        </span>
+      </div>
+
+      <div className="min-w-0 flex-1 p-3">
+        <p className="line-clamp-1 text-sm font-semibold text-[#0F172A] group-hover:text-[#2563EB]">
+          {voucher.mgg_shop_ten || "Voucher shop"}
+        </p>
+        <p className="mt-0.5 text-xs text-[#64748B]">
+          Giảm tối đa{" "}
+          <strong className="text-[#DC2626]">
+            {money(voucher.mgg_shop_sotiengiamtoidamoilan)}
+          </strong>
+        </p>
+        <p className="text-xs text-[#64748B]">
+          Đơn từ {money(voucher.mgg_shop_giatridontoithieu)}
+        </p>
+
+        <div className="mt-1.5 flex items-center justify-between gap-2">
+          <span className="rounded-md bg-[#EFF6FF] px-2 py-0.5 font-mono text-[11px] font-bold text-[#2563EB]">
+            {voucher.mgg_shop_ma}
+          </span>
+          <span className="text-[10px] text-[#94A3B8]">
+            HSD {fmtDate(voucher.mgg_shop_thoidiemketthuc)}
+          </span>
+        </div>
+
+        <p className="mt-1 line-clamp-1 text-[11px] text-[#64748B]">
+          {voucher.gh_ten}
+        </p>
+      </div>
+    </div>
+  </button>
+);
+
+/* ---------- Thẻ sản phẩm (memo: không re-render khi state khác đổi) ---------- */
+const ProductCard = memo(({ sp }) => (
+  <Link
+    to={`/san-pham/${sp.sp_ma}?ctsp_ma=${sp.first_variant_id}`}
+    className="group flex flex-col overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl"
+  >
+    <div className="relative flex aspect-square items-center justify-center overflow-hidden bg-[#F8FAFC]">
+      {sp.cover_image ? (
+        <img
+          src={imgUrl(sp.cover_image)}
+          alt={sp.sp_ten}
+          loading="lazy"
+          decoding="async"
+          className="h-full w-full object-contain p-3 transition-transform duration-500 group-hover:scale-110"
+        />
+      ) : (
+        <span className="material-symbols-outlined text-6xl text-gray-300">
+          image
+        </span>
+      )}
+    </div>
+    <div className="flex flex-1 flex-col p-4">
+      <h3 className="line-clamp-2 min-h-[40px] text-sm font-semibold leading-snug text-[#0F172A] group-hover:text-[#2563EB]">
+        {sp.sp_ten}
+      </h3>
+      <div className="mt-auto pt-3">
+        <p className="text-lg font-bold text-[#DC2626]">
+          {formatPriceRange({
+            minPrice: sp.min_price,
+            maxPrice: sp.max_price,
+          })}
+        </p>
+        <div className="mt-2 flex items-center justify-between text-xs font-medium text-[#64748B]">
+          <span className="flex items-center gap-1">
+            <span
+              className="material-symbols-outlined text-[16px] text-[#F59E0B]"
+              style={{ fontVariationSettings: "'FILL' 1" }}
+            >
+              star
+            </span>
+            {Number(sp.sp_diemdanhgiatrungbinh || 0).toFixed(1)}
+          </span>
+          <span>Đã bán {sp.sp_luotmua || 0}</span>
+        </div>
+      </div>
+    </div>
+  </Link>
+));
+
+/* ---------- Skeleton lưới sản phẩm ---------- */
+const GridSkeleton = () => (
+  <div className="grid grid-cols-2 gap-5 md:grid-cols-4 lg:grid-cols-5">
+    {Array.from({ length: 10 }).map((_, i) => (
+      <div
+        key={i}
+        className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white"
+      >
+        <div className="aspect-square animate-pulse bg-[#F1F5F9]" />
+        <div className="space-y-2 p-4">
+          <div className="h-3 w-full animate-pulse rounded bg-[#F1F5F9]" />
+          <div className="h-3 w-2/3 animate-pulse rounded bg-[#F1F5F9]" />
+          <div className="h-5 w-1/2 animate-pulse rounded bg-[#F1F5F9]" />
+        </div>
+      </div>
+    ))}
+  </div>
+);
 
 const DanhSachSanPham = () => {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
 
+  /* ================= STATE ================= */
+  // 1 state duy nhất cho truy vấn -> tránh 4 effect chạy lệch nhau
+  const [query, setQuery] = useState({
+    page: 1,
+    search: "",
+    brand: "",
+    sort: "newest",
+  });
+  const [searchInput, setSearchInput] = useState("");
+
   const [products, setProducts] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // 3 khối nổi bật
+  const [noiBat, setNoiBat] = useState({
+    thuong_hieu: [],
+    gian_hang: [],
+    voucher: [],
+  });
+  const [noiBatLoading, setNoiBatLoading] = useState(!noiBatCache);
+
+  // Thương hiệu cho dropdown (lazy-load lần đầu mở)
+  const [brandList, setBrandList] = useState([]);
+  const [brandLoading, setBrandLoading] = useState(false);
+  const brandsRequested = useRef(false);
+
   const [cartCount, setCartCount] = useState(0);
 
-  // State cho tìm kiếm & phân trang
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchKeyword, setSearchKeyword] = useState("");
-  const [selectedBrand, setSelectedBrand] = useState("");
-  const [sortBy, setSortBy] = useState("newest");
+  const [toast, setToast] = useState({
+    show: false,
+    message: "",
+    type: "success",
+  });
 
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1); // 🟢 Thêm state tổng số trang
+  const toastTimer = useRef(null);
+  const gridRef = useRef(null);
 
-  // 1. Reset trang về 1 khi đổi từ khóa hoặc bộ lọc
+  const showToast = useCallback((message, type = "success") => {
+    setToast({ show: true, message, type });
+    window.clearTimeout(toastTimer.current);
+    toastTimer.current = window.setTimeout(
+      () => setToast((t) => ({ ...t, show: false })),
+      2500,
+    );
+  }, []);
+
+  /* ================= TẢI DANH SÁCH SẢN PHẨM ================= */
+  const cacheKey = buildKey(query.page, query.search, query.brand, query.sort);
+
   useEffect(() => {
-    setPage(1);
-  }, [searchKeyword, selectedBrand, sortBy]);
+    let alive = true;
+    const cached = listCache.get(cacheKey);
 
-  // 2. Gọi API khi page hoặc bộ lọc thay đổi
-  useEffect(() => {
-    const fetchData = async () => {
+    if (cached) {
+      // Stale-while-revalidate: hiện ngay dữ liệu cũ, cập nhật ngầm
+      setProducts(cached.data);
+      setTotal(cached.total);
+      setTotalPages(cached.totalPages);
+      setLoading(false);
+      setRefreshing(true);
+    } else {
       setLoading(true);
-      try {
-        const res = await publicSanPhamService.getAll({
-          page: page,
-          limit: ITEMS_PER_PAGE,
-          search: searchKeyword,
-          brand: selectedBrand,
-          sort: sortBy,
-        });
+      setProducts([]);
+    }
 
-        setProducts(res.data.data);
-
-        // 🟢 Lấy tổng số trang từ Backend (Cần Backend trả về trường totalPages hoặc total)
-        if (res.data.totalPages) {
-          setTotalPages(res.data.totalPages);
-        } else if (res.data.total) {
-          setTotalPages(Math.ceil(res.data.total / ITEMS_PER_PAGE));
-        } else {
-          // Fallback nếu Backend chưa cập nhật (Chỉ hiện nút Next/Prev)
-          setTotalPages(
-            res.data.data.length === ITEMS_PER_PAGE ? page + 1 : page,
-          );
+    publicSanPhamService
+      .getAll({
+        page: query.page,
+        limit: ITEMS_PER_PAGE,
+        search: query.search,
+        brand: query.brand,
+        sort: query.sort,
+      })
+      .then((res) => {
+        if (!alive) return;
+        const parsed = parseListResponse(res.data);
+        listCache.set(cacheKey, parsed);
+        setProducts(parsed.data);
+        setTotal(parsed.total);
+        setTotalPages(parsed.totalPages);
+      })
+      .catch((error) => {
+        if (!alive) return;
+        console.error("Lỗi tải dữ liệu sản phẩm:", error);
+        if (!cached) {
+          setProducts([]);
+          setTotal(0);
+          setTotalPages(1);
         }
-      } catch (error) {
-        console.error("Lỗi tải dữ liệu:", error);
-      } finally {
+      })
+      .finally(() => {
+        if (!alive) return;
         setLoading(false);
-      }
+        setRefreshing(false);
+      });
+
+    return () => {
+      alive = false;
     };
+  }, [cacheKey, query.page, query.search, query.brand, query.sort]);
 
-    fetchData();
-  }, [page, searchKeyword, selectedBrand, sortBy]);
+  /* ================= PREFETCH TRANG KẾ ================= */
+  useEffect(() => {
+    if (query.page >= totalPages) return;
 
-  // Giỏ hàng & Auth
+    const nextKey = buildKey(
+      query.page + 1,
+      query.search,
+      query.brand,
+      query.sort,
+    );
+    if (listCache.has(nextKey)) return;
+
+    const timer = window.setTimeout(() => {
+      publicSanPhamService
+        .getAll({
+          page: query.page + 1,
+          limit: ITEMS_PER_PAGE,
+          search: query.search,
+          brand: query.brand,
+          sort: query.sort,
+        })
+        .then((res) => {
+          if (!listCache.has(nextKey)) {
+            listCache.set(nextKey, parseListResponse(res.data));
+          }
+        })
+        .catch(() => {});
+    }, 900);
+
+    return () => window.clearTimeout(timer);
+  }, [query.page, query.search, query.brand, query.sort, totalPages]);
+
+  /* ================= DEBOUNCE Ô TÌM KIẾM ================= */
+  useEffect(() => {
+    const term = searchInput.trim();
+    if (term === query.search) return;
+
+    const timer = window.setTimeout(() => {
+      setQuery((prev) =>
+        prev.search === term ? prev : { ...prev, search: term, page: 1 },
+      );
+    }, SEARCH_DEBOUNCE);
+
+    return () => window.clearTimeout(timer);
+  }, [searchInput, query.search]);
+
+  /* ================= 3 KHỐI NỔI BẬT ================= */
+  useEffect(() => {
+    let alive = true;
+
+    if (noiBatCache) {
+      setNoiBat(noiBatCache);
+      setNoiBatLoading(false);
+      return undefined;
+    }
+
+    setNoiBatLoading(true);
+
+    publicSanPhamService
+      .getNoiBat(TOP_LIMIT)
+      .then((res) => {
+        const data = {
+          thuong_hieu: res.data?.thuong_hieu || [],
+          gian_hang: res.data?.gian_hang || [],
+          voucher: res.data?.voucher || [],
+        };
+        noiBatCache = data;
+        if (alive) setNoiBat(data);
+      })
+      .catch((err) => {
+        console.error("Lỗi tải khối nổi bật:", err);
+      })
+      .finally(() => {
+        if (alive) setNoiBatLoading(false);
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  /* ================= THƯƠNG HIỆU (LAZY) ================= */
+  const ensureBrands = useCallback(() => {
+    if (brandsRequested.current) return;
+    brandsRequested.current = true;
+    setBrandLoading(true);
+
+    thuongHieuService
+      .getAll()
+      .then((res) => {
+        setBrandList(Array.isArray(res.data) ? res.data : []);
+      })
+      .catch(() => {
+        brandsRequested.current = false; // cho phép thử lại
+      })
+      .finally(() => setBrandLoading(false));
+  }, []);
+
+  // Ưu tiên danh sách đầy đủ; nếu chưa tải thì suy ra từ sản phẩm đang có
+  const brands = useMemo(() => {
+    if (brandList.length > 0) {
+      return brandList
+        .filter((b) => b.th_ma && b.th_ten)
+        .map((b) => ({ id: b.th_ma, name: b.th_ten }));
+    }
+
+    const bMap = new Map();
+    products.forEach((p) => {
+      if (p.th_ma && p.th_ten) bMap.set(p.th_ma, p.th_ten);
+    });
+    return Array.from(bMap, ([id, name]) => ({ id, name }));
+  }, [brandList, products]);
+
+  /* ================= GIỎ HÀNG ================= */
   useEffect(() => {
     if (user && user.kh_ma) {
       gioHangService
@@ -84,100 +539,95 @@ const DanhSachSanPham = () => {
     navigate("/");
   };
 
-  const brands = useMemo(() => {
-    const bMap = new Map();
-    products.forEach((p) => {
-      if (p.th_ma && p.th_ten) bMap.set(p.th_ma, p.th_ten);
-    });
-    return Array.from(bMap, ([id, name]) => ({ id, name }));
-  }, [products]);
+  /* ================= HANDLERS ================= */
+  const handleSubmitSearch = useCallback(() => {
+    const term = searchInput.trim();
+    setQuery((prev) => ({ ...prev, search: term, page: 1 }));
+  }, [searchInput]);
 
-  const topBrands = useMemo(() => {
-    const countMap = {};
-    products.forEach((p) => {
-      if (p.th_ma && p.th_ten) {
-        if (!countMap[p.th_ma])
-          countMap[p.th_ma] = {
-            id: p.th_ma,
-            name: p.th_ten,
-            logo: p.th_hinhanh,
-            count: 0,
-          };
-        countMap[p.th_ma].count++;
-      }
-    });
-    return Object.values(countMap)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 10);
-  }, [products]);
+  const handleClearSearch = useCallback(() => {
+    setSearchInput("");
+    setQuery((prev) => ({ ...prev, search: "", page: 1 }));
+  }, []);
 
-  const handleKeyDown = (e) => {
-    if (e.key === "Enter") {
-      setSearchKeyword(searchTerm);
+  const handleClearFilters = () => {
+    setSearchInput("");
+    setQuery({ page: 1, search: "", brand: "", sort: "newest" });
+  };
+
+  const handlePickBrand = (th_ma) => {
+    setQuery((prev) => ({ ...prev, brand: th_ma, page: 1 }));
+    window.setTimeout(() => {
+      gridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
+  };
+
+  const handleCopyCode = async (code) => {
+    try {
+      await navigator.clipboard.writeText(code);
+      showToast(`Đã sao chép mã [${code}]`);
+    } catch {
+      showToast(`Không sao chép được, mã của bạn là: ${code}`, "error");
     }
   };
 
-  const handleSearchClick = () => {
-    setSearchKeyword(searchTerm);
-  };
-
-  // 🟢 Hàm chuyển trang
   const handlePageChange = (newPage) => {
-    if (newPage >= 1 && newPage <= totalPages) {
-      setPage(newPage);
-      window.scrollTo({ top: 0, behavior: "smooth" }); // Cuộn lên đầu trang
-    }
+    if (newPage < 1 || newPage > totalPages || newPage === query.page) return;
+    setQuery((prev) => ({ ...prev, page: newPage }));
+    gridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  // 🟢 Tạo mảng các số trang hiển thị (VD: 1 ... 3 4 5 ... 10)
+  /* ================= PHÂN TRANG ================= */
   const renderPagination = () => {
     if (totalPages <= 1) return null;
 
-    let pages = [];
-    for (let i = 1; i <= totalPages; i++) {
-      pages.push(i);
+    const items = [];
+    for (let i = 1; i <= totalPages; i += 1) {
+      const nearCurrent = i >= query.page - 1 && i <= query.page + 1;
+      if (i === 1 || i === totalPages || nearCurrent) {
+        items.push(i);
+      } else if (i === query.page - 2 || i === query.page + 2) {
+        items.push(`dots-${i}`);
+      }
     }
 
     return (
-      <div className="flex items-center justify-center gap-2 mt-10">
+      <div className="mt-10 flex flex-wrap items-center justify-center gap-2">
         <button
-          onClick={() => handlePageChange(page - 1)}
-          disabled={page === 1}
-          className="px-4 py-2 border rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 bg-white"
+          type="button"
+          onClick={() => handlePageChange(query.page - 1)}
+          disabled={query.page === 1}
+          className="rounded-xl border border-[#E2E8F0] bg-white px-4 py-2 text-sm font-semibold text-[#334155] hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Trước
         </button>
 
-        {pages.map((p) => {
-          // Chỉ hiển thị trang đầu, trang cuối, trang hiện tại và +-1 trang xung quanh
-          if (p === 1 || p === totalPages || (p >= page - 1 && p <= page + 1)) {
-            return (
-              <button
-                key={p}
-                onClick={() => handlePageChange(p)}
-                className={`w-10 h-10 rounded-xl border flex items-center justify-center font-semibold transition-colors ${
-                  page === p
-                    ? "bg-[#2563EB] text-white border-[#2563EB]"
-                    : "bg-white text-[#334155] border-[#E2E8F0] hover:bg-gray-50"
-                }`}
-              >
-                {p}
-              </button>
-            );
-          } else if (p === page - 2 || p === page + 2) {
-            return (
-              <span key={p} className="text-gray-400">
-                ...
-              </span>
-            );
-          }
-          return null;
-        })}
+        {items.map((item) =>
+          typeof item === "string" ? (
+            <span key={item} className="px-1 text-gray-400">
+              …
+            </span>
+          ) : (
+            <button
+              key={item}
+              type="button"
+              onClick={() => handlePageChange(item)}
+              className={`flex h-10 w-10 items-center justify-center rounded-xl border text-sm font-semibold transition-colors ${
+                query.page === item
+                  ? "border-[#2563EB] bg-[#2563EB] text-white"
+                  : "border-[#E2E8F0] bg-white text-[#334155] hover:bg-gray-50"
+              }`}
+            >
+              {item}
+            </button>
+          ),
+        )}
 
         <button
-          onClick={() => handlePageChange(page + 1)}
-          disabled={page === totalPages}
-          className="px-4 py-2 border rounded-xl disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50 bg-white"
+          type="button"
+          onClick={() => handlePageChange(query.page + 1)}
+          disabled={query.page === totalPages}
+          className="rounded-xl border border-[#E2E8F0] bg-white px-4 py-2 text-sm font-semibold text-[#334155] hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
         >
           Sau
         </button>
@@ -185,208 +635,210 @@ const DanhSachSanPham = () => {
     );
   };
 
+  const hasFilter =
+    Boolean(query.brand) || Boolean(query.search) || query.sort !== "newest";
+
   return (
-    <div className="min-h-screen bg-[#F8FAFC] pb-16 font-sans">
-      <header className="bg-white shadow-sm sticky top-0 z-20">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link
-            to="/"
-            className="text-2xl font-bold text-[#2563EB] flex items-center gap-2"
-          >
-            <span className="material-symbols-outlined text-3xl">
-              storefront
-            </span>{" "}
-            CT255 Shop
-          </Link>
+    <div className="min-h-screen bg-[#F8FAFC] font-sans">
+      {/* ===== Header động (admin cấu hình) ===== */}
+      <SiteHeader
+        showUtilities
+        cartCount={cartCount}
+        user={user}
+        onLogout={handleLogout}
+        search={{
+          value: searchInput,
+          onChange: setSearchInput,
+          onSubmit: handleSubmitSearch,
+          onClear: handleClearSearch,
+          loading: loading && query.page === 1,
+        }}
+      />
 
-          <div className="flex-1 max-w-2xl mx-8 hidden md:block">
-            <div className="relative">
-              <button
-                onClick={handleSearchClick}
-                className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-[#2563EB]"
-              >
-                <span className="material-symbols-outlined">
-                  {loading && page === 1 ? "sync" : "search"}
+      <main className="mx-auto max-w-7xl space-y-6 px-6 py-8">
+        {/* ===== 3 KHỐI NỔI BẬT ===== */}
+        <SectionRow
+          icon="sell"
+          title="Top 10 thương hiệu doanh thu cao nhất"
+          subtitle="Xếp hạng theo doanh thu 90 ngày gần nhất, chỉ tính đơn đã hoàn thành"
+          loading={noiBatLoading}
+          empty={noiBat.thuong_hieu.length === 0}
+          emptyText="Chưa có dữ liệu bán hàng trong 90 ngày gần nhất."
+        >
+          {noiBat.thuong_hieu.map((b) => (
+            <BrandCard key={b.th_ma} brand={b} onPick={handlePickBrand} />
+          ))}
+        </SectionRow>
+
+        <SectionRow
+          icon="storefront"
+          title="Top 10 gian hàng được đánh giá cao nhất"
+          subtitle="Xếp theo điểm đánh giá của gian hàng"
+          loading={noiBatLoading}
+          empty={noiBat.gian_hang.length === 0}
+          emptyText="Chưa có gian hàng nào."
+        >
+          {noiBat.gian_hang.map((s) => (
+            <ShopCard key={s.gh_ma} shop={s} />
+          ))}
+        </SectionRow>
+
+        <SectionRow
+          icon="confirmation_number"
+          title="Top 10 voucher giảm giá cao nhất"
+          subtitle="Chỉ hiển thị voucher đang hiệu lực — bấm để sao chép mã"
+          loading={noiBatLoading}
+          empty={noiBat.voucher.length === 0}
+          emptyText="Chưa có voucher nào đang hiệu lực."
+        >
+          {noiBat.voucher.map((v) => (
+            <VoucherCard
+              key={v.mgg_shop_ma}
+              voucher={v}
+              onCopy={handleCopyCode}
+            />
+          ))}
+        </SectionRow>
+
+        {/* ===== BỘ LỌC + LƯỚI SẢN PHẨM ===== */}
+        <div ref={gridRef} className="scroll-mt-24">
+          {/* Bộ lọc đặt sát lưới sản phẩm */}
+          <div className="mb-6 flex flex-col gap-4 rounded-2xl border border-[#E2E8F0] bg-white p-4 shadow-sm md:flex-row md:items-center md:justify-between">
+            <div className="flex w-full flex-wrap items-center gap-3 md:w-auto">
+              <span className="flex items-center gap-1 text-sm font-semibold text-[#64748B]">
+                <span className="material-symbols-outlined text-[18px]">
+                  filter_alt
                 </span>
-              </button>
-              <input
-                type="text"
-                placeholder="Nhập tên sản phẩm... (Bấm Enter để tìm)"
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                onKeyDown={handleKeyDown}
-                className="w-full pl-11 pr-4 py-2.5 rounded-full border border-[#E2E8F0] bg-[#F8FAFC] text-sm text-[#0F172A] outline-none focus:border-[#2563EB] focus:bg-white transition-all shadow-sm"
-              />
-            </div>
-          </div>
-
-          <div className="flex items-center gap-5 text-sm font-semibold">
-            <Link
-              to="/khach-hang/gio-hang"
-              className="relative text-[#334155] hover:text-[#2563EB]"
-            >
-              <span className="material-symbols-outlined text-[24px]">
-                shopping_cart
+                Bộ lọc:
               </span>
-              {cartCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-[#DC2626] text-white text-[10px] w-5 h-5 flex items-center justify-center rounded-full border-2 border-white">
-                  {cartCount}
+
+              <select
+                value={query.brand}
+                onFocus={ensureBrands}
+                onMouseDown={ensureBrands}
+                onChange={(e) =>
+                  setQuery((prev) => ({
+                    ...prev,
+                    brand: e.target.value,
+                    page: 1,
+                  }))
+                }
+                className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-2 text-sm text-[#0F172A] outline-none focus:border-[#2563EB] focus:bg-white"
+              >
+                <option value="">
+                  {brandLoading ? "Đang tải thương hiệu..." : "Thương hiệu"}
+                </option>
+                {brands.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
+
+              <select
+                value={query.sort}
+                onChange={(e) =>
+                  setQuery((prev) => ({
+                    ...prev,
+                    sort: e.target.value,
+                    page: 1,
+                  }))
+                }
+                className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-2 text-sm text-[#0F172A] outline-none focus:border-[#2563EB] focus:bg-white"
+              >
+                <option value="newest">Mới nhất</option>
+                <option value="popular">Bán chạy</option>
+                <option value="price_asc">Giá tăng dần</option>
+                <option value="price_desc">Giá giảm dần</option>
+              </select>
+
+              {hasFilter && (
+                <button
+                  type="button"
+                  onClick={handleClearFilters}
+                  className="flex items-center gap-1 text-sm font-semibold text-[#DC2626] hover:underline"
+                >
+                  <span className="material-symbols-outlined text-[16px]">
+                    close
+                  </span>
+                  Xóa lọc
+                </button>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2 text-sm text-[#64748B]">
+              {refreshing && (
+                <span className="material-symbols-outlined animate-spin text-[18px] text-[#2563EB]">
+                  progress_activity
                 </span>
               )}
-            </Link>
-            {user ? (
-              <div className="flex items-center gap-4">
-                <Link
-                  to="/khach-hang/thong-tin-ca-nhan"
-                  className="flex items-center gap-2 px-3 py-1.5 rounded-full hover:bg-[#F8FAFC]"
-                >
-                  <div className="w-8 h-8 rounded-full bg-[#2563EB] text-white flex items-center justify-center text-xs">
-                    {user.kh_ten?.charAt(0).toUpperCase()}
-                  </div>
-                  <span className="text-[#334155]">{user.kh_ten}</span>
-                </Link>
-                <button
-                  onClick={handleLogout}
-                  className="text-[#DC2626] hover:underline"
-                >
-                  Đăng xuất
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-4">
-                <Link
-                  to="/khach-hang/login"
-                  className="text-[#334155] hover:text-[#2563EB]"
-                >
-                  Đăng nhập
-                </Link>
-                <Link
-                  to="/khach-hang/register"
-                  className="bg-[#2563EB] text-white px-5 py-2 rounded-full hover:bg-[#1D4ED8]"
-                >
-                  Đăng ký
-                </Link>
-              </div>
-            )}
-          </div>
-        </div>
-      </header>
-
-      <div className="max-w-7xl mx-auto px-6 py-8 space-y-6">
-        {/* BỘ LỌC */}
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-[#E2E8F0] flex flex-col md:flex-row gap-4 items-center justify-between">
-          <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-            <span className="text-sm font-semibold text-[#64748B] flex items-center gap-1">
-              <span className="material-symbols-outlined text-[18px]">
-                filter_alt
-              </span>{" "}
-              Bộ lọc:
-            </span>
-            <select
-              value={selectedBrand}
-              onChange={(e) => setSelectedBrand(e.target.value)}
-              className="px-4 py-2 border rounded-xl bg-[#F8FAFC]"
-            >
-              <option value="">Thương hiệu</option>
-              {brands.map((b) => (
-                <option key={b.id} value={b.id}>
-                  {b.name}
-                </option>
-              ))}
-            </select>
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="px-4 py-2 border rounded-xl bg-[#F8FAFC]"
-            >
-              <option value="newest">Mới nhất</option>
-              <option value="popular">Bán chạy</option>
-              <option value="price_asc">Giá tăng dần</option>
-              <option value="price_desc">Giá giảm dần</option>
-            </select>
-          </div>
-        </div>
-
-        {/* HIỂN THỊ THƯƠNG HIỆU NỔI BẬT */}
-        {topBrands.length > 0 && (
-          <div className="bg-white p-6 rounded-2xl shadow-sm border border-[#E2E8F0]">
-            {/* Giữ nguyên khối Thương hiệu của bạn */}
-          </div>
-        )}
-
-        {/* LƯỚI SẢN PHẨM */}
-        {loading ? (
-          <div className="text-center py-20 text-[#2563EB] font-medium flex flex-col items-center gap-3">
-            <span className="animate-spin material-symbols-outlined text-4xl">
-              sync
-            </span>
-            Đang tải sản phẩm...
-          </div>
-        ) : products.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-[#E2E8F0]">
-            <span className="material-symbols-outlined text-6xl text-gray-300 mb-4">
-              search_off
-            </span>
-            <p className="text-lg font-bold text-gray-700">
-              Không tìm thấy sản phẩm nào phù hợp.
-            </p>
-          </div>
-        ) : (
-          <>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-5">
-              {products.map((sp) => (
-                <Link
-                  to={`/san-pham/${sp.sp_ma}?ctsp_ma=${sp.first_variant_id}`}
-                  key={sp.sp_ma}
-                  className="group bg-white rounded-2xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border border-[#E2E8F0] overflow-hidden flex flex-col"
-                >
-                  <div className="aspect-square relative overflow-hidden bg-[#F8FAFC] flex items-center justify-center">
-                    {sp.cover_image ? (
-                      <img
-                        src={`${BACKEND_URL}${sp.cover_image}`}
-                        alt={sp.sp_ten}
-                        className="w-full h-full object-contain p-3 group-hover:scale-110 transition-transform duration-500"
-                      />
-                    ) : (
-                      <span className="material-symbols-outlined text-6xl text-gray-300">
-                        image
-                      </span>
-                    )}
-                  </div>
-                  <div className="p-4 flex-1 flex flex-col">
-                    <h3 className="text-sm font-semibold text-[#0F172A] line-clamp-2 min-h-[40px] group-hover:text-[#2563EB] leading-snug">
-                      {sp.sp_ten}
-                    </h3>
-                    <div className="mt-auto pt-3">
-                      <p className="text-[#DC2626] font-bold text-lg">
-                        {formatPriceRange({
-                          minPrice: sp.min_price,
-                          maxPrice: sp.max_price,
-                        })}
-                      </p>
-                      <div className="flex items-center justify-between mt-2 text-xs text-[#64748B] font-medium">
-                        <span className="flex items-center gap-1">
-                          <span
-                            className="material-symbols-outlined text-[16px] text-[#F59E0B]"
-                            style={{ fontVariationSettings: "'FILL' 1" }}
-                          >
-                            star
-                          </span>
-                          {Number(sp.sp_diemdanhgiatrungbinh || 0).toFixed(1)}
-                        </span>
-                        <span>Đã bán {sp.sp_luotmua || 0}</span>
-                      </div>
-                    </div>
-                  </div>
-                </Link>
-              ))}
+              <span>
+                Tìm thấy{" "}
+                <strong className="text-[#0F172A]">
+                  {total.toLocaleString("vi-VN")}
+                </strong>{" "}
+                sản phẩm
+              </span>
             </div>
+          </div>
 
-            {/* 🟢 THANH PHÂN TRANG */}
-            {renderPagination()}
-          </>
-        )}
-      </div>
+          {query.search && (
+            <div className="mb-4 flex items-center gap-2 text-sm text-[#64748B]">
+              <span className="material-symbols-outlined text-[18px]">
+                search
+              </span>
+              Từ khóa:
+              <span className="rounded-md bg-[#EFF6FF] px-2 py-0.5 font-semibold text-[#2563EB]">
+                {query.search}
+              </span>
+              <button
+                type="button"
+                onClick={handleClearSearch}
+                className="text-[#DC2626] hover:underline"
+              >
+                bỏ
+              </button>
+            </div>
+          )}
+
+          {loading ? (
+            <GridSkeleton />
+          ) : products.length === 0 ? (
+            <div className="rounded-2xl border border-dashed border-[#E2E8F0] bg-white py-20 text-center">
+              <span className="material-symbols-outlined mb-4 text-6xl text-gray-300">
+                search_off
+              </span>
+              <p className="text-lg font-bold text-gray-700">
+                Không tìm thấy sản phẩm nào phù hợp.
+              </p>
+              {hasFilter && (
+                <button
+                  type="button"
+                  onClick={handleClearFilters}
+                  className="mt-4 rounded-xl bg-[#2563EB] px-5 py-2 text-sm font-semibold text-white hover:bg-[#1D4ED8]"
+                >
+                  Xóa bộ lọc
+                </button>
+              )}
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-2 gap-5 md:grid-cols-4 lg:grid-cols-5">
+                {products.map((sp) => (
+                  <ProductCard key={sp.sp_ma} sp={sp} />
+                ))}
+              </div>
+
+              {renderPagination()}
+            </>
+          )}
+        </div>
+      </main>
+
+      {/* ===== Footer động (admin cấu hình) ===== */}
+      <SiteFooter />
+
+      <ToastNotification toast={toast} />
     </div>
   );
 };

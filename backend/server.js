@@ -83,7 +83,9 @@ const donHangRoutes = require('./src/routes/khachhang/donHangRoutes');
 const thongKeNganhHangRoutes = require('./src/routes/san/thongKeNganhHangRoutes');
 
 const thongKeShopRoutes = require('./src/routes/gianhang/thongKeShopRoutes');
-
+// Giao diện header/footer
+const publicGiaoDienRoutes = require('./src/routes/san/publicGiaoDienRoutes');
+const adminGiaoDienRoutes = require('./src/routes/san/adminGiaoDienRoutes');
 
 // Khác
 const trangThaiDonHangRoutes = require('./src/routes/san/trangThaiDonHangRoutes');
@@ -130,6 +132,8 @@ app.use('/api/auth', sanAuthRoutes);
 app.use('/api/nguoi-ban/auth', gianHangAuthRoutes); 
 app.use('/api/dvvc/auth', dvvcAuthRoutes); 
 app.use('/api/quan-ly-kho/auth', quanLyKhoAuthRoutes);
+app.use('/api/giao-dien', publicGiaoDienRoutes);
+app.use('/api/admin/giao-dien', adminGiaoDienRoutes);
 app.use('/api/khach-hang/auth', khachHangAuthRoutes);
 app.use('/api/san', sanThuongMaiRoutes);
 

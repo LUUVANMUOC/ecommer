@@ -1,4 +1,6 @@
 import { useNavigate } from "react-router-dom";
+import SiteHeader from "../components/layout/SiteHeader";
+import SiteFooter from "../components/layout/SiteFooter";
 
 const Home = () => {
   const navigate = useNavigate();
@@ -45,19 +47,18 @@ const Home = () => {
       labelColor: "group-hover:text-tertiary",
     },
     {
-      id: "shipper", // ← THÊM
-      title: "Shipper", // ← THÊM
-      subtitle: "Giao hàng", // ← THÊM
-      description: "Nhận đơn được phân công và giao hàng đến khách", // ← THÊM
-      path: "/shipper/login", // ← THÊM
-      icon: "two_wheeler", // ← THÊM
-      color: "text-green-600", // ← THÊM
-      bgColor: "bg-green-600/10", // ← THÊM
-      borderHover: "hover:border-green-600/50", // ← THÊM
-      gradientHover: "group-hover:from-green-600/5 group-hover:to-green-600/10", // ← THÊM
-      labelColor: "group-hover:text-green-600", // ← THÊM
+      id: "shipper",
+      title: "Shipper",
+      subtitle: "Giao hàng",
+      description: "Nhận đơn được phân công và giao hàng đến khách",
+      path: "/shipper/login",
+      icon: "two_wheeler",
+      color: "text-green-600",
+      bgColor: "bg-green-600/10",
+      borderHover: "hover:border-green-600/50",
+      gradientHover: "group-hover:from-green-600/5 group-hover:to-green-600/10",
+      labelColor: "group-hover:text-green-600",
     },
-    // ... (sau card shipper)
     {
       id: "quanlykho",
       title: "Quản lý kho",
@@ -88,50 +89,21 @@ const Home = () => {
     },
   ];
 
-  const stats = [
-    { label: "Gian hàng", value: "10K+" },
-    { label: "Khách hàng", value: "500K+" },
-    { label: "Đơn hàng / ngày", value: "50K+" },
-    { label: "Đối tác vận chuyển", value: "20+" },
-  ];
-
   return (
-    <div className="relative min-h-screen bg-background overflow-hidden">
-      {/* Decorative gradient blobs */}
-      <div className="absolute -top-32 -left-32 w-[500px] h-[500px] bg-primary/20 rounded-full blur-3xl opacity-60 pointer-events-none" />
-      <div className="absolute -top-20 -right-32 w-[500px] h-[500px] bg-secondary/20 rounded-full blur-3xl opacity-50 pointer-events-none" />
-      <div className="absolute -bottom-32 left-1/3 w-[500px] h-[500px] bg-tertiary/20 rounded-full blur-3xl opacity-50 pointer-events-none" />
+    <div className="relative min-h-screen bg-background">
+      {/* Decorative gradient blobs (bọc riêng để không phá sticky header) */}
+      <div className="pointer-events-none absolute inset-0 overflow-hidden">
+        <div className="absolute -top-32 -left-32 w-[500px] h-[500px] bg-primary/20 rounded-full blur-3xl opacity-60" />
+        <div className="absolute -top-20 -right-32 w-[500px] h-[500px] bg-secondary/20 rounded-full blur-3xl opacity-50" />
+        <div className="absolute -bottom-32 left-1/3 w-[500px] h-[500px] bg-tertiary/20 rounded-full blur-3xl opacity-50" />
+      </div>
 
-      <div className="relative z-10 flex flex-col min-h-screen px-6">
-        {/* ===== Header ===== */}
-        <header className="flex items-center justify-between w-full max-w-7xl mx-auto py-6">
-          <div className="flex items-center gap-3">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary to-secondary flex items-center justify-center shadow-lg shadow-primary/30">
-              <span className="material-symbols-outlined text-white text-[22px]">
-                storefront
-              </span>
-            </div>
-            <div className="leading-tight">
-              <div className="text-headline-sm font-bold text-on-surface">
-                CT255
-              </div>
-              <div className="text-body-sm text-on-surface-variant">
-                E-Commerce Platform
-              </div>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            className="hidden md:inline-flex items-center gap-2 px-4 py-2 rounded-full border border-outline-variant text-on-surface-variant text-body-sm hover:border-primary hover:text-primary transition-colors"
-          >
-            <span className="material-symbols-outlined text-[18px]">help</span>
-            Trợ giúp
-          </button>
-        </header>
+      <div className="relative z-10 flex flex-col min-h-screen">
+        {/* ===== Header động (admin cấu hình) ===== */}
+        <SiteHeader />
 
         {/* ===== Main ===== */}
-        <main className="flex-1 flex flex-col items-center justify-center w-full max-w-7xl mx-auto py-10">
+        <main className="flex-1 flex flex-col items-center justify-center w-full max-w-7xl mx-auto px-6 py-10">
           {/* Hero */}
           <div className="text-center mb-14 flex flex-col items-center">
             <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-primary/10 text-primary text-body-sm font-medium mb-6">
@@ -163,7 +135,7 @@ const Home = () => {
             </button>
           </div>
 
-          {/* Role cards grid — đổi lg:grid-cols-4 → md:2 / lg:3 / xl:5 (đủ 5 card) */}
+          {/* Role cards grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 w-full mt-8">
             {roles.map((role, index) => (
               <button
@@ -223,37 +195,10 @@ const Home = () => {
               </button>
             ))}
           </div>
-
-          {/* Stats */}
-          <div className="mt-20 grid grid-cols-2 md:grid-cols-4 gap-6 md:gap-10 w-full max-w-4xl">
-            {stats.map((stat) => (
-              <div key={stat.label} className="text-center">
-                <div className="text-headline-lg font-bold bg-gradient-to-r from-primary to-secondary bg-clip-text text-transparent">
-                  {stat.value}
-                </div>
-                <div className="text-body-sm text-on-surface-variant mt-1">
-                  {stat.label}
-                </div>
-              </div>
-            ))}
-          </div>
         </main>
 
-        {/* ===== Footer ===== */}
-        <footer className="w-full max-w-7xl mx-auto py-6 mt-12 border-t border-outline-variant/40 flex flex-col md:flex-row items-center justify-between gap-3 text-body-sm text-on-surface-variant">
-          <div>© 2025 CT255 E-Commerce Platform. Bảo lưu mọi quyền.</div>
-          <div className="flex items-center gap-6">
-            <a href="#" className="hover:text-primary transition-colors">
-              Điều khoản
-            </a>
-            <a href="#" className="hover:text-primary transition-colors">
-              Bảo mật
-            </a>
-            <a href="#" className="hover:text-primary transition-colors">
-              Liên hệ
-            </a>
-          </div>
-        </footer>
+        {/* ===== Footer động (admin cấu hình) ===== */}
+        <SiteFooter />
       </div>
 
       {/* Keyframes */}

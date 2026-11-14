@@ -35,6 +35,10 @@ const AdminDashboard = () => {
       path: "/admin/thong-tin-san",
     },
     {
+      title: "Giao diện Header & Footer",
+      path: "/admin/giao-dien",
+    },
+    {
       title: "Thanh toán Vận chuyển",
       path: "/admin/thanh-toan-van-chuyen",
     },

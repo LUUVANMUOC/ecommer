@@ -2,10 +2,14 @@ const express = require('express');
 const router = express.Router();
 const PublicSanPhamController = require('../../controllers/san/publicSanPhamController');
 const PublicGianHangController = require('../../controllers/san/publicGianHangController');
+const PublicNoiBatController = require('../../controllers/san/publicNoiBatController');
 
 // ==========================================================
 // CÁC ROUTE CỤ THỂ (PHẢI ĐẶT TRƯỚC ROUTE CÓ THAM SỐ /:sp_ma)
 // ==========================================================
+
+// 0. Khối nổi bật cho trang /san-pham
+router.get('/noi-bat', PublicNoiBatController.getNoiBat);
 
 // 1. Route Lịch sử xem và Ghi nhận view
 router.post('/record-view', PublicSanPhamController.recordView);
@@ -16,8 +20,6 @@ router.get('/shop/:gh_ma', PublicSanPhamController.getByShop);
 
 // 3. Route lấy thông tin Shop
 router.get('/gian-hang/:gh_ma', PublicGianHangController.getShopProfile);
-
-// 🟢 Đã mở khóa Route Gợi ý AI
 
 // 4. Route Like sản phẩm
 router.put('/:id/like', PublicSanPhamController.toggleLike);
