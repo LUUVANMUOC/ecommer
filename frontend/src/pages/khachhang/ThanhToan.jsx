@@ -13,14 +13,14 @@ import ToastNotification from "../../components/common/Crud/ToastNotification";
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
 const EMPTY_ADDRESS_FORM = {
-  ttnh_ma: "",
-  ttnh_tennguoinhan: "",
+  dc_ma: "",
+  ttnh_ten: "",
   ttnh_sdt: "",
   tinh_ma: "",
   xa_ma: "",
   dc_mota: "",
   ttnh_ghichu: "",
-  ttnh_macdinh: false,
+  ttnh_lamacdinh: false,
 };
 
 const ThanhToan = () => {
@@ -96,7 +96,7 @@ const ThanhToan = () => {
         const exists = data.find((a) => a.ttnh_ma === selectedAddressId);
         if (!exists) {
           const defaultAddr =
-            data.find((a) => a.ttnh_macdinh === true) || data[0];
+            data.find((a) => a.ttnh_lamacdinh === true) || data[0];
           setSelectedAddressId(defaultAddr.ttnh_ma);
         }
       } else {
@@ -174,16 +174,20 @@ const ThanhToan = () => {
     if (addr) {
       setIsEditingAddress(true);
       setAddressFormData({
-        ...addr,
+        dc_ma: addr.dc_ma || "",
+        ttnh_ten: addr.ttnh_ten || "",
+        ttnh_sdt: addr.ttnh_sdt || "",
         tinh_ma: addr.tinh_ma || "",
         xa_ma: addr.xa_ma || "",
-        ttnh_ghichu: addr.ttnh_ghichu || addr.ttnh_mota || "",
+        dc_mota: addr.dc_mota || "",
+        ttnh_ghichu: addr.ttnh_ghichu || "",
+        ttnh_lamacdinh: Boolean(addr.ttnh_lamacdinh),
       });
     } else {
       setIsEditingAddress(false);
       setAddressFormData({
         ...EMPTY_ADDRESS_FORM,
-        ttnh_tennguoinhan: user?.kh_ten || "",
+        ttnh_ten: user?.kh_ten || "",
         ttnh_sdt: user?.kh_sdt || "",
       });
     }
@@ -194,8 +198,19 @@ const ThanhToan = () => {
     e.preventDefault();
     if (!addressFormData.tinh_ma || !addressFormData.xa_ma)
       return showToast("Chọn đầy đủ Tỉnh/Xã!", "error");
+
     setSavingAddress(true);
-    const payload = { kh_ma: user.kh_ma, ...addressFormData };
+    // Snapshot địa chỉ do backend dựng từ xa_ma (tra tên Xã/Tỉnh trong DB)
+    const payload = {
+      kh_ma: user.kh_ma,
+      dc_ma: addressFormData.dc_ma || undefined,
+      ttnh_ten: addressFormData.ttnh_ten?.trim(),
+      ttnh_sdt: addressFormData.ttnh_sdt?.trim(),
+      dc_mota: addressFormData.dc_mota?.trim(),
+      xa_ma: addressFormData.xa_ma,
+      ttnh_ghichu: addressFormData.ttnh_ghichu || "",
+      ttnh_lamacdinh: Boolean(addressFormData.ttnh_lamacdinh),
+    };
     try {
       if (isEditingAddress)
         await thongTinNhanHangService.update(addressFormData.ttnh_ma, payload);
@@ -204,7 +219,7 @@ const ThanhToan = () => {
       setIsAddressModalOpen(false);
       fetchAddresses();
     } catch (err) {
-      showToast("Lỗi lưu địa chỉ", "error");
+      showToast(err.response?.data?.message || "Lỗi lưu địa chỉ", "error");
     } finally {
       setSavingAddress(false);
     }
@@ -213,9 +228,13 @@ const ThanhToan = () => {
   const handleDeleteAddress = async (e, ttnh_ma) => {
     e.stopPropagation();
     if (!window.confirm("Xóa địa chỉ này?")) return;
-    await thongTinNhanHangService.delete(ttnh_ma);
-    showToast("Đã xóa!");
-    fetchAddresses();
+    try {
+      const res = await thongTinNhanHangService.delete(ttnh_ma);
+      showToast(res.data?.message || "Đã xóa!");
+      fetchAddresses();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Lỗi khi xóa", "error");
+    }
   };
 
   const filteredXas = useMemo(
@@ -605,11 +624,9 @@ const ThanhToan = () => {
                     <div className="pr-6">
                       <div className="flex flex-wrap items-center gap-2 mb-1">
                         <span className="font-bold text-[#0F172A] text-sm">
-                          {addr.ttnh_tennguoinhan ||
-                            user?.kh_ten ||
-                            "Khách hàng"}
+                          {addr.ttnh_ten || user?.kh_ten || "Khách hàng"}
                         </span>
-                        {addr.ttnh_macdinh && (
+                        {addr.ttnh_lamacdinh && (
                           <span className="text-[10px] font-bold text-[#DC2626] border border-[#DC2626] px-1 py-0.5 rounded">
                             Mặc định
                           </span>
@@ -930,11 +947,11 @@ const ThanhToan = () => {
                   <input
                     type="text"
                     required
-                    value={addressFormData.ttnh_tennguoinhan}
+                    value={addressFormData.ttnh_ten}
                     onChange={(e) =>
                       setAddressFormData({
                         ...addressFormData,
-                        ttnh_tennguoinhan: e.target.value,
+                        ttnh_ten: e.target.value,
                       })
                     }
                     className="w-full px-4 py-2.5 rounded-xl border border-[#E2E8F0] outline-none focus:border-[#2563EB]"
@@ -1047,11 +1064,11 @@ const ThanhToan = () => {
                 <input
                   type="checkbox"
                   id="defaultAddr"
-                  checked={addressFormData.ttnh_macdinh}
+                  checked={addressFormData.ttnh_lamacdinh}
                   onChange={(e) =>
                     setAddressFormData({
                       ...addressFormData,
-                      ttnh_macdinh: e.target.checked,
+                      ttnh_lamacdinh: e.target.checked,
                     })
                   }
                   className="w-4 h-4 accent-[#2563EB]"

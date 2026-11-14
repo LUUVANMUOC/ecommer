@@ -18,6 +18,7 @@ export const DiaChiNhanHangSection = ({ kh_ma }) => {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
+    dc_ma: "",
     ttnh_ten: "",
     ttnh_sdt: "",
     tinh_ma: "",
@@ -54,6 +55,7 @@ export const DiaChiNhanHangSection = ({ kh_ma }) => {
   const handleOpenForm = (dc = null) => {
     if (dc) {
       setFormData({
+        dc_ma: dc.dc_ma || "",
         ttnh_ten: dc.ttnh_ten,
         ttnh_sdt: dc.ttnh_sdt,
         tinh_ma: dc.tinh_ma,
@@ -65,6 +67,7 @@ export const DiaChiNhanHangSection = ({ kh_ma }) => {
       setEditingId(dc.ttnh_ma);
     } else {
       setFormData({
+        dc_ma: "",
         ttnh_ten: "",
         ttnh_sdt: "",
         tinh_ma: "",
@@ -84,17 +87,21 @@ export const DiaChiNhanHangSection = ({ kh_ma }) => {
       return showToast("Vui lòng chọn đủ Tỉnh/Xã", "error");
 
     try {
-      // Lấy tên Tỉnh/Xã để tạo snapshot
-      const tinh_ten = tinhs.find(
-        (t) => t.tinh_ma === formData.tinh_ma,
-      )?.tinh_ten;
-      const xa_ten = xas.find((x) => x.xa_ma === formData.xa_ma)?.xa_ten;
-
-      const payload = { ...formData, kh_ma, tinh_ten, xa_ten };
+      // Snapshot địa chỉ do backend dựng từ xa_ma (tra tên Xã/Tỉnh trong DB)
+      const payload = {
+        kh_ma,
+        dc_ma: formData.dc_ma || undefined,
+        ttnh_ten: formData.ttnh_ten,
+        ttnh_sdt: formData.ttnh_sdt,
+        dc_mota: formData.dc_mota,
+        xa_ma: formData.xa_ma,
+        ttnh_ghichu: formData.ttnh_ghichu,
+        ttnh_lamacdinh: Boolean(formData.ttnh_lamacdinh),
+      };
 
       if (editingId) {
         await thongTinNhanHangService.update(editingId, payload);
-        showToast("Cập nhật thành công!");
+        showToast("Cập nhật thành công! Đơn hàng cũ vẫn giữ địa chỉ cũ.");
       } else {
         await thongTinNhanHangService.create(payload);
         showToast("Thêm địa chỉ thành công!");
@@ -109,21 +116,21 @@ export const DiaChiNhanHangSection = ({ kh_ma }) => {
   const handleDelete = async (id) => {
     if (!window.confirm("Xóa địa chỉ này?")) return;
     try {
-      await thongTinNhanHangService.delete(id);
-      showToast("Đã xóa");
+      const res = await thongTinNhanHangService.delete(id);
+      showToast(res.data?.message || "Đã xóa");
       fetchAddresses();
     } catch (err) {
-      showToast("Lỗi khi xóa", "error");
+      showToast(err.response?.data?.message || "Lỗi khi xóa", "error");
     }
   };
 
   const handleSetDefault = async (id) => {
     try {
       await thongTinNhanHangService.setDefault(kh_ma, id);
-      showToast("Đã đặt làm mặc định");
+      showToast("Đã đặt làm mặc định. Đơn hàng cũ không thay đổi.");
       fetchAddresses();
     } catch (err) {
-      showToast("Lỗi khi đặt mặc định", "error");
+      showToast(err.response?.data?.message || "Lỗi khi đặt mặc định", "error");
     }
   };
 

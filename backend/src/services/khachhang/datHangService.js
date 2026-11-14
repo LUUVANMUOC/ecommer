@@ -1,5 +1,6 @@
 // backend/src/services/khachhang/datHangService.js
 const pool = require('../../config/db');
+const ThongTinNhanHangModel = require('../../models/khachhang/thongTinNhanHangModel');
 
 // Hàm hỗ trợ format tiền tệ
 const formatVND = (amount) => Number(amount).toLocaleString('vi-VN') + ' đ';
@@ -10,7 +11,7 @@ const DatHangService = {
     let totalPlatformFee = 0;
     let totalBasePrice = 0;
     console.log(`\n   💸 [TÍNH PHÍ SÀN CHO SHOP]`);
-    
+
     for (const item of items) {
       const query = `
         SELECT p.psck_phantram 
@@ -24,18 +25,18 @@ const DatHangService = {
       `;
       const res = await client.query(query, [item.ctsp_ma]);
       const itemTotalInclusive = Number(item.ctsp_gianban) * item.ctgh_soluong;
-      
+
       if (res.rows.length > 0 && res.rows[0].psck_phantram) {
         const phantram = Number(res.rows[0].psck_phantram);
-        
+
         // 🟢 THUẬT TOÁN MỚI: Tách giá gốc và phí sàn từ giá đã bao gồm phí
         // Giá gốc = Giá đã gồm phí / (1 + phí sàn / 100)
         const itemBasePrice = Math.round(itemTotalInclusive / (1 + phantram / 100));
         const fee = itemTotalInclusive - itemBasePrice;
-        
+
         totalPlatformFee += fee;
         totalBasePrice += itemBasePrice;
-        
+
         console.log(`      - Sản phẩm ${item.ctsp_ma}: Giá khách trả ${formatVND(itemTotalInclusive)} | Phí sàn ${phantram}% = ${formatVND(fee)} | Tiền shop nhận ${formatVND(itemBasePrice)}`);
       } else {
         totalBasePrice += itemTotalInclusive;
@@ -44,7 +45,7 @@ const DatHangService = {
     }
     console.log(`      => TỔNG PHÍ SÀN SHOP NÀY: ${formatVND(totalPlatformFee)}`);
     console.log(`      => TỔNG TIỀN HÀNG GỐC (CHƯA PHÍ) SHOP NÀY: ${formatVND(totalBasePrice)}`);
-    
+
     return { totalPlatformFee, totalBasePrice };
   },
 
@@ -53,6 +54,18 @@ const DatHangService = {
     try {
       await client.query('BEGIN');
       console.log(`\n🚀🚀🚀 BẮT ĐẦU QUÁ TRÌNH ĐẶT HÀNG 🚀🚀🚀`);
+
+      // 0. 🔒 ĐÓNG BĂNG ĐỊA CHỈ NHẬN HÀNG
+      //    Clone dòng thongtinnhanhang + diachi thành bản ghi riêng của đơn.
+      //    Nhờ vậy khách sửa/xóa địa chỉ trong sổ về sau không làm đổi đơn cũ.
+      const ttnhSnapshotMa = await ThongTinNhanHangModel.cloneForOrder(
+        client,
+        payload.ttnh_ma,
+        payload.kh_ma,
+      );
+      console.log(formatLog('0. ĐÓNG BĂNG ĐỊA CHỈ NHẬN HÀNG'));
+      console.log(`   - Địa chỉ khách chọn: ${payload.ttnh_ma}`);
+      console.log(`   - Bản sao lưu cho đơn: ${ttnhSnapshotMa}`);
 
       // 1. Tạo mã đơn hàng tổng (DM_MA)
       const dmRes = await client.query(`SELECT dm_ma FROM donhangkhachmua ORDER BY dm_ma DESC LIMIT 1`);
@@ -63,25 +76,25 @@ const DatHangService = {
       }
       console.log(formatLog('1. TẠO ĐƠN HÀNG TỔNG (DONHANGKHACHMUA)'));
       console.log(`   - Mã đơn tổng mới: ${newDmMa}`);
-      console.log(`   - Khách hàng: ${payload.kh_ma} | Địa chỉ: ${payload.ttnh_ma}`);
+      console.log(`   - Khách hàng: ${payload.kh_ma} | Địa chỉ (bản đóng băng): ${ttnhSnapshotMa}`);
       console.log(`   - Tổng tiền thanh toán cuối cùng: ${formatVND(payload.finalTotal)}`);
 
       await client.query(`
         INSERT INTO donhangkhachmua (dm_ma, dm_tongtien, kh_ma, ttnh_ma)
         VALUES ($1, $2, $3, $4)
-      `, [newDmMa, payload.finalTotal, payload.kh_ma, payload.ttnh_ma]);
+      `, [newDmMa, payload.finalTotal, payload.kh_ma, ttnhSnapshotMa]);
       console.log(`   ✅ Đã insert thành công vào bảng donhangkhachmua.`);
 
       // ✅ Tự động tính ngày giao hàng dự kiến
       const deliveryDate = new Date();
       deliveryDate.setDate(deliveryDate.getDate() + 5);
-      const formattedDeliveryDate = deliveryDate.toISOString().split('T')[0]; 
+      const formattedDeliveryDate = deliveryDate.toISOString().split('T')[0];
       console.log(`   - Ngày giao hàng dự kiến (Auto +5 ngày): ${formattedDeliveryDate}`);
 
       // 3. Duyệt qua từng Shop
       for (const order of payload.orders) {
         console.log(formatLog(`2. XỬ LÝ ĐƠN CỦA SHOP: ${order.gh_ma}`));
-        
+
         // 🟢 Lấy về cả tiền gốc và phí sàn
         const { totalPlatformFee: platformFee, totalBasePrice } = await DatHangService.calculatePlatformFee(client, order.items);
 
@@ -100,11 +113,11 @@ const DatHangService = {
         console.log(`      - Phí vận chuyển gốc (Trước giảm giá): ${formatVND(order.originalShippingFee || 'Không có dữ liệu')}`);
         console.log(`      - Giảm giá vận chuyển (Voucher VC): -${formatVND(order.shippingDiscount)}`);
         console.log(`      - Phí vận chuyển THỰC TẾ KHÁCH PHẢI TRẢ (finalShippingFee): ${formatVND(order.finalShippingFee)}`);
-        
+
         if (order.voucherVC) {
           console.log(`      - Mã Voucher Vận chuyển áp dụng: ${order.voucherVC}`);
         }
-        
+
         console.log(`      - Cân nặng (klkh_ma): ${order.klkh_ma} | ĐVVC: ${order.dvvc_ma}`);
 
         // Công thức tính tổng tiền khách phải trả cho Shop này:
@@ -133,8 +146,8 @@ const DatHangService = {
           order.shippingDiscount, // → dts_tonggiamgiavanchuyen
           order.shopDiscount,     // → dts_tonggiamgiashop
           finalAmountForShop, platformFee,
-          newDmMa, order.gh_ma, 
-          order.voucherShop || null, 
+          newDmMa, order.gh_ma,
+          order.voucherShop || null,
           order.voucherVC || null,
           order.klkh_ma, order.dc_layhangma, order.dvvc_ma
         ]);
@@ -188,7 +201,7 @@ const DatHangService = {
       await client.query('COMMIT');
       console.log(`\n✅✅✅ [THÀNH CÔNG] ĐÃ COMMIT TOÀN BỘ ĐƠN HÀNG ${newDmMa} VÀO DATABASE! ✅✅✅\n`);
       return { message: "Đặt hàng thành công!", dm_ma: newDmMa };
-      
+
     } catch (error) {
       await client.query('ROLLBACK');
       console.error(`\n❌❌❌ [LỖI NGHIÊM TRỌNG] ĐÃ ROLLBACK TOÀN BỘ QUÁ TRÌNH ĐẶT HÀNG! ❌❌❌`);

@@ -11,7 +11,15 @@ const ThongTinNhanHangController = {
     try { res.json(await ThongTinNhanHangService.update(req.params.ttnh_ma, req.body)); } catch (error) { res.status(400).json({ message: error.message }); }
   },
   delete: async (req, res) => {
-    try { await ThongTinNhanHangService.delete(req.params.ttnh_ma); res.json({ message: 'Xóa thành công' }); } catch (error) { res.status(400).json({ message: error.message }); }
+    try {
+      const result = await ThongTinNhanHangService.delete(req.params.ttnh_ma);
+      res.json({
+        message: result?.da_luu_tru
+          ? 'Địa chỉ đã dùng cho đơn hàng nên được lưu trữ (đã ẩn khỏi sổ địa chỉ).'
+          : 'Xóa thành công',
+        da_luu_tru: Boolean(result?.da_luu_tru),
+      });
+    } catch (error) { res.status(400).json({ message: error.message }); }
   },
   setDefault: async (req, res) => {
     try { res.json(await ThongTinNhanHangService.setDefault(req.body.kh_ma, req.params.ttnh_ma)); } catch (error) { res.status(400).json({ message: error.message }); }
