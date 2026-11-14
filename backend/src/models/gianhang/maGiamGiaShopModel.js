@@ -1,5 +1,6 @@
 // backend/src/models/gianhang/maGiamGiaShopModel.js
 const pool = require('../../config/db');
+const ThongBaoService = require('../../services/thongbao/thongBaoService');
 
 const MaGiamGiaShopModel = {
   // 1. Lấy tất cả mã giảm giá của một Shop
@@ -104,7 +105,29 @@ const MaGiamGiaShopModel = {
     ];
     
     const result = await pool.query(query, values);
-    return result.rows[0];
+    const voucher = result.rows[0];
+
+    // ✅ Thông báo cho khách hàng đang theo dõi shop (không làm hỏng nghiệp vụ nếu lỗi)
+    try {
+      const [shopRes, khRes] = await Promise.all([
+        pool.query(`SELECT gh_ten FROM gianhang WHERE gh_ma = $1`, [GH_Ma]),
+        pool.query(
+          `SELECT kh_ma FROM khachhang_theodoi_shop WHERE gh_ma = $1`,
+          [GH_Ma],
+        ),
+      ]);
+
+      await ThongBaoService.thongBaoVoucherMoi({
+        gh_ma: GH_Ma,
+        ten_shop: shopRes.rows[0]?.gh_ten || 'Shop',
+        voucher,
+        ds_kh_ma: khRes.rows.map((r) => r.kh_ma),
+      });
+    } catch (error) {
+      console.error('❌ Lỗi gửi thông báo mã giảm giá mới:', error.message);
+    }
+
+    return voucher;
   },
 
   // 4. Cập nhật
@@ -144,7 +167,7 @@ const MaGiamGiaShopModel = {
       finalStatus, // ✅ Dùng trạng thái đã tính toán
       MGG_Shop_ThoiDiemBatDau || null, MGG_Shop_ThoiDiemKetThuc || null,
       MGG_Shop_GiaTriDonToiThieu, MGG_Shop_SoLuongConLai, MGG_Shop_PhanTramGiam,
-      MGG_Shop_SoLuongBanDau, MGG_Shop_SoTienToiDaMoiLan, id 
+      MGG_Shop_SoLuongBandau, MGG_Shop_SoTienToiDaMoiLan, id 
     ];
 
     const result = await pool.query(query, values);

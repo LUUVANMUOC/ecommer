@@ -1,4 +1,6 @@
 const express = require('express');
+const http = require('http');
+const { Server } = require('socket.io');
 const cors = require('cors');
 const path = require('path'); 
 require('dotenv').config();
@@ -16,7 +18,11 @@ const gianHangAuthRoutes = require('./src/routes/gianhang/gianHangAuthRoutes');
 const dvvcAuthRoutes = require('./src/routes/dvvc/authRoutes');
 const sanThuongMaiRoutes = require('./src/routes/san/sanThuongMaiRoutes');
 const adminDonHangRoutes = require('./src/routes/san/adminDonHangRoutes');
-
+const dvvcDongTienThongKeRoutes = require('./src/routes/dvvc/dongTienThongKeRoutes');
+const realtimeSocket = require('./src/realtime/socket');
+const thongBaoRoutes = require('./src/routes/thongbao/thongBaoRoutes');
+const thongBaoShopRoutes = require('./src/routes/gianhang/thongBaoShopRoutes');
+const thongBaoSanRoutes = require('./src/routes/san/thongBaoSanRoutes');
 // Danh mục & Hệ thống
 const tinhRoutes = require('./src/routes/san/tinhRoutes');
 const xaRoutes = require('./src/routes/san/xaRoutes');
@@ -188,7 +194,10 @@ app.use('/api/dvvc/thong-tin', dvvcProfileRoutes);
 app.use('/api/dvvc/phan-cong', phanCongRoutes);
 app.use('/api/dvvc/theo-doi', dvvcTheoDoiRoutes);
 app.use('/api/dvvc/shipper', shipperRoutes);
-
+// 10. Thông báo
+app.use('/api/thong-bao', thongBaoRoutes);
+app.use('/api/nguoi-ban/thong-bao', thongBaoShopRoutes);
+app.use('/api/admin/thong-bao', thongBaoSanRoutes);
 // 7. Shipper
 app.use('/api/dvvc/shipper/auth', shipperAuthRoutes);
 app.use('/api/dvvc/shipper/don-hang', shipperDonHangRoutes);
@@ -210,6 +219,7 @@ app.use('/api/dong-tien', dongTienRoutes);
 app.use('/api/phi-van-chuyen', phiVanChuyenRoutes);
 app.use('/api/admin/thong-ke-nganh-hang', thongKeNganhHangRoutes);
 app.use('/api/admin/thong-ke-nganh-hang', thongKeNganhHangRoutes);
+app.use('/api/dvvc/thong-ke-dong-tien', dvvcDongTienThongKeRoutes);
 
 // 9. Trạng thái đơn hàng
 app.use('/api/trang-thai-don-hang', trangThaiDonHangRoutes);
@@ -296,9 +306,18 @@ cron.schedule('* * * * *', async () => {
 });
 
 // ================= 7. START SERVER =================
-const PORT = process.env.PORT || 8080; 
-app.listen(PORT, () => {
-    console.log(`🚀 Server Backend đang chạy ở cổng ${PORT}`);
-    console.log(`🔗 API URL: http://localhost:${PORT}/api/auth`);
-    console.log(`⏰ Cronjobs đã được bật (Voucher, Dọn dẹp phiếu).`);
+const PORT = process.env.PORT || 8080;
+
+const httpServer = http.createServer(app);
+const io = new Server(httpServer, {
+  cors: { origin: true, credentials: true },
+});
+
+realtimeSocket.init(io);
+
+httpServer.listen(PORT, () => {
+  console.log(`🚀 Server Backend đang chạy ở cổng ${PORT}`);
+  console.log(`🔗 API URL: http://localhost:${PORT}/api/auth`);
+  console.log(`⏰ Cronjobs đã được bật (Voucher, Dọn dẹp phiếu).`);
+  console.log(`🔔 Thông báo real-time đã bật (Socket.IO).`);
 });

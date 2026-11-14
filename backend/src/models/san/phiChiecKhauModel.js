@@ -1,4 +1,5 @@
 const pool = require('../../config/db');
+const ThongBaoService = require('../../services/thongbao/thongBaoService');
 
 const PhiChiecKhauModel = {
   // Lấy cây ngành hàng kèm mức phí mới nhất
@@ -37,8 +38,27 @@ const PhiChiecKhauModel = {
     const { nh_ma, stmdt_ma, psck_phantram } = data;
 
     const client = await pool.connect();
+    let ketQua = null;
+    let phanTramCu = null;
+    let tenNganh = null;
+
     try {
       await client.query('BEGIN');
+
+      // 0. Lấy phí cũ + tên ngành hàng để soạn thông báo
+      const [truocRes, nganhRes] = await Promise.all([
+        client.query(
+          `SELECT psck_phantram
+           FROM phisanchieckhau
+           WHERE nh_ma = $1 AND stmdt_ma = $2
+           ORDER BY psck_thoidiem DESC
+           LIMIT 1`,
+          [nh_ma, stmdt_ma],
+        ),
+        client.query(`SELECT nh_ten FROM nganhhang WHERE nh_ma = $1`, [nh_ma]),
+      ]);
+      phanTramCu = truocRes.rows[0]?.psck_phantram ?? null;
+      tenNganh = nganhRes.rows[0]?.nh_ten || null;
 
       // 1. Lưu lịch sử phí mới
       const queryInsert = `
@@ -47,6 +67,7 @@ const PhiChiecKhauModel = {
         RETURNING *;
       `;
       const result = await client.query(queryInsert, [psck_phantram, nh_ma, stmdt_ma]);
+      ketQua = result.rows[0];
 
       // 2. Cập nhật lại giá bán cho TẤT CẢ sản phẩm thuộc ngành hàng này
       const queryUpdatePrice = `
@@ -67,8 +88,6 @@ const PhiChiecKhauModel = {
       await client.query(queryUpdatePrice, [psck_phantram, nh_ma]);
 
       await client.query('COMMIT');
-      return result.rows[0];
-
     } catch (error) {
       await client.query('ROLLBACK');
       console.error("LỖI KHI CẬP NHẬT PHÍ VÀ GIÁ SẢN PHẨM:", error);
@@ -76,6 +95,31 @@ const PhiChiecKhauModel = {
     } finally {
       client.release();
     }
+
+    // 3. Gửi thông báo cho các shop có sản phẩm thuộc ngành hàng vừa đổi phí
+    //    (chạy sau khi đã commit, lỗi thông báo không làm hỏng nghiệp vụ)
+    try {
+      const shopRes = await pool.query(
+        `SELECT DISTINCT sp.gh_ma
+         FROM chitietsanpham ctsp
+         JOIN sanpham sp ON sp.sp_ma = ctsp.sp_ma
+         WHERE ctsp.nh_ma = $1`,
+        [nh_ma],
+      );
+
+      await ThongBaoService.thongBaoDoiPhi({
+        stmdt_ma,
+        nh_ma,
+        ten_nganh: tenNganh,
+        phan_tram_cu: phanTramCu,
+        phan_tram_moi: psck_phantram,
+        ds_gh_ma: shopRes.rows.map((r) => r.gh_ma),
+      });
+    } catch (error) {
+      console.error("❌ Lỗi gửi thông báo đổi phí chiết khấu:", error.message);
+    }
+
+    return ketQua;
   }
 };
 

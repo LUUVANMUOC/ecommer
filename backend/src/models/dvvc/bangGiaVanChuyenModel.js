@@ -1,9 +1,10 @@
 // backend/src/models/dvvc/bangGiaVanChuyenModel.js
 const pool = require('../../config/db');
+const ThongBaoService = require('../../services/thongbao/thongBaoService');
+
+const tien = (v) => `${Number(v || 0).toLocaleString('vi-VN')} đ`;
 
 const BangGiaVanChuyenModel = {
-  // ... (Các hàm getKhoiLuong, getKhuVuc, getTuyen, getBangGia, updateGia giữ nguyên)
-
   getKhoiLuong: async () => {
     const res = await pool.query('SELECT * FROM khoiluongkienhang ORDER BY klkh_trongluongmin ASC');
     return res.rows;
@@ -32,13 +33,63 @@ const BangGiaVanChuyenModel = {
   },
 
   updateGia: async (data) => {
+    const { kvvc_ma, tvc_ma, klkh_ma, dvvc_ma, cpvc_gia } = data;
+
+    // 0. Lấy giá cũ + tên khu vực/tuyến/khối lượng để soạn thông báo
+    const [cuRes, tenRes] = await Promise.all([
+      pool.query(
+        `SELECT cpvc_gia
+         FROM cuocphivanchuyen
+         WHERE kvvc_ma = $1 AND tvc_ma = $2 AND klkh_ma = $3 AND dvvc_ma = $4
+         ORDER BY cpvc_thoidiem DESC
+         LIMIT 1`,
+        [kvvc_ma, tvc_ma, klkh_ma, dvvc_ma],
+      ),
+      pool.query(
+        `SELECT kv.kvvc_ten, tv.tvc_ten, kl.klkh_ten
+         FROM khuvucvanchuyen kv, tuyenvanchuyen tv, khoiluongkienhang kl
+         WHERE kv.kvvc_ma = $1 AND tv.tvc_ma = $2 AND kl.klkh_ma = $3`,
+        [kvvc_ma, tvc_ma, klkh_ma],
+      ),
+    ]);
+
     const query = `
       INSERT INTO cuocphivanchuyen (kvvc_ma, tvc_ma, klkh_ma, dvvc_ma, cpvc_thoidiem, cpvc_gia)
       VALUES ($1, $2, $3, $4, CURRENT_TIMESTAMP, $5)
       RETURNING *
     `;
-    const values = [data.kvvc_ma, data.tvc_ma, data.klkh_ma, data.dvvc_ma, data.cpvc_gia];
+    const values = [kvvc_ma, tvc_ma, klkh_ma, dvvc_ma, cpvc_gia];
     const res = await pool.query(query, values);
+
+    // 1. Thông báo cho các shop gắn với ĐVVC này (sau khi đã ghi giá mới)
+    try {
+      const shopRes = await pool.query(
+        `SELECT gh_ma FROM gianhang_donvivanchuyen WHERE dvvc_ma = $1`,
+        [dvvc_ma],
+      );
+
+      const ten = tenRes.rows[0] || {};
+      const khuVuc = ten.kvvc_ten || kvvc_ma;
+      const tuyen = ten.tvc_ten || tvc_ma;
+      const khoiLuong = ten.klkh_ten || klkh_ma;
+      const giaCu = cuRes.rows[0]?.cpvc_gia;
+
+      const noiDung =
+        giaCu === undefined || giaCu === null
+          ? `Cước vận chuyển khu vực ${khuVuc}, tuyến ${tuyen}, khối lượng ${khoiLuong} được cập nhật thành ${tien(cpvc_gia)}.`
+          : `Cước vận chuyển khu vực ${khuVuc}, tuyến ${tuyen}, khối lượng ${khoiLuong} thay đổi từ ${tien(giaCu)} thành ${tien(cpvc_gia)}.`;
+
+      await ThongBaoService.thongBaoDoiCuoc({
+        dvvc_ma,
+        tieu_de: `Thay đổi cước vận chuyển: ${khuVuc} - ${tuyen}`,
+        noi_dung: noiDung,
+        doituong_ma: kvvc_ma,
+        ds_gh_ma: shopRes.rows.map((r) => r.gh_ma),
+      });
+    } catch (error) {
+      console.error('❌ Lỗi gửi thông báo đổi cước vận chuyển:', error.message);
+    }
+
     return res.rows[0];
   },
 
