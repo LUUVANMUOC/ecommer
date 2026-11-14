@@ -5,11 +5,13 @@ const path = require('path');
 
 const UPLOAD_DIR = path.join(__dirname, '../../../public/uploads/products');
 
+// phisanchieckhau.psck_phantram LUÔN lưu theo đơn vị % (10.00 = 10%, 1.00 = 1%).
+// Phải luôn chia 100 để khớp với datHangService.calculatePlatformFee
+// và phiChiecKhauModel.updateFee (cả hai đều dùng phantram / 100).
 const tinhGianBan = (gb_gia, psck_phantram) => {
     const giaGoc = Number(gb_gia) || 0;
-    const psckRaw = Number(psck_phantram) || 0;
-    const psckDecimal = psckRaw > 1 ? psckRaw / 100 : psckRaw;
-    const ctsp_gianban = giaGoc * (1 + psckDecimal);
+    const phanTram = Number(psck_phantram) || 0;
+    const ctsp_gianban = giaGoc * (1 + phanTram / 100);
     return Math.round(ctsp_gianban * 100) / 100;
 };
 

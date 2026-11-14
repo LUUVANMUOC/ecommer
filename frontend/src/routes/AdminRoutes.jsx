@@ -3,6 +3,7 @@ import { Routes, Route } from "react-router-dom";
 import ProtectedRoute from "./ProtectedRoute";
 import AdminDashboard from "../pages/admin/Dashboard";
 import QuanLyPhiVanChuyen from "../pages/admin/QuanLyPhiVanChuyen";
+import ThongKeNganhHang from "../pages/admin/ThongKeNganhHang";
 
 import MaGiamGiaSanCRUD from "../pages/admin/MaGiamGiaSanCRUD";
 import PhiChiecKhauCRUD from "../pages/admin/PhiChiecKhauCRUD";
@@ -16,7 +17,6 @@ import ThongTinSan from "../pages/admin/ThongTinSan";
 import QuanLyDonHangAdmin from "../pages/admin/QuanLyDonHangAdmin";
 import LichSuThanhToanVanChuyen from "../pages/admin/LichSuThanhToanVanChuyen";
 import QuanLyDongTien from "../pages/admin/QuanLyDongTien";
-// 🟢 Import trang Thanh toán vận chuyển
 import ThanhToanVanChuyen from "../pages/admin/ThanhToanVanChuyen";
 
 const AdminRoutes = () => {
@@ -50,7 +50,6 @@ const AdminRoutes = () => {
           <Route path="quan-ly-don-hang" element={<QuanLyDonHangAdmin />} />
 
           <Route path="quan-ly-dong-tien" element={<QuanLyDongTien />} />
-          {/* 🟢 Thêm Route cho trang Thanh toán vận chuyển */}
           <Route
             path="thanh-toan-van-chuyen"
             element={<ThanhToanVanChuyen />}
@@ -59,9 +58,14 @@ const AdminRoutes = () => {
             path="lich-su-van-chuyen"
             element={<LichSuThanhToanVanChuyen />}
           />
+
+          {/* 2 route này phải nằm trong layout Dashboard để có sidebar */}
+          <Route
+            path="quan-ly-phi-van-chuyen"
+            element={<QuanLyPhiVanChuyen />}
+          />
+          <Route path="thong-ke-nganh-hang" element={<ThongKeNganhHang />} />
         </Route>
-        // Route
-        <Route path="quan-ly-phi-van-chuyen" element={<QuanLyPhiVanChuyen />} />
       </Route>
     </Routes>
   );

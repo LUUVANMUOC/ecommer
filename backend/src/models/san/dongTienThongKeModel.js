@@ -4,6 +4,10 @@
 //  - Chỉ tính tiền THỰC THU: phieu_tat_toan có ptt_trang_thai_thanh_toan = 'DA_THANH_TOAN'
 //  - Mốc thời gian: ptt_thoi_diem_hoan_tat (KHÔNG dùng ptt_ngay_tat_toan vì đó là lúc tạo phiếu)
 //  - Tiền vào kho: shipper đã nộp tiền (ttgh_da_nop_tien = true) theo ttgh_thoidiem_nop
+//  - Chi trả ĐVVC: phieu_chi_dvvc đã thanh toán; pcd_tong_tien chỉ gồm phần sàn bù
+//    voucher ship (tổng dts_tonggiamgiavanchuyen của các đơn trong phiếu)
+//  - Tiền ship ĐVVC nhận: dts_tienvanchuyen (khách trả) + dts_tonggiamgiavanchuyen (sàn bù),
+//    tính theo ngày lập đơn, loại đơn có trạng thái mới nhất là TTDH06 (Đã hủy)
 //  - Quy đổi múi giờ Việt Nam ngay trong SQL, không đổi cấu hình DB
 
 const pool = require('../../config/db');
@@ -36,6 +40,10 @@ const DongTienThongKeModel = {
           SELECT EXTRACT(YEAR FROM ttgh_thoidiem_nop AT TIME ZONE '${TZ}')::int AS nam
           FROM thongtingiaohang
           WHERE ttgh_thoidiem_nop IS NOT NULL
+          UNION
+          SELECT EXTRACT(YEAR FROM dts_ngaylap AT TIME ZONE '${TZ}')::int AS nam
+          FROM donhangtheoshop
+          WHERE dts_ngaylap IS NOT NULL
         ) x
         WHERE nam IS NOT NULL
         ORDER BY nam DESC
@@ -92,11 +100,31 @@ const DongTienThongKeModel = {
         WHERE pcd_trang_thai = 'DA_THANH_TOAN'
           AND pcd_ngay_hoan_tat >= ${TU('$2')}
           AND pcd_ngay_hoan_tat <  ${DEN('$3')}
+      ),
+      ship AS (
+        SELECT COALESCE(
+                 SUM(COALESCE(o.dts_tienvanchuyen, 0)
+                     + COALESCE(o.dts_tonggiamgiavanchuyen, 0)), 0
+               ) AS ship_dvvc,
+               COALESCE(SUM(o.dts_tienvanchuyen), 0) AS ship_khach_tra,
+               COALESCE(SUM(o.dts_tonggiamgiavanchuyen), 0) AS ship_san_bu,
+               COUNT(*)::int AS so_don_ship
+        FROM donhangtheoshop o
+        WHERE o.dts_ngaylap >= ${TU('$2')}
+          AND o.dts_ngaylap <  ${DEN('$3')}
+          AND COALESCE((
+            SELECT c.ttdh_ma
+            FROM chitiettrangthaidonhang c
+            WHERE c.dts_ma = o.dts_ma
+            ORDER BY c.ctttdh_thoidiem DESC
+            LIMIT 1
+          ), '') <> 'TTDH06'
       )
       SELECT vao.tien_vao, vao.so_don_cod,
              ra.tra_shop, ra.tra_san, ra.so_phieu,
-             don.so_don_tt, dvvc.chi_dvvc
-      FROM vao, ra, don, dvvc
+             don.so_don_tt, dvvc.chi_dvvc,
+             ship.ship_dvvc, ship.ship_khach_tra, ship.ship_san_bu, ship.so_don_ship
+      FROM vao, ra, don, dvvc, ship
     `;
 
     // ---------- 2.2. Series theo 12 tháng của năm được chọn ----------
@@ -269,6 +297,10 @@ const DongTienThongKeModel = {
         tra_shop,
         tra_san,
         chi_dvvc,
+        ship_dvvc: num(k.ship_dvvc),
+        ship_khach_tra: num(k.ship_khach_tra),
+        ship_san_bu: num(k.ship_san_bu),
+        so_don_ship: num(k.so_don_ship),
         so_phieu: num(k.so_phieu),
         so_don_tt: num(k.so_don_tt),
         so_don_cod: num(k.so_don_cod),

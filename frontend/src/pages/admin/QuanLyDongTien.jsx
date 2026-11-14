@@ -174,25 +174,25 @@ const QuanLyDongTien = () => {
           hint: "Phí sàn thu được từ các kho",
         },
         {
+          icon: "delivery_dining",
+          label: "Tiền ship ĐVVC nhận",
+          value: money(kpi.ship_dvvc),
+          tone: "blue",
+          hint: `Khách trả + sàn bù · ${kpi.so_don_ship ?? 0} đơn`,
+        },
+        {
           icon: "local_shipping",
-          label: "Chi trả ĐVVC",
+          label: "Đã chi trả ĐVVC",
           value: money(kpi.chi_dvvc),
           tone: "red",
-          hint: "Toàn hệ thống, không phân bổ theo kho",
+          hint: "Phần sàn bù voucher ship đã trả · toàn hệ thống",
         },
         {
           icon: "trending_up",
           label: "Lãi sau chi ĐVVC",
           value: money(kpi.lai_san),
           tone: "indigo",
-          hint: "Doanh thu sàn − chi ĐVVC",
-        },
-        {
-          icon: "inventory_2",
-          label: "COD phát sinh",
-          value: money(kpi.tien_vao),
-          tone: "blue",
-          hint: "Tiền shipper đã nộp kho (tham khảo)",
+          hint: "Doanh thu sàn − phần sàn bù đã trả ĐVVC",
         },
         {
           icon: "receipt_long",
@@ -289,7 +289,11 @@ const QuanLyDongTien = () => {
         value: kpi.tra_san || 0,
         color: CHART_COLORS.san,
       },
-      { label: "Chi ĐVVC", value: kpi.chi_dvvc || 0, color: CHART_COLORS.dvvc },
+      {
+        label: "Đã chi ĐVVC",
+        value: kpi.chi_dvvc || 0,
+        color: CHART_COLORS.dvvc,
+      },
     ],
     [kpi],
   );
@@ -422,7 +426,11 @@ const QuanLyDongTien = () => {
 
   const chartLabels =
     filters.che_do === "san"
-      ? { vao: "Doanh thu phí sàn", ra: "Chi ĐVVC", net: "Lãi" }
+      ? {
+          vao: "Doanh thu phí sàn",
+          ra: "Đã chi trả ĐVVC",
+          net: "Lãi",
+        }
       : { vao: "Tiền vào kho", ra: "Tiền ra", net: "Còn giữ" };
 
   return (
@@ -495,7 +503,7 @@ const QuanLyDongTien = () => {
                 data={chartNam}
                 labels={
                   filters.che_do === "san"
-                    ? { a: "Doanh thu sàn", b: "Chi ĐVVC" }
+                    ? { a: "Doanh thu sàn", b: "Đã chi trả ĐVVC" }
                     : { a: "Tiền vào", b: "Phí sàn" }
                 }
               />
@@ -505,10 +513,14 @@ const QuanLyDongTien = () => {
           </SectionCard>
 
           <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] leading-relaxed text-amber-800">
-            Lưu ý: phiếu chờ thu bị hệ thống tự dọn sau 2 phút nên không dùng
-            làm số liệu lịch sử. Báo cáo chỉ tính phiếu
-            <strong> Đã thu đủ</strong>; nếu một phiếu mới thu một phần QR rồi
-            bị dọn, phần đó sẽ không xuất hiện.
+            Quy ước: <strong>Tiền ship ĐVVC nhận</strong> = phí ship khách trả (
+            <code>dts_tienvanchuyen</code>) + phần sàn bù voucher ship (
+            <code>dts_tonggiamgiavanchuyen</code>), tính theo ngày lập đơn và
+            không gồm đơn đã hủy. <strong>Đã chi trả ĐVVC</strong> chỉ là phần
+            sàn bù voucher ship đã thanh toán qua phiếu chi; phần khách trả nằm
+            trong COD shipper thu nên không đi qua phiếu chi. Phiếu chờ thu bị
+            hệ thống tự dọn sau 2 phút nên không dùng làm số liệu lịch sử; báo
+            cáo chỉ tính phiếu <strong> Đã thu đủ</strong>.
           </p>
         </div>
       )}

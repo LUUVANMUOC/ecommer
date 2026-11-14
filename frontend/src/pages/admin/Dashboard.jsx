@@ -34,17 +34,21 @@ const AdminDashboard = () => {
       title: "Thông tin sàn",
       path: "/admin/thong-tin-san",
     },
-    {
-      title: "Quản lý dòng tiền",
-      path: "/admin/quan-ly-dong-tien",
-    },
+
     // 🟢 THÊM MỤC MỚI TẠI ĐÂY
     {
       title: "Thanh toán Vận chuyển",
       path: "/admin/thanh-toan-van-chuyen",
     },
-    { title: "Lịch sử trả phí Ship", path: "/admin/lich-su-van-chuyen" },
-    { title: "Quản lý phí vận chuyển", path: "/admin/quan-ly-phi-van-chuyen" },
+    // { title: "Lịch sử trả phí Ship", path: "/admin/lich-su-van-chuyen" },
+
+    {
+      title: "Thống kê & Báo cáo",
+      children: [
+        { title: "Thống kê ngành hàng", path: "/admin/thong-ke-nganh-hang" },
+        { title: "Thống kê vận chuyển", path: "/admin/quan-ly-phi-van-chuyen" },
+      ],
+    },
   ];
 
   // 2. Cấu hình Màu sắc riêng cho Admin

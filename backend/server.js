@@ -80,6 +80,8 @@ const maGiamGiaVanChuyenRoutesKH = require('./src/routes/khachhang/maGiamGiaVanC
 const maGiamGiaShopRoutesKH = require('./src/routes/khachhang/maGiamGiaShopRoutes');
 const datHangRoutes = require('./src/routes/khachhang/datHangRoutes');
 const donHangRoutes = require('./src/routes/khachhang/donHangRoutes');
+const thongKeNganhHangRoutes = require('./src/routes/san/thongKeNganhHangRoutes');
+
 
 // Khác
 const trangThaiDonHangRoutes = require('./src/routes/san/trangThaiDonHangRoutes');
@@ -198,6 +200,8 @@ app.use('/api/khach-hang/don-hang', donHangRoutes);
 app.post('/api/khach-hang/tinh-phi-ship', phiVanChuyenController.calculateFee);
 app.use('/api/dong-tien', dongTienRoutes);
 app.use('/api/phi-van-chuyen', phiVanChuyenRoutes);
+app.use('/api/admin/thong-ke-nganh-hang', thongKeNganhHangRoutes);
+app.use('/api/admin/thong-ke-nganh-hang', thongKeNganhHangRoutes);
 
 // 9. Trạng thái đơn hàng
 app.use('/api/trang-thai-don-hang', trangThaiDonHangRoutes);

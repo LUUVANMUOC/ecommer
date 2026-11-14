@@ -20,10 +20,11 @@ const ThanhToanVanChuyenModel = {
   // 2. Lấy chi tiết đơn nợ
   getChiTietNo: async (dvvc_ma) => {
     const query = `
-      SELECT dts_ma, dts_tonggiamgiavanchuyen AS tien_ship
+      SELECT dts_ma, dts_ngaylap, dts_tonggiamgiavanchuyen AS tien_ship
       FROM donhangtheoshop
       WHERE dvvc_ma = $1 AND dts_tonggiamgiavanchuyen > 0
         AND dts_ma NOT IN (SELECT dts_ma FROM chitiet_chi_dvvc)
+      ORDER BY dts_ngaylap ASC, dts_ma ASC
     `;
     const result = await pool.query(query, [dvvc_ma]);
     return result.rows;
