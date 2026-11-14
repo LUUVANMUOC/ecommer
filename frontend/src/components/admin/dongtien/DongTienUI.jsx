@@ -77,12 +77,13 @@ export const KpiCard = ({ icon, label, value, hint, tone = "slate" }) => {
 };
 
 export const FilterBar = ({
-  danhMuc,
+  danhMuc = {},
   filters,
   onChange,
   onReload,
   loading,
   onExport,
+  extra = null,
 }) => {
   const set = (key, value) => onChange({ ...filters, [key]: value });
 
@@ -92,7 +93,7 @@ export const FilterBar = ({
         <span className="text-xs font-medium text-slate-500">Kho</span>
         <select
           className={`${INPUT} min-w-[180px]`}
-          value={filters.kho_ma}
+          value={filters.kho_ma || ""}
           onChange={(e) => set("kho_ma", e.target.value)}
         >
           <option value="">Tất cả kho</option>
@@ -123,7 +124,7 @@ export const FilterBar = ({
         <span className="text-xs font-medium text-slate-500">Tháng</span>
         <select
           className={`${INPUT} w-[130px]`}
-          value={filters.thang}
+          value={filters.thang || ""}
           onChange={(e) => set("thang", e.target.value)}
         >
           <option value="">Cả năm</option>
@@ -135,28 +136,7 @@ export const FilterBar = ({
         </select>
       </label>
 
-      <div className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-slate-500">Chế độ</span>
-        <div className="flex h-10 overflow-hidden rounded-lg border border-slate-200">
-          {[
-            { key: "kho", label: "Dòng tiền kho" },
-            { key: "san", label: "Doanh thu sàn" },
-          ].map((m) => (
-            <button
-              key={m.key}
-              type="button"
-              onClick={() => set("che_do", m.key)}
-              className={`px-3 text-sm font-medium transition-colors ${
-                filters.che_do === m.key
-                  ? "bg-[#1e3a5f] text-white"
-                  : "bg-white text-slate-600 hover:bg-slate-50"
-              }`}
-            >
-              {m.label}
-            </button>
-          ))}
-        </div>
-      </div>
+      {extra}
 
       <div className="ml-auto flex items-center gap-2">
         <button
@@ -176,7 +156,9 @@ export const FilterBar = ({
           className="flex h-10 items-center gap-1.5 rounded-lg bg-[#1e3a5f] px-4 text-sm font-semibold text-white transition-colors hover:bg-[#2a4b73] disabled:opacity-60"
         >
           <span
-            className={`material-symbols-outlined text-[18px] ${loading ? "animate-spin" : ""}`}
+            className={`material-symbols-outlined text-[18px] ${
+              loading ? "animate-spin" : ""
+            }`}
           >
             refresh
           </span>
@@ -201,6 +183,26 @@ export const TabBar = ({ tabs, active, onChange }) => (
         }`}
       >
         {t.label}
+      </button>
+    ))}
+  </div>
+);
+
+export const ViewToggle = ({ views = [], active, onChange }) => (
+  <div className="flex shrink-0 flex-wrap rounded-xl border border-slate-200 bg-slate-50 p-1">
+    {views.map((v) => (
+      <button
+        key={v.id}
+        type="button"
+        onClick={() => onChange(v.id)}
+        className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${
+          active === v.id
+            ? "bg-[#1e3a5f] text-white shadow-sm"
+            : "text-slate-600 hover:bg-white"
+        }`}
+      >
+        <span className="material-symbols-outlined text-[16px]">{v.icon}</span>
+        {v.label}
       </button>
     ))}
   </div>
@@ -261,10 +263,32 @@ export const StatusBadge = ({ status }) => {
   );
 };
 
-export const Pager = ({ page, totalPages, total, onChange }) => (
+const NOTE_TONES = {
+  amber: "border-amber-200 bg-amber-50 text-amber-800",
+  sky: "border-sky-200 bg-sky-50 text-sky-800",
+  slate: "border-slate-200 bg-slate-50 text-slate-600",
+};
+
+export const NoteBox = ({ tone = "amber", children }) => (
+  <div
+    className={`rounded-xl border px-4 py-3 text-[11px] leading-relaxed ${
+      NOTE_TONES[tone] || NOTE_TONES.amber
+    }`}
+  >
+    {children}
+  </div>
+);
+
+export const Pager = ({
+  page,
+  totalPages,
+  total,
+  onChange,
+  unit = "phiếu",
+}) => (
   <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
     <p className="text-xs text-slate-500">
-      Tổng <strong className="text-slate-700">{total ?? 0}</strong> phiếu
+      Tổng <strong className="text-slate-700">{total ?? 0}</strong> {unit}
     </p>
     <div className="flex items-center gap-1">
       <button

@@ -1,7 +1,18 @@
 // frontend/src/components/admin/dongtien/PhieuChiTietDrawer.jsx
 import { money, fmtDate, StatusBadge, EmptyState } from "./DongTienUI";
 
-const PhieuChiTietDrawer = ({ open, onClose, data, loading }) => {
+const doanhThuDon = (d) =>
+  (Number(d?.dts_tienvanchuyen) || 0) +
+  (Number(d?.dts_tonggiamgiavanchuyen) || 0);
+
+const PhieuChiTietDrawer = ({
+  open,
+  onClose,
+  data,
+  loading,
+  variant = "kho",
+}) => {
+  const laKho = variant === "kho";
   const phieu = data?.phieu;
   const donHang = data?.don_hang || [];
   const qr = data?.qr || [];
@@ -24,7 +35,7 @@ const PhieuChiTietDrawer = ({ open, onClose, data, loading }) => {
         <div className="flex items-start justify-between gap-3 border-b border-slate-200 px-6 py-5">
           <div>
             <h2 className="text-lg font-bold text-slate-900">
-              Chi tiết phiếu tất toán
+              {laKho ? "Chi tiết phiếu tất toán" : "Chi tiết phiếu thu phí sàn"}
             </h2>
             <p className="mt-0.5 text-sm text-slate-500">
               {phieu ? `${phieu.ptt_ma} · ${phieu.kho_ten}` : "Đang tải..."}
@@ -133,7 +144,11 @@ const PhieuChiTietDrawer = ({ open, onClose, data, loading }) => {
                           {money(q.qr_so_tien)}
                         </p>
                         <p
-                          className={`text-[11px] font-medium ${q.qr_trang_thai === "DA_THANH_TOAN" ? "text-emerald-600" : "text-amber-600"}`}
+                          className={`text-[11px] font-medium ${
+                            q.qr_trang_thai === "DA_THANH_TOAN"
+                              ? "text-emerald-600"
+                              : "text-amber-600"
+                          }`}
                         >
                           {q.qr_trang_thai === "DA_THANH_TOAN"
                             ? "Đã thanh toán"
@@ -150,13 +165,18 @@ const PhieuChiTietDrawer = ({ open, onClose, data, loading }) => {
                   Đơn hàng trong phiếu
                 </h3>
                 <div className="overflow-x-auto rounded-lg border border-slate-200">
-                  <table className="w-full min-w-[440px] text-left text-sm">
+                  <table className="w-full min-w-[560px] text-left text-sm">
                     <thead className="bg-slate-50 text-xs uppercase text-slate-500">
                       <tr>
                         <th className="px-3 py-2">Đơn</th>
                         <th className="px-3 py-2">Shop</th>
                         <th className="px-3 py-2 text-right">Phí sàn</th>
                         <th className="px-3 py-2 text-right">Tiền shop</th>
+                        {laKho && (
+                          <th className="px-3 py-2 text-right">
+                            Doanh thu kho
+                          </th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
@@ -165,7 +185,7 @@ const PhieuChiTietDrawer = ({ open, onClose, data, loading }) => {
                           <td className="px-3 py-2 font-mono text-xs text-indigo-600">
                             {d.dts_ma}
                           </td>
-                          <td className="max-w-[140px] truncate px-3 py-2 text-slate-700">
+                          <td className="max-w-[120px] truncate px-3 py-2 text-slate-700">
                             {d.gh_ten || "—"}
                           </td>
                           <td className="px-3 py-2 text-right text-slate-700">
@@ -174,12 +194,17 @@ const PhieuChiTietDrawer = ({ open, onClose, data, loading }) => {
                           <td className="px-3 py-2 text-right text-slate-700">
                             {money(d.ctt_tien_shop)}
                           </td>
+                          {laKho && (
+                            <td className="px-3 py-2 text-right font-semibold text-emerald-700">
+                              {money(doanhThuDon(d))}
+                            </td>
+                          )}
                         </tr>
                       ))}
                       {donHang.length === 0 && (
                         <tr>
                           <td
-                            colSpan="4"
+                            colSpan={laKho ? 5 : 4}
                             className="px-3 py-6 text-center text-slate-400"
                           >
                             Không có đơn hàng.
@@ -189,6 +214,21 @@ const PhieuChiTietDrawer = ({ open, onClose, data, loading }) => {
                     </tbody>
                   </table>
                 </div>
+                <p className="mt-2 text-[11px] leading-relaxed text-slate-400">
+                  {laKho ? (
+                    <>
+                      Doanh thu kho mỗi đơn = tiền ship khách trả (
+                      <code>dts_tienvanchuyen</code>) + voucher ship sàn chuyển
+                      cho kho (<code>dts_tonggiamgiavanchuyen</code>).
+                    </>
+                  ) : (
+                    <>
+                      Phí sàn mỗi đơn là phần sàn giữ lại trên đơn (
+                      <code>ctt_tien_san</code>); tiền shop là phần kho trả lại
+                      cho shop (<code>ctt_tien_shop</code>).
+                    </>
+                  )}
+                </p>
               </div>
             </>
           )}

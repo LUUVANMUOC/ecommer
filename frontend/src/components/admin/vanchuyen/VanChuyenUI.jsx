@@ -8,6 +8,8 @@ export const FilterBarVC = ({
   onReload,
   loading,
   onExport,
+  showKho = true,
+  showDvvc = true,
   showTrangThai = false,
   trangThaiOptions = [],
   extra = null,
@@ -17,23 +19,43 @@ export const FilterBarVC = ({
 
   return (
     <div className="flex flex-wrap items-end gap-3 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <label className="flex flex-col gap-1">
-        <span className="text-xs font-medium text-slate-500">
-          Đơn vị vận chuyển
-        </span>
-        <select
-          className={`${INPUT} min-w-[200px]`}
-          value={filters.dvvc_ma || ""}
-          onChange={(e) => set("dvvc_ma", e.target.value)}
-        >
-          <option value="">Tất cả ĐVVC</option>
-          {(danhMuc.dvvc || []).map((d) => (
-            <option key={d.dvvc_ma} value={d.dvvc_ma}>
-              {d.dvvc_ten}
-            </option>
-          ))}
-        </select>
-      </label>
+      {showKho && (
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-slate-500">Kho</span>
+          <select
+            className={`${INPUT} min-w-[180px]`}
+            value={filters.kho_ma || ""}
+            onChange={(e) => set("kho_ma", e.target.value)}
+          >
+            <option value="">Tất cả kho</option>
+            {(danhMuc.kho || []).map((k) => (
+              <option key={k.kho_ma} value={k.kho_ma}>
+                {k.kho_ten}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+
+      {showDvvc && (
+        <label className="flex flex-col gap-1">
+          <span className="text-xs font-medium text-slate-500">
+            Đơn vị vận chuyển
+          </span>
+          <select
+            className={`${INPUT} min-w-[200px]`}
+            value={filters.dvvc_ma || ""}
+            onChange={(e) => set("dvvc_ma", e.target.value)}
+          >
+            <option value="">Tất cả ĐVVC</option>
+            {(danhMuc.dvvc || []).map((d) => (
+              <option key={d.dvvc_ma} value={d.dvvc_ma}>
+                {d.dvvc_ten}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
 
       <label className="flex flex-col gap-1">
         <span className="text-xs font-medium text-slate-500">Năm</span>

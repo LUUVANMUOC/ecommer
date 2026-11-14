@@ -32,4 +32,6 @@ router.get('/:id', TrangThaiChiTietSanPhamController.getById);
 // ==========================================================
 router.post('/gui-duyet', TrangThaiChiTietSanPhamController.submitForApproval);
 router.post('/gui-duyet-hang-loat', TrangThaiChiTietSanPhamController.submitAllForApproval); // 🟢 Thêm dòng này
+router.get('/admin/san-pham-phan-trang', TrangThaiChiTietSanPhamController.getSanPhamPhanTrang);
+
 module.exports = router;

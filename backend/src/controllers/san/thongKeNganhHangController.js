@@ -4,12 +4,13 @@ const Model = require('../../models/san/thongKeNganhHangModel');
 const namHienTai = () => new Date().getFullYear();
 
 const layPhamVi = (req) => {
-  const { nh_ma, gh_ma, nam, thang } = req.query;
+  const { nh_ma, gh_ma, th_ma, nam, thang } = req.query;
   const m = Number(thang);
 
   return {
     nh_ma: nh_ma || null,
     gh_ma: gh_ma || null,
+    th_ma: th_ma || null,
     nam: Number(nam) || namHienTai(),
     thang: m >= 1 && m <= 12 ? m : null,
   };
@@ -42,6 +43,22 @@ const ThongKeNganhHangController = {
       res.status(200).json(await Model.getTheoNganh(layPhamVi(req)));
     } catch (e) {
       loi(res, e, 'thống kê theo ngành hàng');
+    }
+  },
+
+  getTheoThuongHieu: async (req, res) => {
+    try {
+      const { q, page, limit } = req.query;
+      res.status(200).json(
+        await Model.getTheoThuongHieu({
+          ...layPhamVi(req),
+          q: q || null,
+          page: Number(page) || 1,
+          limit: Number(limit) || 10,
+        })
+      );
+    } catch (e) {
+      loi(res, e, 'thống kê theo thương hiệu');
     }
   },
 

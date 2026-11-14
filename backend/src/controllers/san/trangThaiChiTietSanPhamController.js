@@ -229,6 +229,38 @@ const TrangThaiChiTietSanPhamController = {
             res.status(400).json({ message: error.message });
         }
     },
+        // ==========================================================
+    // H. ADMIN — sản phẩm toàn sàn có phân trang + tìm kiếm + lọc
+    //    GET /api/trang-thai-chi-tiet/admin/san-pham-phan-trang
+    // ==========================================================
+        getSanPhamPhanTrang: async (req, res) => {
+        try {
+            const { q, gh_ma, trang_thai, nh_ma, page, limit } = req.query;
+            const TRANG_THAI_HOP_LE = [
+                'TTCTSP0001',
+                'TTCTSP0002',
+                'TTCTSP0003',
+                'DEFAULT',
+            ];
+            const nh_ma_hop_le = /^NH_[0-9]+$/.test(String(nh_ma || ''))
+                ? String(nh_ma)
+                : null;
+
+            const data = await TrangThaiChiTietSanPhamModel.getSanPhamPhanTrang({
+                q: String(q || '').trim() || null,
+                gh_ma: gh_ma || null,
+                trang_thai: TRANG_THAI_HOP_LE.includes(trang_thai) ? trang_thai : null,
+                nh_ma: nh_ma_hop_le,
+                page: Number(page) || 1,
+                limit: Number(limit) || 24,
+            });
+
+            res.status(200).json(data);
+        } catch (error) {
+            console.error('Lỗi lấy sản phẩm phân trang:', error);
+            res.status(500).json({ message: error.message });
+        }
+    },
 };
 
 module.exports = TrangThaiChiTietSanPhamController;

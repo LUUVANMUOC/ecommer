@@ -1,3 +1,4 @@
+// backend/src/controllers/san/phiVanChuyenController.js
 const PhiVanChuyenModel = require('../../models/san/phiVanChuyenModel');
 const PhiVanChuyenThongKeModel = require('../../models/san/phiVanChuyenThongKeModel');
 
@@ -6,27 +7,38 @@ const PhiVanChuyenController = {
     try {
       const data = await PhiVanChuyenModel.getDanhSachPhiVanChuyen('ADMIN');
       res.status(200).json(data);
-    } catch (error) { res.status(500).json({ message: error.message }); }
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
   },
 
   getDVVC: async (req, res) => {
     try {
-      const data = await PhiVanChuyenModel.getDanhSachPhiVanChuyen('DVVC', req.params.dvvc_ma);
+      const data = await PhiVanChuyenModel.getDanhSachPhiVanChuyen(
+        'DVVC',
+        req.params.dvvc_ma
+      );
       res.status(200).json(data);
-    } catch (error) { res.status(500).json({ message: error.message }); }
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
   },
 
   // ================= THỐNG KÊ =================
   getDanhMuc: async (req, res) => {
-    try { res.status(200).json(await PhiVanChuyenThongKeModel.getDanhMuc()); }
-    catch (error) { res.status(500).json({ message: error.message }); }
+    try {
+      res.status(200).json(await PhiVanChuyenThongKeModel.getDanhMuc());
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
   },
 
   getTongQuan: async (req, res) => {
     try {
-      const { dvvc_ma, nam, thang } = req.query;
+      const { dvvc_ma, kho_ma, nam, thang } = req.query;
       const data = await PhiVanChuyenThongKeModel.getTongQuan({
         dvvc_ma: dvvc_ma || null,
+        kho_ma: kho_ma || null,
         nam: Number(nam) || new Date().getFullYear(),
         thang: thang ? Number(thang) : null,
       });
@@ -39,9 +51,11 @@ const PhiVanChuyenController = {
 
   getDanhSach: async (req, res) => {
     try {
-      const { dvvc_ma, nam, thang, trang_thai, q, page, limit } = req.query;
+      const { dvvc_ma, kho_ma, nam, thang, trang_thai, q, page, limit } =
+        req.query;
       const data = await PhiVanChuyenThongKeModel.getDanhSach({
         dvvc_ma: dvvc_ma || null,
+        kho_ma: kho_ma || null,
         nam: Number(nam) || new Date().getFullYear(),
         thang: thang ? Number(thang) : null,
         trang_thai: trang_thai || null,

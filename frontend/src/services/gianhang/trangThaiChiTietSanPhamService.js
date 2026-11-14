@@ -17,7 +17,9 @@ const trangThaiChiTietSanPhamService = {
 
     // Admin
     getChoDuyet: () => axiosClient.get(`${BASE}/admin/cho-duyet`),
-    getAllSanPham: () => axiosClient.get(`${BASE}/admin/tat-ca-san-pham`), // <-- MỚI
+    getAllSanPham: () => axiosClient.get(`${BASE}/admin/tat-ca-san-pham`),
+    getSanPhamPhanTrang: (params) =>
+        axiosClient.get(`${BASE}/admin/san-pham-phan-trang`, { params }),
     approve: (ctsp_ma, phanhoi) =>
         axiosClient.post(`${BASE}/admin/${ctsp_ma}/duyet`, { phanhoi }),
     suspend: (ctsp_ma, phanhoi) =>

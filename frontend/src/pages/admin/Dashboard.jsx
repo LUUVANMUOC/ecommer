@@ -34,19 +34,20 @@ const AdminDashboard = () => {
       title: "Thông tin sàn",
       path: "/admin/thong-tin-san",
     },
-
-    // 🟢 THÊM MỤC MỚI TẠI ĐÂY
     {
       title: "Thanh toán Vận chuyển",
       path: "/admin/thanh-toan-van-chuyen",
     },
-    // { title: "Lịch sử trả phí Ship", path: "/admin/lich-su-van-chuyen" },
 
     {
       title: "Thống kê & Báo cáo",
       children: [
-        { title: "Thống kê ngành hàng", path: "/admin/thong-ke-nganh-hang" },
-        { title: "Thống kê vận chuyển", path: "/admin/quan-ly-phi-van-chuyen" },
+        { title: "Thống kê hàng", path: "/admin/thong-ke-nganh-hang" },
+        { title: "Doanh thu sàn", path: "/admin/thong-ke-dong-tien" },
+        {
+          title: "Vận chuyển & dòng tiền kho",
+          path: "/admin/quan-ly-phi-van-chuyen",
+        },
       ],
     },
   ];

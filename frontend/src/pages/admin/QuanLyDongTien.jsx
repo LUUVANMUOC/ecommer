@@ -1,4 +1,6 @@
 // frontend/src/pages/admin/QuanLyDongTien.jsx
+// Trang DOANH THU SÀN: chỉ thống kê phí sàn thu được + tiền đã chi cho ĐVVC.
+// (Dòng tiền kho đã chuyển sang trang Vận chuyển & dòng tiền kho.)
 import { useState, useEffect, useCallback, useMemo } from "react";
 import dongTienService from "../../services/san/dongTienService";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
@@ -8,45 +10,111 @@ import {
   fmtDate,
   KpiCard,
   FilterBar,
-  TabBar,
   SectionCard,
   EmptyState,
   StatusBadge,
+  ViewToggle,
+  NoteBox,
   Pager,
 } from "../../components/admin/dongtien/DongTienUI";
-import {
-  BarLineChart,
-  YearLineChart,
-  DonutChart,
-  StackedBarChart,
-  CHART_COLORS,
-} from "../../components/admin/dongtien/Charts";
 import PhieuChiTietDrawer from "../../components/admin/dongtien/PhieuChiTietDrawer";
 
 const NAM_HIEN_TAI = new Date().getFullYear();
-const TABS = [
-  { key: "tong-quan", label: "Tổng quan" },
-  { key: "theo-kho", label: "Theo kho" },
-  { key: "theo-thang", label: "Theo tháng" },
-  { key: "theo-nam", label: "Theo năm" },
-  { key: "giao-dich", label: "Giao dịch" },
+
+const VIEWS = [
+  { id: "theo-kho", label: "Theo kho", icon: "warehouse" },
+  { id: "theo-thang", label: "Theo tháng", icon: "calendar_month" },
+  { id: "theo-nam", label: "Theo năm", icon: "event_note" },
+  { id: "giao-dich", label: "Giao dịch", icon: "receipt_long" },
 ];
+
+const KHO_PAGE_SIZES = [10, 20, 50];
+
 const TH =
   "whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500";
 const TD = "px-3 py-2.5 text-sm text-slate-700";
 
+const ZERO_KHO = { so_phieu: 0, so_don: 0, doanh_thu_san: 0, tra_shop: 0 };
+
+const congKho = (rows) =>
+  rows.reduce(
+    (a, k) => ({
+      so_phieu: a.so_phieu + (Number(k.so_phieu) || 0),
+      so_don: a.so_don + (Number(k.so_don) || 0),
+      doanh_thu_san: a.doanh_thu_san + (Number(k.doanh_thu_san) || 0),
+      tra_shop: a.tra_shop + (Number(k.tra_shop) || 0),
+    }),
+    { ...ZERO_KHO },
+  );
+
+const ZERO_KY = {
+  so_phieu: 0,
+  so_don: 0,
+  doanh_thu_san: 0,
+  tra_shop: 0,
+  chi_dvvc: 0,
+  lai_san: 0,
+};
+
+const congKy = (rows) =>
+  rows.reduce(
+    (a, t) => ({
+      so_phieu: a.so_phieu + (Number(t.so_phieu) || 0),
+      so_don: a.so_don + (Number(t.so_don) || 0),
+      doanh_thu_san: a.doanh_thu_san + (Number(t.doanh_thu_san) || 0),
+      tra_shop: a.tra_shop + (Number(t.tra_shop) || 0),
+      chi_dvvc: a.chi_dvvc + (Number(t.chi_dvvc) || 0),
+      lai_san: a.lai_san + (Number(t.lai_san) || 0),
+    }),
+    { ...ZERO_KY },
+  );
+
+const pct = (v, total) => {
+  const t = Number(total) || 0;
+  if (!t) return "0.0";
+  return (((Number(v) || 0) / t) * 100).toFixed(1);
+};
+
+const downloadCsv = (name, headers, rows) => {
+  const csv = [headers, ...rows]
+    .map((r) =>
+      r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(","),
+    )
+    .join("\n");
+  const url = URL.createObjectURL(
+    new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }),
+  );
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `${name}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+};
+
 const QuanLyDongTien = () => {
-  const [danhMuc, setDanhMuc] = useState({ kho: [], nam: [NAM_HIEN_TAI] });
+  const [danhMuc, setDanhMuc] = useState({
+    kho: [],
+    nam: [NAM_HIEN_TAI],
+    nam_hien_tai: NAM_HIEN_TAI,
+  });
   const [filters, setFilters] = useState({
     kho_ma: "",
     nam: String(NAM_HIEN_TAI),
     thang: "",
-    che_do: "kho",
   });
+
+  const [viewMode, setViewMode] = useState("theo-kho");
+
+  // Phân trang bảng "Theo kho"
+  const [khoPage, setKhoPage] = useState(1);
+  const [khoPageSize, setKhoPageSize] = useState(10);
+
   const [tongQuan, setTongQuan] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("tong-quan");
 
+  // Giao dịch
   const [txFilter, setTxFilter] = useState({
     trang_thai: "",
     q: "",
@@ -62,17 +130,18 @@ const QuanLyDongTien = () => {
   });
   const [txLoading, setTxLoading] = useState(false);
 
+  // Drawer chi tiết phiếu
   const [detail, setDetail] = useState({
     open: false,
     loading: false,
     data: null,
   });
+
   const [toast, setToast] = useState({
     show: false,
     message: "",
     type: "success",
   });
-
   const showToast = useCallback((message, type = "success") => {
     setToast({ show: true, message, type });
     setTimeout(() => setToast((p) => ({ ...p, show: false })), 3000);
@@ -81,16 +150,16 @@ const QuanLyDongTien = () => {
   // ---- Danh mục kho/năm ----
   useEffect(() => {
     dongTienService
-      .getDanhMuc()
+      .getDanhMucDoanhThuSan()
       .then((r) => setDanhMuc(r.data))
       .catch(() => showToast("Không tải được danh mục kho/năm", "error"));
   }, [showToast]);
 
-  // ---- Tổng quan ----
+  // ---- Tổng quan: KPI + bảng theo kho/tháng/năm ----
   const loadTongQuan = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await dongTienService.getTongQuan({
+      const res = await dongTienService.getTongQuanDoanhThuSan({
         kho_ma: filters.kho_ma || undefined,
         nam: filters.nam,
         thang: filters.thang || undefined,
@@ -98,7 +167,7 @@ const QuanLyDongTien = () => {
       setTongQuan(res.data);
     } catch (e) {
       showToast(
-        e.response?.data?.message || "Lỗi tải tổng quan dòng tiền",
+        e.response?.data?.message || "Lỗi tải tổng quan doanh thu sàn",
         "error",
       );
     } finally {
@@ -110,51 +179,63 @@ const QuanLyDongTien = () => {
     loadTongQuan();
   }, [loadTongQuan]);
 
-  // ---- Giao dịch ----
+  // Đổi bộ lọc chung → về trang 1 của bảng giao dịch và bảng kho
   useEffect(() => {
     setTxFilter((p) => (p.page === 1 ? p : { ...p, page: 1 }));
+    setKhoPage(1);
   }, [filters.kho_ma, filters.nam, filters.thang]);
 
+  // ---- Danh sách phiếu tất toán (chỉ tải khi mở chế độ Giao dịch) ----
+  const loadGiaoDich = useCallback(async () => {
+    if (viewMode !== "giao-dich") return;
+    setTxLoading(true);
+    try {
+      const res = await dongTienService.getGiaoDichDoanhThuSan({
+        kho_ma: filters.kho_ma || undefined,
+        nam: filters.nam,
+        thang: filters.thang || undefined,
+        trang_thai: txFilter.trang_thai || undefined,
+        q: txFilter.q || undefined,
+        page: txFilter.page,
+        limit: txFilter.limit,
+      });
+      setGiaoDich(res.data);
+    } catch (e) {
+      showToast(
+        e.response?.data?.message || "Lỗi tải danh sách giao dịch",
+        "error",
+      );
+    } finally {
+      setTxLoading(false);
+    }
+  }, [
+    viewMode,
+    filters.kho_ma,
+    filters.nam,
+    filters.thang,
+    txFilter,
+    showToast,
+  ]);
+
   useEffect(() => {
-    if (tab !== "giao-dich") return;
-    let alive = true;
-    (async () => {
-      setTxLoading(true);
-      try {
-        const res = await dongTienService.getGiaoDich({
-          kho_ma: filters.kho_ma || undefined,
-          nam: filters.nam,
-          thang: filters.thang || undefined,
-          trang_thai: txFilter.trang_thai || undefined,
-          q: txFilter.q || undefined,
-          page: txFilter.page,
-          limit: txFilter.limit,
-        });
-        if (alive) setGiaoDich(res.data);
-      } catch (e) {
-        if (alive)
-          showToast(
-            e.response?.data?.message || "Lỗi tải danh sách giao dịch",
-            "error",
-          );
-      } finally {
-        if (alive) setTxLoading(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [tab, filters.kho_ma, filters.nam, filters.thang, txFilter, showToast]);
+    if (viewMode !== "giao-dich") return;
+    loadGiaoDich();
+  }, [viewMode, loadGiaoDich]);
 
   const openDetail = async (ptt_ma) => {
     setDetail({ open: true, loading: true, data: null });
     try {
-      const res = await dongTienService.getPhieuChiTiet(ptt_ma);
+      const res = await dongTienService.getPhieuChiTietDoanhThuSan(ptt_ma);
       setDetail({ open: true, loading: false, data: res.data });
     } catch {
       setDetail({ open: true, loading: false, data: null });
       showToast("Không tải được chi tiết phiếu", "error");
     }
+  };
+
+  const reloadAll = () => {
+    loadTongQuan();
+    if (viewMode === "giao-dich") loadGiaoDich();
   };
 
   // ---- Dữ liệu dẫn xuất ----
@@ -163,674 +244,696 @@ const QuanLyDongTien = () => {
   const theoThang = tongQuan?.theo_thang || [];
   const theoNam = tongQuan?.theo_nam || [];
 
+  // Lãi chỉ đúng khi không lọc 1 kho (chi ĐVVC không gắn kho)
+  const hienLai = !filters.kho_ma;
+
+  // Tổng toàn bộ kho (dùng cho % và footer)
+  const tongKhoAll = useMemo(() => congKho(theoKho), [theoKho]);
+
+  // Phân trang kho
+  const totalKhoPages = Math.max(1, Math.ceil(theoKho.length / khoPageSize));
+  const khoPageSafe = Math.min(khoPage, totalKhoPages);
+  const theoKhoTrang = useMemo(() => {
+    const start = (khoPageSafe - 1) * khoPageSize;
+    return theoKho.slice(start, start + khoPageSize);
+  }, [theoKho, khoPageSafe, khoPageSize]);
+  const tongKhoTrang = useMemo(() => congKho(theoKhoTrang), [theoKhoTrang]);
+
+  const startIdx =
+    theoKho.length === 0 ? 0 : (khoPageSafe - 1) * khoPageSize + 1;
+  const endIdx = Math.min(khoPageSafe * khoPageSize, theoKho.length);
+
+  const tongThang = useMemo(() => congKy(theoThang), [theoThang]);
+  const tongNam = useMemo(() => congKy(theoNam), [theoNam]);
+
   const kpiCards = useMemo(() => {
-    if (filters.che_do === "san") {
-      return [
-        {
-          icon: "savings",
-          label: "Doanh thu phí sàn",
-          value: money(kpi.tra_san),
-          tone: "emerald",
-          hint: "Phí sàn thu được từ các kho",
-        },
-        {
-          icon: "delivery_dining",
-          label: "Tiền ship ĐVVC nhận",
-          value: money(kpi.ship_dvvc),
-          tone: "blue",
-          hint: `Khách trả + sàn bù · ${kpi.so_don_ship ?? 0} đơn`,
-        },
-        {
-          icon: "local_shipping",
-          label: "Đã chi trả ĐVVC",
-          value: money(kpi.chi_dvvc),
-          tone: "red",
-          hint: "Phần sàn bù voucher ship đã trả · toàn hệ thống",
-        },
-        {
-          icon: "trending_up",
-          label: "Lãi sau chi ĐVVC",
-          value: money(kpi.lai_san),
-          tone: "indigo",
-          hint: "Doanh thu sàn − phần sàn bù đã trả ĐVVC",
-        },
-        {
-          icon: "receipt_long",
-          label: "Số phiếu tất toán",
-          value: String(kpi.so_phieu ?? 0),
-          tone: "slate",
-        },
-        {
-          icon: "shopping_bag",
-          label: "Số đơn trong phiếu",
-          value: String(kpi.so_don_tt ?? 0),
-          tone: "slate",
-        },
-      ];
-    }
-    return [
-      {
-        icon: "account_balance_wallet",
-        label: "Tiền vào kho (COD)",
-        value: money(kpi.tien_vao),
-        tone: "blue",
-        hint: "Shipper đã nộp tiền",
-      },
-      {
-        icon: "storefront",
-        label: "Đã trả shop",
-        value: money(kpi.tra_shop),
-        tone: "indigo",
-        hint: "Chỉ tính phiếu đã thu đủ",
-      },
+    const cards = [
       {
         icon: "percent",
-        label: "Đã trả phí sàn",
-        value: money(kpi.tra_san),
-        tone: "amber",
+        label: "Doanh thu phí sàn",
+        value: money(kpi.doanh_thu_san),
+        tone: "emerald",
+        hint: filters.kho_ma
+          ? "Phí sàn của kho đang chọn · chỉ tính phiếu đã thu đủ"
+          : "Tổng phí sàn thu từ các phiếu tất toán đã thu đủ",
       },
       {
-        icon: "savings",
-        label: "Còn giữ tại kho",
-        value: money(kpi.con_giu),
-        tone: kpi.con_giu < 0 ? "red" : "emerald",
-        hint: "Tiền vào − trả shop − phí sàn",
-      },
-      {
-        icon: "receipt_long",
-        label: "Số phiếu tất toán",
-        value: String(kpi.so_phieu ?? 0),
-        tone: "slate",
-      },
-      {
-        icon: "shopping_bag",
-        label: "Số đơn trong phiếu",
-        value: String(kpi.so_don_tt ?? 0),
-        tone: "slate",
+        icon: "local_shipping",
+        label: "Đã chi cho ĐVVC",
+        value: money(kpi.chi_dvvc),
+        tone: "red",
+        hint: "Sàn bù voucher ship đã thanh toán · toàn hệ thống",
       },
     ];
-  }, [filters.che_do, kpi]);
+    // Chi ĐVVC không gắn kho_ma nên không tính Lãi khi đang lọc 1 kho
+    if (hienLai) {
+      cards.push({
+        icon: "trending_up",
+        label: "Lãi",
+        value: money(kpi.lai_san),
+        tone: "indigo",
+        hint: "Doanh thu phí sàn − tổng tiền đã chi cho ĐVVC",
+      });
+    }
+    return cards;
+  }, [hienLai, filters.kho_ma, kpi]);
 
-  const chartThang = useMemo(
-    () =>
-      theoThang.map((r) =>
-        filters.che_do === "san"
-          ? {
-              label: `T${r.thang}`,
-              vao: r.tra_san,
-              ra: r.chi_dvvc,
-              net: r.tra_san - r.chi_dvvc,
-            }
-          : {
-              label: `T${r.thang}`,
-              vao: r.tien_vao,
-              ra: r.tra_shop + r.tra_san,
-              net: r.tien_vao - r.tra_shop - r.tra_san,
-            },
-      ),
-    [theoThang, filters.che_do],
-  );
-
-  const chartNam = useMemo(
-    () =>
-      theoNam.map((r) =>
-        filters.che_do === "san"
-          ? { label: `T${r.nam}`, a: r.tra_san, b: r.chi_dvvc }
-          : { label: `T${r.nam}`, a: r.tien_vao, b: r.tra_san },
-      ),
-    [theoNam, filters.che_do],
-  );
-
-  const donutItems = useMemo(
-    () => [
-      { label: "Trả shop", value: kpi.tra_shop || 0, color: CHART_COLORS.shop },
-      {
-        label: "Trả phí sàn",
-        value: kpi.tra_san || 0,
-        color: CHART_COLORS.san,
-      },
-      {
-        label: "Đã chi ĐVVC",
-        value: kpi.chi_dvvc || 0,
-        color: CHART_COLORS.dvvc,
-      },
-    ],
-    [kpi],
-  );
-
-  const stackedRows = useMemo(
-    () =>
-      theoKho.slice(0, 8).map((k) => ({
-        label: k.kho_ten,
-        parts: [
-          { label: "Trả shop", value: k.tra_shop, color: CHART_COLORS.shop },
-          { label: "Trả sàn", value: k.tra_san, color: CHART_COLORS.san },
-          {
-            label: "Còn giữ",
-            value: Math.max(k.con_giu, 0),
-            color: CHART_COLORS.giu,
-          },
-        ],
-      })),
-    [theoKho],
-  );
-
-  const tongTraSan = useMemo(
-    () => theoKho.reduce((s, k) => s + k.tra_san, 0),
-    [theoKho],
-  );
-
-  // ---- Xuất CSV ----
+  // ---- Xuất CSV theo đúng bảng đang xem ----
   const exportCsv = () => {
-    let headers, rows, name;
-    if (tab === "theo-kho") {
-      headers = [
-        "Mã kho",
-        "Tên kho",
+    const suffix = `${filters.nam}${filters.thang ? `-T${filters.thang}` : ""}`;
+
+    if (viewMode === "theo-kho") {
+      if (theoKho.length === 0)
+        return showToast("Không có dữ liệu để xuất", "error");
+      downloadCsv(
+        `doanh-thu-san-theo-kho-${suffix}`,
+        [
+          "Mã kho",
+          "Tên kho",
+          "Số phiếu",
+          "Số đơn",
+          "Doanh thu phí sàn",
+          "Tiền trả shop",
+          "% doanh thu",
+        ],
+        theoKho.map((k) => [
+          k.kho_ma,
+          k.kho_ten,
+          k.so_phieu,
+          k.so_don,
+          k.doanh_thu_san,
+          k.tra_shop,
+          pct(k.doanh_thu_san, tongKhoAll.doanh_thu_san),
+        ]),
+      );
+    } else if (viewMode === "theo-thang" || viewMode === "theo-nam") {
+      const laThang = viewMode === "theo-thang";
+      const rowsData = laThang ? theoThang : theoNam;
+      if (rowsData.length === 0)
+        return showToast("Không có dữ liệu để xuất", "error");
+
+      const headers = [
+        laThang ? "Tháng" : "Năm",
         "Số phiếu",
         "Số đơn",
-        "Tiền vào",
-        "Trả shop",
-        "Trả sàn",
-        "Còn giữ",
-      ];
-      rows = theoKho.map((k) => [
-        k.kho_ma,
-        k.kho_ten,
-        k.so_phieu,
-        k.so_don,
-        k.tien_vao,
-        k.tra_shop,
-        k.tra_san,
-        k.con_giu,
-      ]);
-      name = "dong-tien-theo-kho";
-    } else if (tab === "theo-thang") {
-      headers = [
-        "Tháng",
-        "Tiền vào",
-        "Trả shop",
-        "Trả sàn",
+        "Doanh thu phí sàn",
+        "Tiền trả shop",
         "Chi ĐVVC",
-        "Chênh lệch",
       ];
-      rows = theoThang.map((t) => [
-        t.thang,
-        t.tien_vao,
-        t.tra_shop,
-        t.tra_san,
-        t.chi_dvvc,
-        t.tien_vao - t.tra_shop - t.tra_san,
-      ]);
-      name = `dong-tien-thang-${filters.nam}`;
-    } else if (tab === "theo-nam") {
-      headers = [
-        "Năm",
-        "Tiền vào",
-        "Trả shop",
-        "Trả sàn",
-        "Chi ĐVVC",
-        "Chênh lệch",
-      ];
-      rows = theoNam.map((t) => [
-        t.nam,
-        t.tien_vao,
-        t.tra_shop,
-        t.tra_san,
-        t.chi_dvvc,
-        t.tien_vao - t.tra_shop - t.tra_san,
-      ]);
-      name = "dong-tien-theo-nam";
-    } else if (tab === "giao-dich") {
-      headers = [
-        "Mã phiếu",
-        "Kho",
-        "Ngày tạo",
-        "Ngày hoàn tất",
-        "Số đơn",
-        "Phí sàn",
-        "Tiền shop",
-        "Trạng thái",
-      ];
-      rows = giaoDich.rows.map((r) => [
-        r.ptt_ma,
-        r.kho_ten,
-        fmtDate(r.ptt_ngay_tat_toan),
-        fmtDate(r.ptt_thoi_diem_hoan_tat),
-        r.so_don,
-        r.ptt_tong_tien_san,
-        r.ptt_tong_tien_shop,
-        r.ptt_trang_thai_thanh_toan,
-      ]);
-      name = "giao-dich-tat-toan";
+      if (hienLai) headers.push("Lãi");
+
+      downloadCsv(
+        laThang
+          ? `doanh-thu-san-theo-thang-${filters.nam}`
+          : "doanh-thu-san-theo-nam",
+        headers,
+        rowsData.map((t) => {
+          const r = [
+            laThang ? t.thang : t.nam,
+            t.so_phieu,
+            t.so_don,
+            t.doanh_thu_san,
+            t.tra_shop,
+            t.chi_dvvc,
+          ];
+          if (hienLai) r.push(t.lai_san);
+          return r;
+        }),
+      );
     } else {
-      return showToast("Chọn tab có bảng dữ liệu để xuất CSV", "error");
+      if (giaoDich.rows.length === 0)
+        return showToast("Không có giao dịch để xuất", "error");
+      downloadCsv(
+        `doanh-thu-san-giao-dich-${suffix}`,
+        [
+          "Mã phiếu",
+          "Kho",
+          "Ngày tạo",
+          "Hoàn tất",
+          "Số đơn",
+          "Phí sàn",
+          "Tiền shop",
+          "QR đã TT",
+          "Tổng QR",
+          "Trạng thái",
+        ],
+        giaoDich.rows.map((r) => [
+          r.ptt_ma,
+          r.kho_ten,
+          fmtDate(r.ptt_ngay_tat_toan),
+          fmtDate(r.ptt_thoi_diem_hoan_tat),
+          r.so_don,
+          r.ptt_tong_tien_san,
+          r.ptt_tong_tien_shop,
+          r.so_qr_da_tt,
+          r.so_qr,
+          r.ptt_trang_thai_thanh_toan,
+        ]),
+      );
     }
-    const csv = [headers, ...rows]
-      .map((r) =>
-        r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(","),
-      )
-      .join("\n");
-    const url = URL.createObjectURL(
-      new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }),
-    );
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `${name}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+
     showToast("Đã xuất file CSV");
   };
 
-  const chartLabels =
-    filters.che_do === "san"
-      ? {
-          vao: "Doanh thu phí sàn",
-          ra: "Đã chi trả ĐVVC",
-          net: "Lãi",
-        }
-      : { vao: "Tiền vào kho", ra: "Tiền ra", net: "Còn giữ" };
+  const sectionTitle =
+    viewMode === "theo-kho"
+      ? "Doanh thu phí sàn theo kho"
+      : viewMode === "theo-thang"
+        ? `Doanh thu phí sàn 12 tháng năm ${filters.nam}`
+        : viewMode === "theo-nam"
+          ? "Doanh thu phí sàn theo năm"
+          : "Danh sách phiếu tất toán";
+
+  const sectionSubtitle =
+    viewMode === "theo-kho"
+      ? "Chỉ tính phiếu tất toán Đã thu đủ · mốc thời gian = ngày hoàn tất phiếu"
+      : viewMode === "theo-thang"
+        ? "Mốc thời gian = ngày hoàn tất phiếu · Chi ĐVVC là số toàn hệ thống"
+        : viewMode === "theo-nam"
+          ? "Toàn bộ các năm có phát sinh · Chi ĐVVC là số toàn hệ thống"
+          : "Bấm vào dòng để xem chi tiết đơn hàng và mã QR";
+
+  const busy = loading || (viewMode === "giao-dich" && txLoading);
 
   return (
     <div className="min-h-screen space-y-5 bg-[#F8FAFC] p-6">
       <div>
-        <h1 className="text-2xl font-bold text-[#0F172A]">Quản lý dòng tiền</h1>
-        <p className="mt-1 text-sm text-[#64748B]">
-          Theo dõi tiền vào – tiền ra theo kho, tháng, năm. Số liệu chỉ tính
-          phiếu đã thu đủ và các đơn shipper đã nộp tiền.
-        </p>
+        <h1 className="text-2xl font-bold text-[#0F172A]">Doanh thu sàn</h1>
       </div>
 
       <FilterBar
         danhMuc={danhMuc}
         filters={filters}
         onChange={setFilters}
-        onReload={loadTongQuan}
-        loading={loading}
+        onReload={reloadAll}
+        loading={busy}
         onExport={exportCsv}
       />
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+      <div
+        className={`grid gap-3 sm:grid-cols-2 ${
+          kpiCards.length >= 3 ? "xl:grid-cols-3" : ""
+        }`}
+      >
         {kpiCards.map((c) => (
           <KpiCard key={c.label} {...c} />
         ))}
       </div>
 
-      <TabBar tabs={TABS} active={tab} onChange={setTab} />
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-xs text-slate-500">
+        <span>
+          <strong className="text-slate-700">{kpi.so_phieu ?? 0}</strong> phiếu
+          tất toán
+        </span>
+        <span>
+          <strong className="text-slate-700">{kpi.so_don ?? 0}</strong> đơn
+          trong phiếu
+        </span>
+        <span>
+          Tiền trả shop:{" "}
+          <strong className="text-slate-700">{money(kpi.tra_shop)}</strong>
+        </span>
+        {filters.kho_ma && (
+          <span className="font-medium text-amber-600">
+            Đang lọc 1 kho: "Đã chi cho ĐVVC" là số toàn hệ thống nên không tính
+            Lãi.
+          </span>
+        )}
+      </div>
 
-      {tab === "tong-quan" && (
-        <div className="space-y-4">
-          <SectionCard
-            title="Thu – chi theo tháng"
-            subtitle={`Năm ${filters.nam}${filters.thang ? ` · đang lọc tháng ${filters.thang}` : ""}`}
-          >
-            {chartThang.length ? (
-              <BarLineChart data={chartThang} labels={chartLabels} />
-            ) : (
+      <SectionCard
+        title={sectionTitle}
+        subtitle={sectionSubtitle}
+        action={
+          <ViewToggle views={VIEWS} active={viewMode} onChange={setViewMode} />
+        }
+      >
+        {viewMode === "theo-kho" && (
+          <>
+            {loading ? (
+              <p className="py-10 text-center text-sm text-slate-500">
+                Đang tải doanh thu theo kho...
+              </p>
+            ) : theoKho.length === 0 ? (
               <EmptyState />
-            )}
-          </SectionCard>
-
-          <div className="grid gap-4 xl:grid-cols-3">
-            <SectionCard
-              className="xl:col-span-2"
-              title="Cơ cấu theo kho"
-              subtitle="Top 8 kho theo tổng phát sinh"
-            >
-              {stackedRows.length ? (
-                <StackedBarChart rows={stackedRows} />
-              ) : (
-                <EmptyState />
-              )}
-            </SectionCard>
-            <SectionCard
-              title="Cơ cấu chi ra"
-              subtitle="Shop · Sàn · ĐVVC"
-              className="self-start"
-            >
-              <DonutChart items={donutItems} />
-            </SectionCard>
-          </div>
-
-          <SectionCard
-            title="Xu hướng theo năm"
-            subtitle="So sánh các năm có phát sinh"
-          >
-            {chartNam.length ? (
-              <YearLineChart
-                data={chartNam}
-                labels={
-                  filters.che_do === "san"
-                    ? { a: "Doanh thu sàn", b: "Đã chi trả ĐVVC" }
-                    : { a: "Tiền vào", b: "Phí sàn" }
-                }
-              />
             ) : (
-              <EmptyState />
+              <>
+                {/* Thanh chọn trang + số kho mỗi trang */}
+                <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                  <p className="text-xs text-slate-500">
+                    Đang xem{" "}
+                    <strong className="text-slate-700">
+                      {startIdx}–{endIdx}
+                    </strong>{" "}
+                    /{" "}
+                    <strong className="text-slate-700">{theoKho.length}</strong>{" "}
+                    kho có phát sinh · sắp xếp theo doanh thu phí sàn giảm dần
+                  </p>
+
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-slate-500">
+                        Trang
+                      </span>
+                      <select
+                        className={`${INPUT} w-[90px]`}
+                        value={khoPageSafe}
+                        onChange={(e) => setKhoPage(Number(e.target.value))}
+                      >
+                        {Array.from(
+                          { length: totalKhoPages },
+                          (_, i) => i + 1,
+                        ).map((p) => (
+                          <option key={p} value={p}>
+                            {p}
+                          </option>
+                        ))}
+                      </select>
+                      <span className="text-xs text-slate-500">
+                        / {totalKhoPages}
+                      </span>
+                    </label>
+
+                    <label className="flex items-center gap-2">
+                      <span className="text-xs font-medium text-slate-500">
+                        Số kho/trang
+                      </span>
+                      <select
+                        className={`${INPUT} w-[90px]`}
+                        value={khoPageSize}
+                        onChange={(e) => {
+                          setKhoPageSize(Number(e.target.value));
+                          setKhoPage(1);
+                        }}
+                      >
+                        {KHO_PAGE_SIZES.map((n) => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="w-full min-w-[860px] border-collapse">
+                    <thead className="border-b border-slate-200 bg-slate-50">
+                      <tr>
+                        <th className={TH}>Kho</th>
+                        <th className={`${TH} text-right`}>Số phiếu</th>
+                        <th className={`${TH} text-right`}>Số đơn</th>
+                        <th className={`${TH} text-right`}>
+                          Doanh thu phí sàn
+                        </th>
+                        <th className={`${TH} text-right`}>Tiền trả shop</th>
+                        <th className={`${TH} text-right`}>% doanh thu</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100">
+                      {theoKhoTrang.map((k) => (
+                        <tr key={k.kho_ma} className="hover:bg-slate-50/70">
+                          <td className={`${TD} font-medium`}>{k.kho_ten}</td>
+                          <td className={`${TD} text-right`}>{k.so_phieu}</td>
+                          <td className={`${TD} text-right`}>{k.so_don}</td>
+                          <td
+                            className={`${TD} text-right font-semibold ${
+                              k.doanh_thu_san < 0
+                                ? "text-rose-600"
+                                : "text-emerald-700"
+                            }`}
+                          >
+                            {money(k.doanh_thu_san)}
+                          </td>
+                          <td className={`${TD} text-right text-indigo-700`}>
+                            {money(k.tra_shop)}
+                          </td>
+                          <td className={`${TD} text-right text-slate-500`}>
+                            {pct(k.doanh_thu_san, tongKhoAll.doanh_thu_san)}%
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                    <tfoot className="border-t-2 border-slate-200 bg-slate-50 font-semibold">
+                      <tr className="border-b border-slate-200">
+                        <td className={TD}>
+                          Trang này ({theoKhoTrang.length} kho)
+                        </td>
+                        <td className={`${TD} text-right`}>
+                          {tongKhoTrang.so_phieu}
+                        </td>
+                        <td className={`${TD} text-right`}>
+                          {tongKhoTrang.so_don}
+                        </td>
+                        <td
+                          className={`${TD} text-right ${
+                            tongKhoTrang.doanh_thu_san < 0
+                              ? "text-rose-600"
+                              : "text-emerald-700"
+                          }`}
+                        >
+                          {money(tongKhoTrang.doanh_thu_san)}
+                        </td>
+                        <td className={`${TD} text-right text-indigo-700`}>
+                          {money(tongKhoTrang.tra_shop)}
+                        </td>
+                        <td className={`${TD} text-right text-slate-500`}>
+                          {pct(
+                            tongKhoTrang.doanh_thu_san,
+                            tongKhoAll.doanh_thu_san,
+                          )}
+                          %
+                        </td>
+                      </tr>
+                      <tr>
+                        <td className={TD}>Tất cả ({theoKho.length} kho)</td>
+                        <td className={`${TD} text-right`}>
+                          {tongKhoAll.so_phieu}
+                        </td>
+                        <td className={`${TD} text-right`}>
+                          {tongKhoAll.so_don}
+                        </td>
+                        <td
+                          className={`${TD} text-right ${
+                            tongKhoAll.doanh_thu_san < 0
+                              ? "text-rose-600"
+                              : "text-emerald-700"
+                          }`}
+                        >
+                          {money(tongKhoAll.doanh_thu_san)}
+                        </td>
+                        <td className={`${TD} text-right text-indigo-700`}>
+                          {money(tongKhoAll.tra_shop)}
+                        </td>
+                        <td className={`${TD} text-right text-slate-500`}>
+                          100.0%
+                        </td>
+                      </tr>
+                    </tfoot>
+                  </table>
+                </div>
+
+                <Pager
+                  page={khoPageSafe}
+                  totalPages={totalKhoPages}
+                  total={theoKho.length}
+                  unit="kho"
+                  onChange={setKhoPage}
+                />
+              </>
             )}
-          </SectionCard>
+          </>
+        )}
 
-          <p className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-[11px] leading-relaxed text-amber-800">
-            Quy ước: <strong>Tiền ship ĐVVC nhận</strong> = phí ship khách trả (
-            <code>dts_tienvanchuyen</code>) + phần sàn bù voucher ship (
-            <code>dts_tonggiamgiavanchuyen</code>), tính theo ngày lập đơn và
-            không gồm đơn đã hủy. <strong>Đã chi trả ĐVVC</strong> chỉ là phần
-            sàn bù voucher ship đã thanh toán qua phiếu chi; phần khách trả nằm
-            trong COD shipper thu nên không đi qua phiếu chi. Phiếu chờ thu bị
-            hệ thống tự dọn sau 2 phút nên không dùng làm số liệu lịch sử; báo
-            cáo chỉ tính phiếu <strong> Đã thu đủ</strong>.
-          </p>
-        </div>
-      )}
-
-      {tab === "theo-kho" && (
-        <SectionCard
-          title="Dòng tiền theo kho"
-          subtitle="Tính theo khoảng thời gian đang lọc"
-        >
-          {theoKho.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] border-collapse">
-                <thead className="border-b border-slate-200 bg-slate-50">
-                  <tr>
-                    <th className={TH}>Kho</th>
-                    <th className={`${TH} text-right`}>Số phiếu</th>
-                    <th className={`${TH} text-right`}>Số đơn</th>
-                    <th className={`${TH} text-right`}>Tiền vào</th>
-                    <th className={`${TH} text-right`}>Trả shop</th>
-                    <th className={`${TH} text-right`}>Trả sàn</th>
-                    <th className={`${TH} text-right`}>Còn giữ</th>
-                    <th className={`${TH} text-right`}>% phí sàn</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {theoKho.map((k) => (
-                    <tr key={k.kho_ma} className="hover:bg-slate-50/70">
-                      <td className={`${TD} font-medium`}>{k.kho_ten}</td>
-                      <td className={`${TD} text-right`}>{k.so_phieu}</td>
-                      <td className={`${TD} text-right`}>{k.so_don}</td>
-                      <td className={`${TD} text-right text-sky-700`}>
-                        {money(k.tien_vao)}
-                      </td>
-                      <td className={`${TD} text-right text-indigo-700`}>
-                        {money(k.tra_shop)}
-                      </td>
-                      <td className={`${TD} text-right text-amber-700`}>
-                        {money(k.tra_san)}
-                      </td>
-                      <td
-                        className={`${TD} text-right font-semibold ${k.con_giu < 0 ? "text-rose-600" : "text-emerald-700"}`}
-                      >
-                        {money(k.con_giu)}
-                      </td>
-                      <td className={`${TD} text-right text-slate-500`}>
-                        {tongTraSan
-                          ? ((k.tra_san / tongTraSan) * 100).toFixed(1)
-                          : "0.0"}
-                        %
-                      </td>
+        {viewMode === "theo-thang" && (
+          <>
+            {loading ? (
+              <p className="py-10 text-center text-sm text-slate-500">
+                Đang tải doanh thu theo tháng...
+              </p>
+            ) : theoThang.length === 0 ? (
+              <EmptyState />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[920px] border-collapse">
+                  <thead className="border-b border-slate-200 bg-slate-50">
+                    <tr>
+                      <th className={TH}>Tháng</th>
+                      <th className={`${TH} text-right`}>Số phiếu</th>
+                      <th className={`${TH} text-right`}>Số đơn</th>
+                      <th className={`${TH} text-right`}>Doanh thu phí sàn</th>
+                      <th className={`${TH} text-right`}>Tiền trả shop</th>
+                      <th className={`${TH} text-right`}>Chi ĐVVC</th>
+                      {hienLai && <th className={`${TH} text-right`}>Lãi</th>}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </SectionCard>
-      )}
-
-      {tab === "theo-thang" && (
-        <SectionCard
-          title={`Dòng tiền 12 tháng năm ${filters.nam}`}
-          subtitle="Chi ĐVVC là số toàn hệ thống, không phân bổ theo kho"
-        >
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[760px] border-collapse">
-              <thead className="border-b border-slate-200 bg-slate-50">
-                <tr>
-                  <th className={TH}>Tháng</th>
-                  <th className={`${TH} text-right`}>Tiền vào</th>
-                  <th className={`${TH} text-right`}>Trả shop</th>
-                  <th className={`${TH} text-right`}>Trả sàn</th>
-                  <th className={`${TH} text-right`}>Chi ĐVVC</th>
-                  <th className={`${TH} text-right`}>Chênh lệch</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-100">
-                {theoThang.map((t) => {
-                  const net = t.tien_vao - t.tra_shop - t.tra_san;
-                  return (
-                    <tr key={t.thang} className="hover:bg-slate-50/70">
-                      <td className={`${TD} font-medium`}>Tháng {t.thang}</td>
-                      <td className={`${TD} text-right text-sky-700`}>
-                        {money(t.tien_vao)}
-                      </td>
-                      <td className={`${TD} text-right text-indigo-700`}>
-                        {money(t.tra_shop)}
-                      </td>
-                      <td className={`${TD} text-right text-amber-700`}>
-                        {money(t.tra_san)}
-                      </td>
-                      <td className={`${TD} text-right text-rose-600`}>
-                        {money(t.chi_dvvc)}
-                      </td>
-                      <td
-                        className={`${TD} text-right font-semibold ${net < 0 ? "text-rose-600" : "text-emerald-700"}`}
-                      >
-                        {money(net)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-              <tfoot className="border-t-2 border-slate-200 bg-slate-50 font-semibold">
-                <tr>
-                  <td className={TD}>Tổng</td>
-                  <td className={`${TD} text-right text-sky-700`}>
-                    {money(theoThang.reduce((s, t) => s + t.tien_vao, 0))}
-                  </td>
-                  <td className={`${TD} text-right text-indigo-700`}>
-                    {money(theoThang.reduce((s, t) => s + t.tra_shop, 0))}
-                  </td>
-                  <td className={`${TD} text-right text-amber-700`}>
-                    {money(theoThang.reduce((s, t) => s + t.tra_san, 0))}
-                  </td>
-                  <td className={`${TD} text-right text-rose-600`}>
-                    {money(theoThang.reduce((s, t) => s + t.chi_dvvc, 0))}
-                  </td>
-                  <td className={`${TD} text-right text-emerald-700`}>
-                    {money(
-                      theoThang.reduce(
-                        (s, t) => s + t.tien_vao - t.tra_shop - t.tra_san,
-                        0,
-                      ),
-                    )}
-                  </td>
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        </SectionCard>
-      )}
-
-      {tab === "theo-nam" && (
-        <SectionCard
-          title="Dòng tiền theo năm"
-          subtitle="Toàn bộ các năm có phát sinh"
-        >
-          {theoNam.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[760px] border-collapse">
-                <thead className="border-b border-slate-200 bg-slate-50">
-                  <tr>
-                    <th className={TH}>Năm</th>
-                    <th className={`${TH} text-right`}>Tiền vào</th>
-                    <th className={`${TH} text-right`}>Trả shop</th>
-                    <th className={`${TH} text-right`}>Trả sàn</th>
-                    <th className={`${TH} text-right`}>Chi ĐVVC</th>
-                    <th className={`${TH} text-right`}>Chênh lệch</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {theoNam.map((t) => {
-                    const net = t.tien_vao - t.tra_shop - t.tra_san;
-                    return (
-                      <tr key={t.nam} className="hover:bg-slate-50/70">
-                        <td className={`${TD} font-medium`}>Năm {t.nam}</td>
-                        <td className={`${TD} text-right text-sky-700`}>
-                          {money(t.tien_vao)}
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {theoThang.map((t) => (
+                      <tr key={t.thang} className="hover:bg-slate-50/70">
+                        <td className={`${TD} font-medium`}>Tháng {t.thang}</td>
+                        <td className={`${TD} text-right`}>{t.so_phieu}</td>
+                        <td className={`${TD} text-right`}>{t.so_don}</td>
+                        <td className={`${TD} text-right text-emerald-700`}>
+                          {money(t.doanh_thu_san)}
                         </td>
                         <td className={`${TD} text-right text-indigo-700`}>
                           {money(t.tra_shop)}
                         </td>
-                        <td className={`${TD} text-right text-amber-700`}>
-                          {money(t.tra_san)}
+                        <td className={`${TD} text-right text-rose-600`}>
+                          {money(t.chi_dvvc)}
+                        </td>
+                        {hienLai && (
+                          <td
+                            className={`${TD} text-right font-semibold ${
+                              t.lai_san < 0
+                                ? "text-rose-600"
+                                : "text-indigo-700"
+                            }`}
+                          >
+                            {money(t.lai_san)}
+                          </td>
+                        )}
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot className="border-t-2 border-slate-200 bg-slate-50 font-semibold">
+                    <tr>
+                      <td className={TD}>Tổng</td>
+                      <td className={`${TD} text-right`}>
+                        {tongThang.so_phieu}
+                      </td>
+                      <td className={`${TD} text-right`}>{tongThang.so_don}</td>
+                      <td className={`${TD} text-right text-emerald-700`}>
+                        {money(tongThang.doanh_thu_san)}
+                      </td>
+                      <td className={`${TD} text-right text-indigo-700`}>
+                        {money(tongThang.tra_shop)}
+                      </td>
+                      <td className={`${TD} text-right text-rose-600`}>
+                        {money(tongThang.chi_dvvc)}
+                      </td>
+                      {hienLai && (
+                        <td className={`${TD} text-right text-indigo-700`}>
+                          {money(tongThang.lai_san)}
+                        </td>
+                      )}
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+
+        {viewMode === "theo-nam" && (
+          <>
+            {loading ? (
+              <p className="py-10 text-center text-sm text-slate-500">
+                Đang tải doanh thu theo năm...
+              </p>
+            ) : theoNam.length === 0 ? (
+              <EmptyState />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[920px] border-collapse">
+                  <thead className="border-b border-slate-200 bg-slate-50">
+                    <tr>
+                      <th className={TH}>Năm</th>
+                      <th className={`${TH} text-right`}>Số phiếu</th>
+                      <th className={`${TH} text-right`}>Số đơn</th>
+                      <th className={`${TH} text-right`}>Doanh thu phí sàn</th>
+                      <th className={`${TH} text-right`}>Tiền trả shop</th>
+                      <th className={`${TH} text-right`}>Chi ĐVVC</th>
+                      {hienLai && <th className={`${TH} text-right`}>Lãi</th>}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {theoNam.map((t) => (
+                      <tr key={t.nam} className="hover:bg-slate-50/70">
+                        <td className={`${TD} font-medium`}>Năm {t.nam}</td>
+                        <td className={`${TD} text-right`}>{t.so_phieu}</td>
+                        <td className={`${TD} text-right`}>{t.so_don}</td>
+                        <td className={`${TD} text-right text-emerald-700`}>
+                          {money(t.doanh_thu_san)}
+                        </td>
+                        <td className={`${TD} text-right text-indigo-700`}>
+                          {money(t.tra_shop)}
                         </td>
                         <td className={`${TD} text-right text-rose-600`}>
                           {money(t.chi_dvvc)}
                         </td>
-                        <td
-                          className={`${TD} text-right font-semibold ${net < 0 ? "text-rose-600" : "text-emerald-700"}`}
-                        >
-                          {money(net)}
-                        </td>
+                        {hienLai && (
+                          <td
+                            className={`${TD} text-right font-semibold ${
+                              t.lai_san < 0
+                                ? "text-rose-600"
+                                : "text-indigo-700"
+                            }`}
+                          >
+                            {money(t.lai_san)}
+                          </td>
+                        )}
                       </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </SectionCard>
-      )}
-
-      {tab === "giao-dich" && (
-        <SectionCard
-          title="Danh sách phiếu tất toán"
-          subtitle="Bấm vào dòng để xem chi tiết đơn hàng và mã QR"
-        >
-          <div className="mb-4 flex flex-wrap items-end gap-3">
-            <label className="flex flex-col gap-1">
-              <span className="text-xs font-medium text-slate-500">
-                Trạng thái
-              </span>
-              <select
-                className={INPUT}
-                value={txFilter.trang_thai}
-                onChange={(e) =>
-                  setTxFilter((p) => ({
-                    ...p,
-                    trang_thai: e.target.value,
-                    page: 1,
-                  }))
-                }
-              >
-                <option value="">Tất cả</option>
-                <option value="DA_THANH_TOAN">Đã thu đủ</option>
-                <option value="CHO_THANH_TOAN">Chờ thu</option>
-              </select>
-            </label>
-            <label className="flex min-w-[240px] flex-col gap-1">
-              <span className="text-xs font-medium text-slate-500">
-                Tìm mã phiếu / tên kho
-              </span>
-              <input
-                className={INPUT}
-                value={qInput}
-                placeholder="VD: PTT0000001"
-                onChange={(e) => setQInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter")
-                    setTxFilter((p) => ({ ...p, q: qInput.trim(), page: 1 }));
-                }}
-              />
-            </label>
-            <button
-              type="button"
-              onClick={() =>
-                setTxFilter((p) => ({ ...p, q: qInput.trim(), page: 1 }))
-              }
-              className="flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600 hover:bg-slate-50"
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                search
-              </span>{" "}
-              Tìm
-            </button>
-          </div>
-
-          {txLoading ? (
-            <p className="py-10 text-center text-sm text-slate-500">
-              Đang tải giao dịch...
-            </p>
-          ) : giaoDich.rows.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[860px] border-collapse">
-                <thead className="border-b border-slate-200 bg-slate-50">
-                  <tr>
-                    <th className={TH}>Mã phiếu</th>
-                    <th className={TH}>Kho</th>
-                    <th className={TH}>Ngày tạo</th>
-                    <th className={TH}>Hoàn tất</th>
-                    <th className={`${TH} text-right`}>Số đơn</th>
-                    <th className={`${TH} text-right`}>Phí sàn</th>
-                    <th className={`${TH} text-right`}>Tiền shop</th>
-                    <th className={TH}>Trạng thái</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {giaoDich.rows.map((r) => (
-                    <tr
-                      key={r.ptt_ma}
-                      onClick={() => openDetail(r.ptt_ma)}
-                      className="cursor-pointer hover:bg-sky-50/60"
-                    >
-                      <td
-                        className={`${TD} font-mono font-semibold text-indigo-600`}
-                      >
-                        {r.ptt_ma}
-                      </td>
-                      <td className={TD}>{r.kho_ten}</td>
-                      <td className={`${TD} text-slate-500`}>
-                        {fmtDate(r.ptt_ngay_tat_toan)}
-                      </td>
-                      <td className={`${TD} text-slate-500`}>
-                        {fmtDate(r.ptt_thoi_diem_hoan_tat)}
-                      </td>
-                      <td className={`${TD} text-right`}>{r.so_don}</td>
-                      <td className={`${TD} text-right text-amber-700`}>
-                        {money(r.ptt_tong_tien_san)}
+                    ))}
+                  </tbody>
+                  <tfoot className="border-t-2 border-slate-200 bg-slate-50 font-semibold">
+                    <tr>
+                      <td className={TD}>Tổng các năm</td>
+                      <td className={`${TD} text-right`}>{tongNam.so_phieu}</td>
+                      <td className={`${TD} text-right`}>{tongNam.so_don}</td>
+                      <td className={`${TD} text-right text-emerald-700`}>
+                        {money(tongNam.doanh_thu_san)}
                       </td>
                       <td className={`${TD} text-right text-indigo-700`}>
-                        {money(r.ptt_tong_tien_shop)}
+                        {money(tongNam.tra_shop)}
                       </td>
-                      <td className={TD}>
-                        <StatusBadge status={r.ptt_trang_thai_thanh_toan} />
+                      <td className={`${TD} text-right text-rose-600`}>
+                        {money(tongNam.chi_dvvc)}
                       </td>
+                      {hienLai && (
+                        <td className={`${TD} text-right text-indigo-700`}>
+                          {money(tongNam.lai_san)}
+                        </td>
+                      )}
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
+                  </tfoot>
+                </table>
+              </div>
+            )}
+          </>
+        )}
 
-          <Pager
-            page={giaoDich.page}
-            totalPages={giaoDich.total_pages}
-            total={giaoDich.total}
-            onChange={(p) => setTxFilter((prev) => ({ ...prev, page: p }))}
-          />
-        </SectionCard>
-      )}
+        {viewMode === "giao-dich" && (
+          <>
+            <div className="mb-4 flex flex-wrap items-end gap-3">
+              <label className="flex flex-col gap-1">
+                <span className="text-xs font-medium text-slate-500">
+                  Trạng thái
+                </span>
+                <select
+                  className={INPUT}
+                  value={txFilter.trang_thai}
+                  onChange={(e) =>
+                    setTxFilter((p) => ({
+                      ...p,
+                      trang_thai: e.target.value,
+                      page: 1,
+                    }))
+                  }
+                >
+                  <option value="">Tất cả</option>
+                  <option value="DA_THANH_TOAN">Đã thu đủ</option>
+                  <option value="CHO_THANH_TOAN">Chờ thu</option>
+                </select>
+              </label>
+
+              <label className="flex min-w-[260px] flex-col gap-1">
+                <span className="text-xs font-medium text-slate-500">
+                  Tìm mã phiếu / tên kho
+                </span>
+                <input
+                  className={INPUT}
+                  value={qInput}
+                  placeholder="VD: PTT0000001"
+                  onChange={(e) => setQInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter")
+                      setTxFilter((p) => ({
+                        ...p,
+                        q: qInput.trim(),
+                        page: 1,
+                      }));
+                  }}
+                />
+              </label>
+
+              <button
+                type="button"
+                onClick={() =>
+                  setTxFilter((p) => ({ ...p, q: qInput.trim(), page: 1 }))
+                }
+                className="flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  search
+                </span>
+                Tìm
+              </button>
+            </div>
+
+            {txLoading ? (
+              <p className="py-10 text-center text-sm text-slate-500">
+                Đang tải giao dịch...
+              </p>
+            ) : giaoDich.rows.length === 0 ? (
+              <EmptyState />
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[1000px] border-collapse">
+                  <thead className="border-b border-slate-200 bg-slate-50">
+                    <tr>
+                      <th className={TH}>Mã phiếu</th>
+                      <th className={TH}>Kho</th>
+                      <th className={TH}>Ngày tạo</th>
+                      <th className={TH}>Hoàn tất</th>
+                      <th className={`${TH} text-right`}>Số đơn</th>
+                      <th className={`${TH} text-right`}>Phí sàn</th>
+                      <th className={`${TH} text-right`}>Tiền shop</th>
+                      <th className={`${TH} text-right`}>QR đã TT</th>
+                      <th className={TH}>Trạng thái</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {giaoDich.rows.map((r) => (
+                      <tr
+                        key={r.ptt_ma}
+                        onClick={() => openDetail(r.ptt_ma)}
+                        className="cursor-pointer hover:bg-sky-50/60"
+                      >
+                        <td
+                          className={`${TD} font-mono font-semibold text-indigo-600`}
+                        >
+                          {r.ptt_ma}
+                        </td>
+                        <td className={TD}>{r.kho_ten}</td>
+                        <td className={`${TD} text-slate-500`}>
+                          {fmtDate(r.ptt_ngay_tat_toan)}
+                        </td>
+                        <td className={`${TD} text-slate-500`}>
+                          {fmtDate(r.ptt_thoi_diem_hoan_tat)}
+                        </td>
+                        <td className={`${TD} text-right`}>{r.so_don}</td>
+                        <td className={`${TD} text-right text-amber-700`}>
+                          {money(r.ptt_tong_tien_san)}
+                        </td>
+                        <td className={`${TD} text-right text-indigo-700`}>
+                          {money(r.ptt_tong_tien_shop)}
+                        </td>
+                        <td className={`${TD} text-right text-slate-600`}>
+                          {r.so_qr_da_tt}/{r.so_qr}
+                        </td>
+                        <td className={TD}>
+                          <StatusBadge status={r.ptt_trang_thai_thanh_toan} />
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            <Pager
+              page={giaoDich.page}
+              totalPages={giaoDich.total_pages}
+              total={giaoDich.total}
+              onChange={(p) => setTxFilter((prev) => ({ ...prev, page: p }))}
+            />
+          </>
+        )}
+      </SectionCard>
 
       <PhieuChiTietDrawer
+        variant="san"
         open={detail.open}
         loading={detail.loading}
         data={detail.data}

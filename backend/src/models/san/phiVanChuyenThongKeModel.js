@@ -6,6 +6,12 @@
 //   dts_tonggiamgiavanchuyen = phần voucher ship được giảm (Sàn bù)
 //   phí ship gốc trước voucher = dts_tienvanchuyen + dts_tonggiamgiavanchuyen
 //
+// Bổ sung bộ lọc Kho:
+//   - Kho của đơn lấy qua thongtingiaohang -> shipper.kho_ma
+//     (ưu tiên shipper đã nộp tiền, sau đó chuyến giao mới nhất).
+//   - Khi lọc kho, các số liệu tính theo đơn (phát sinh, sàn bù, khách trả,
+//     đã chi/chờ chi theo đơn) đều được lọc theo kho.
+//
 // Trạng thái chi trả phản ánh thời điểm hiện tại của các đơn phát sinh trong kỳ lọc.
 // Loại khỏi thống kê các đơn có trạng thái mới nhất là TTDH06 (Đã hủy).
 
@@ -47,6 +53,18 @@ const TTDH_CUOI = (alias = 'o') => `(
 const LOAI_DON_HUY = (alias = 'o') =>
   `COALESCE(${TTDH_CUOI(alias)}, '') <> 'TTDH06'`;
 
+// Kho của một đơn: ưu tiên shipper đã nộp tiền, sau đó chuyến giao mới nhất.
+const KHO_CUA_DON = `
+  LEFT JOIN LATERAL (
+    SELECT s.kho_ma
+    FROM thongtingiaohang t
+    JOIN shipper s ON s.shipper_ma = t.shipper_ma
+    WHERE t.dts_ma = o.dts_ma
+    ORDER BY t.ttgh_da_nop_tien DESC, t.ttgh_thoidiem_nop DESC NULLS LAST
+    LIMIT 1
+  ) kv ON true
+`;
+
 // Dùng EXISTS để tránh nhân dòng khi 1 đơn nằm trong nhiều phiếu
 const TRANG_THAI_CASE = (alias = 'o') => `
   CASE
@@ -67,10 +85,22 @@ const PhiVanChuyenThongKeModel = {
   // 1. DANH MỤC
   // =========================================================
   getDanhMuc: async () => {
-    const [dvvcRes, namRes] = await Promise.all([
+    const [dvvcRes, khoRes, namRes] = await Promise.all([
       pool.query(
         `SELECT dvvc_ma, dvvc_ten FROM donvivanchuyen ORDER BY dvvc_ten ASC`
       ),
+      pool.query(`
+        SELECT k.kho_ma, k.kho_ten
+        FROM kho k
+        WHERE EXISTS (SELECT 1 FROM phieu_tat_toan p WHERE p.kho_ma = k.kho_ma)
+           OR EXISTS (
+             SELECT 1
+             FROM thongtingiaohang t
+             JOIN shipper s ON s.shipper_ma = t.shipper_ma
+             WHERE s.kho_ma = k.kho_ma
+           )
+        ORDER BY k.kho_ten ASC
+      `),
       pool.query(`
         SELECT DISTINCT
                EXTRACT(YEAR FROM o.dts_ngaylap AT TIME ZONE '${TZ}')::int AS nam
@@ -88,13 +118,18 @@ const PhiVanChuyenThongKeModel = {
       .filter((n) => n > 0)
       .sort((a, b) => b - a);
 
-    return { dvvc: dvvcRes.rows, nam: dsNam, nam_hien_tai: namHienTai };
+    return {
+      kho: khoRes.rows,
+      dvvc: dvvcRes.rows,
+      nam: dsNam,
+      nam_hien_tai: namHienTai,
+    };
   },
 
   // =========================================================
   // 2. TỔNG QUAN
   // =========================================================
-  getTongQuan: async ({ dvvc_ma = null, nam, thang = null }) => {
+  getTongQuan: async ({ dvvc_ma = null, kho_ma = null, nam, thang = null }) => {
     const { tu_ngay, den_ngay } = khoangThoiGian(nam, thang);
     const namSo = Number(nam) || new Date().getFullYear();
 
@@ -106,9 +141,11 @@ const PhiVanChuyenThongKeModel = {
                COALESCE(o.dts_tonggiamgiavanchuyen, 0) AS san_bu,
                ${TRANG_THAI_CASE('o')} AS trang_thai
         FROM donhangtheoshop o
+        ${KHO_CUA_DON}
         WHERE o.dts_ngaylap >= ${TU('$2')}
           AND o.dts_ngaylap <  ${DEN('$3')}
           AND ($1::varchar IS NULL OR o.dvvc_ma = $1)
+          AND ($4::varchar IS NULL OR kv.kho_ma = $4)
           AND ${LOAI_DON_HUY('o')}
       )
       SELECT COALESCE(SUM(khach_tra + san_bu), 0) AS phi_goc,
@@ -139,9 +176,11 @@ const PhiVanChuyenThongKeModel = {
                COALESCE(o.dts_tonggiamgiavanchuyen, 0) AS san_bu,
                ${TRANG_THAI_CASE('o')} AS trang_thai
         FROM donhangtheoshop o
+        ${KHO_CUA_DON}
         WHERE o.dts_ngaylap >= (make_date($2::int, 1, 1)::timestamp AT TIME ZONE '${TZ}')
           AND o.dts_ngaylap <  ((make_date($2::int, 12, 31) + 1)::timestamp AT TIME ZONE '${TZ}')
           AND ($1::varchar IS NULL OR o.dvvc_ma = $1)
+          AND ($3::varchar IS NULL OR kv.kho_ma = $3)
           AND ${LOAI_DON_HUY('o')}
       ),
       agg AS (
@@ -173,8 +212,10 @@ const PhiVanChuyenThongKeModel = {
         SELECT DISTINCT
                EXTRACT(YEAR FROM o.dts_ngaylap AT TIME ZONE '${TZ}')::int AS nam
         FROM donhangtheoshop o
+        ${KHO_CUA_DON}
         WHERE o.dts_ngaylap IS NOT NULL
           AND ($1::varchar IS NULL OR o.dvvc_ma = $1)
+          AND ($2::varchar IS NULL OR kv.kho_ma = $2)
           AND ${LOAI_DON_HUY('o')}
       ),
       base AS (
@@ -183,8 +224,10 @@ const PhiVanChuyenThongKeModel = {
                COALESCE(o.dts_tonggiamgiavanchuyen, 0) AS san_bu,
                ${TRANG_THAI_CASE('o')} AS trang_thai
         FROM donhangtheoshop o
+        ${KHO_CUA_DON}
         WHERE o.dts_ngaylap IS NOT NULL
           AND ($1::varchar IS NULL OR o.dvvc_ma = $1)
+          AND ($2::varchar IS NULL OR kv.kho_ma = $2)
           AND ${LOAI_DON_HUY('o')}
       ),
       agg AS (
@@ -218,9 +261,11 @@ const PhiVanChuyenThongKeModel = {
                COALESCE(o.dts_tonggiamgiavanchuyen, 0) AS san_bu,
                ${TRANG_THAI_CASE('o')} AS trang_thai
         FROM donhangtheoshop o
+        ${KHO_CUA_DON}
         WHERE o.dts_ngaylap >= ${TU('$2')}
           AND o.dts_ngaylap <  ${DEN('$3')}
           AND ($1::varchar IS NULL OR o.dvvc_ma = $1)
+          AND ($4::varchar IS NULL OR kv.kho_ma = $4)
           AND ${LOAI_DON_HUY('o')}
       )
       SELECT b.dvvc_ma, d.dvvc_ten,
@@ -237,17 +282,36 @@ const PhiVanChuyenThongKeModel = {
       ORDER BY COALESCE(SUM(b.khach_tra + b.san_bu), 0) DESC, d.dvvc_ten ASC
     `;
 
-    const [kpiRes, thangRes, namRes, dvvcRes] = await Promise.all([
-      pool.query(kpiSql, [dvvc_ma, tu_ngay, den_ngay]),
-      pool.query(thangSql, [dvvc_ma, namSo]),
-      pool.query(namSql, [dvvc_ma]),
-      pool.query(dvvcSql, [dvvc_ma, tu_ngay, den_ngay]),
+    // ---------- 2.5. Phiếu đang chờ QR ----------
+    const phieuChoSql = `
+      SELECT p.pcd_ma, p.dvvc_ma, d.dvvc_ten,
+             p.pcd_tong_tien, p.pcd_ngay_tao
+      FROM phieu_chi_dvvc p
+      JOIN donvivanchuyen d ON d.dvvc_ma = p.dvvc_ma
+      WHERE p.pcd_trang_thai = 'CHO_THANH_TOAN'
+        AND ($1::varchar IS NULL OR p.dvvc_ma = $1)
+      ORDER BY p.pcd_ngay_tao DESC
+    `;
+
+    const [kpiRes, thangRes, namRes, dvvcRes, phieuChoRes] = await Promise.all([
+      pool.query(kpiSql, [dvvc_ma, tu_ngay, den_ngay, kho_ma]),
+      pool.query(thangSql, [dvvc_ma, namSo, kho_ma]),
+      pool.query(namSql, [dvvc_ma, kho_ma]),
+      pool.query(dvvcSql, [dvvc_ma, tu_ngay, den_ngay, kho_ma]),
+      pool.query(phieuChoSql, [dvvc_ma]),
     ]);
 
     const k = kpiRes.rows[0] || {};
 
     return {
-      pham_vi: { dvvc_ma, nam: namSo, thang: thang || null, tu_ngay, den_ngay },
+      pham_vi: {
+        dvvc_ma,
+        kho_ma,
+        nam: namSo,
+        thang: thang || null,
+        tu_ngay,
+        den_ngay,
+      },
       kpi: {
         phi_goc: num(k.phi_goc),
         san_bu: num(k.san_bu),
@@ -289,6 +353,10 @@ const PhiVanChuyenThongKeModel = {
         so_don: num(r.so_don),
         so_don_san_bu: num(r.so_don_san_bu),
       })),
+      phieu_cho: phieuChoRes.rows.map((r) => ({
+        ...r,
+        pcd_tong_tien: num(r.pcd_tong_tien),
+      })),
     };
   },
 
@@ -297,6 +365,7 @@ const PhiVanChuyenThongKeModel = {
   // =========================================================
   getDanhSach: async ({
     dvvc_ma = null,
+    kho_ma = null,
     nam,
     thang = null,
     trang_thai = null,
@@ -312,6 +381,7 @@ const PhiVanChuyenThongKeModel = {
     const baseSql = `
       WITH base AS (
         SELECT o.dts_ma, o.dts_ngaylap, o.dvvc_ma, d.dvvc_ten,
+               kv.kho_ma, k.kho_ten,
                COALESCE(o.dts_tienvanchuyen, 0) AS khach_tra,
                COALESCE(o.dts_tonggiamgiavanchuyen, 0) AS voucher_ship,
                COALESCE(o.dts_tienvanchuyen, 0)
@@ -326,12 +396,16 @@ const PhiVanChuyenThongKeModel = {
                ${TRANG_THAI_CASE('o')} AS trang_thai
         FROM donhangtheoshop o
         JOIN donvivanchuyen d ON d.dvvc_ma = o.dvvc_ma
+        ${KHO_CUA_DON}
+        LEFT JOIN kho k ON k.kho_ma = kv.kho_ma
         WHERE o.dts_ngaylap >= ${TU('$2')}
           AND o.dts_ngaylap <  ${DEN('$3')}
           AND ($1::varchar IS NULL OR o.dvvc_ma = $1)
+          AND ($6::varchar IS NULL OR kv.kho_ma = $6)
           AND ($5::text IS NULL
                OR o.dts_ma ILIKE '%' || $5 || '%'
-               OR d.dvvc_ten ILIKE '%' || $5 || '%')
+               OR d.dvvc_ten ILIKE '%' || $5 || '%'
+               OR k.kho_ten ILIKE '%' || $5 || '%')
           AND ${LOAI_DON_HUY('o')}
       )
     `;
@@ -343,9 +417,9 @@ const PhiVanChuyenThongKeModel = {
         SELECT * FROM base
         WHERE ($4::varchar IS NULL OR trang_thai = $4)
         ORDER BY dts_ngaylap DESC, dts_ma DESC
-        LIMIT $6 OFFSET $7
+        LIMIT $7 OFFSET $8
         `,
-        [dvvc_ma, tu_ngay, den_ngay, trang_thai, q, l, offset]
+        [dvvc_ma, tu_ngay, den_ngay, trang_thai, q, kho_ma, l, offset]
       ),
       pool.query(
         `
@@ -353,7 +427,7 @@ const PhiVanChuyenThongKeModel = {
         SELECT COUNT(*)::int AS total FROM base
         WHERE ($4::varchar IS NULL OR trang_thai = $4)
         `,
-        [dvvc_ma, tu_ngay, den_ngay, trang_thai, q]
+        [dvvc_ma, tu_ngay, den_ngay, trang_thai, q, kho_ma]
       ),
     ]);
 

@@ -213,6 +213,150 @@ const TrangThaiChiTietSanPhamModel = {
             client.release();
         }
     },
+    // Lấy sản phẩm toàn sàn có phân trang + tìm kiếm + lọc (1 dòng / sản phẩm)
+    // nh_ma: lọc theo ngành hàng, BAO GỒM cả các ngành hàng con
+    getSanPhamPhanTrang: async ({
+        q = null,
+        gh_ma = null,
+        trang_thai = null,
+        nh_ma = null,
+        page = 1,
+        limit = 24,
+    } = {}) => {
+        const p = Math.max(1, Number(page) || 1);
+        const l = Math.min(100, Math.max(1, Number(limit) || 24));
+        const offset = (p - 1) * l;
+
+        // CTE dùng chung cho cả query lấy dữ liệu và query đếm tổng.
+        // nh_con = ngành hàng được chọn + toàn bộ ngành hàng con (đệ quy).
+        const cteChung = `
+            latest_status AS (
+                SELECT DISTINCT ON (ctsp_ma)
+                    ctsp_ma, ttctsp_ma
+                FROM chitiettrangthaisanpham
+                ORDER BY ctsp_ma, ctttsp_thoidiem DESC
+            ),
+            nh_con AS (
+                SELECT nh_ma
+                FROM nganhhang
+                WHERE $4::varchar IS NOT NULL
+                  AND nh_ma = $4
+                UNION ALL
+                SELECT con.nh_ma
+                FROM nganhhang con
+                JOIN nh_con cha ON con.nh_cha = cha.nh_ma
+            )
+        `;
+
+        // Điều kiện dùng chung cho query lấy dữ liệu và query đếm tổng
+        const dieuKien = `
+            WHERE ($1::text IS NULL
+                   OR sp.sp_ten ILIKE '%' || $1 || '%'
+                   OR gh.gh_ten ILIKE '%' || $1 || '%')
+              AND ($2::varchar IS NULL OR gh.gh_ma = $2)
+              AND ($3::text IS NULL OR EXISTS (
+                    SELECT 1
+                    FROM chitietsanpham c2
+                    LEFT JOIN latest_status ls2 ON ls2.ctsp_ma = c2.ctsp_ma
+                    WHERE c2.sp_ma = sp.sp_ma
+                      AND (
+                        ($3 = 'DEFAULT' AND ls2.ttctsp_ma IS NULL)
+                        OR ls2.ttctsp_ma = $3
+                      )
+                  ))
+              AND ($4::varchar IS NULL OR EXISTS (
+                    SELECT 1
+                    FROM chitietsanpham c3
+                    WHERE c3.sp_ma = sp.sp_ma
+                      AND c3.nh_ma IN (SELECT nh_ma FROM nh_con)
+                  ))
+        `;
+
+        const rowsSql = `
+            WITH RECURSIVE
+            ${cteChung},
+            sp_loc AS (
+                SELECT sp.sp_ma, sp.sp_ten, gh.gh_ma, gh.gh_ten
+                FROM sanpham sp
+                JOIN gianhang gh ON sp.gh_ma = gh.gh_ma
+                ${dieuKien}
+                ORDER BY sp.sp_ma DESC
+                LIMIT $5 OFFSET $6
+            )
+            SELECT
+                l.sp_ma, l.sp_ten, l.gh_ma, l.gh_ten,
+                COUNT(ctsp.ctsp_ma)::int AS so_phan_loai,
+                COUNT(*) FILTER (WHERE ls.ttctsp_ma = 'TTCTSP0003')::int AS so_bi_dinh_chi,
+                json_agg(
+                    json_build_object(
+                        'ctsp_ma', ctsp.ctsp_ma,
+                        'ctsp_ten', ctsp.ctsp_ten,
+                        'ctsp_gianban', ctsp.ctsp_gianban,
+                        'ctsp_soluongton', ctsp.ctsp_soluongton,
+                        'ctsp_chieudai', ctsp.ctsp_chieudai,
+                        'ctsp_chieurong', ctsp.ctsp_chieurong,
+                        'ctsp_chieucao', ctsp.ctsp_chieucao,
+                        'ctsp_khoiluong', ctsp.ctsp_khoiluong,
+                        'ctsp_ngaytao', ctsp.ctsp_ngaytao,
+                        'ctsp_luotxem', ctsp.ctsp_luotxem,
+                        'ctsp_luotthich', ctsp.ctsp_luotthich,
+                        'ctsp_luotmua', ctsp.ctsp_luotmua,
+                        'ctsp_diemdanhgiatrungbinh', ctsp.ctsp_diemdanhgiatrungbinh,
+                        'ctsp_mota', ctsp.ctsp_mota,
+                        'nh_ma', ctsp.nh_ma,
+                        'nh_ten', nh.nh_ten,
+                        'sp_ma', l.sp_ma,
+                        'sp_ten', l.sp_ten,
+                        'gh_ma', l.gh_ma,
+                        'gh_ten', l.gh_ten,
+                        'ttctsp_ma', ls.ttctsp_ma,
+                        'ttctsp_ten', tt.ttctsp_ten,
+                        'main_image', (
+                            SELECT hasp_link
+                            FROM hinhanhsanpham
+                            WHERE ctsp_ma = ctsp.ctsp_ma
+                            ORDER BY hasp_laanhchinh DESC, hasp_thutu ASC
+                            LIMIT 1
+                        )
+                    )
+                    ORDER BY ctsp.ctsp_ma DESC
+                ) AS variants
+            FROM sp_loc l
+            JOIN chitietsanpham ctsp ON ctsp.sp_ma = l.sp_ma
+            LEFT JOIN latest_status ls ON ls.ctsp_ma = ctsp.ctsp_ma
+            LEFT JOIN trangthaichitietsanpham tt ON ls.ttctsp_ma = tt.ttctsp_ma
+            LEFT JOIN nganhhang nh ON nh.nh_ma = ctsp.nh_ma
+            GROUP BY l.sp_ma, l.sp_ten, l.gh_ma, l.gh_ten
+            ORDER BY l.sp_ma DESC
+        `;
+
+        const countSql = `
+            WITH RECURSIVE
+            ${cteChung}
+            SELECT COUNT(*)::int AS total
+            FROM sanpham sp
+            JOIN gianhang gh ON sp.gh_ma = gh.gh_ma
+            ${dieuKien}
+        `;
+
+        const [rowsRes, countRes] = await Promise.all([
+            pool.query(rowsSql, [q, gh_ma, trang_thai, nh_ma, l, offset]),
+            pool.query(countSql, [q, gh_ma, trang_thai, nh_ma]),
+        ]);
+
+        const total = Number(countRes.rows[0]?.total) || 0;
+
+        return {
+            rows: rowsRes.rows.map((r) => ({
+                ...r,
+                variants: r.variants || [],
+            })),
+            total,
+            page: p,
+            limit: l,
+            total_pages: Math.max(1, Math.ceil(total / l)),
+        };
+    },
 };
 
 module.exports = TrangThaiChiTietSanPhamModel;

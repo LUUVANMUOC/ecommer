@@ -1,5 +1,5 @@
 // src/pages/admin/QuanLySanPhamAdmin.jsx
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import trangThaiChiTietSanPhamService from "../../services/gianhang/trangThaiChiTietSanPhamService";
 import axiosClient from "../../config/axiosClient";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
@@ -8,6 +8,8 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 const imgUrl = (link) => (link ? `${BACKEND_URL}${link}` : "");
 const formatVND = (n) =>
   n || n === 0 ? `${Number(n).toLocaleString("vi-VN")} đ` : "—";
+
+const PAGE_SIZES = [12, 24, 48];
 
 const STATUS_CONFIG = {
   TTCTSP0001: {
@@ -28,20 +30,69 @@ const STATUS_CONFIG = {
   },
 };
 
-const QuanLySanPhamAdmin = () => {
-  const [rawData, setRawData] = useState([]);
-  const [loading, setLoading] = useState(true);
+const pageBtn = (active) =>
+  `h-9 min-w-9 rounded-lg border px-2 text-sm font-bold transition-colors ${
+    active
+      ? "border-[#F2A93B] bg-[#FDF3E1] text-[#8A5A0B]"
+      : "border-[#E2DED3] bg-white text-[#3D4A44] hover:bg-[#F7F5F0]"
+  }`;
 
-  // State bộ lọc
+// Chuyển danh sách ngành hàng phẳng -> mảng phẳng sắp theo cây (cha trước, con sau)
+const buildCategoryOptions = (list) => {
+  const byParent = new Map();
+  list.forEach((c) => {
+    const key = c.nh_cha || "";
+    if (!byParent.has(key)) byParent.set(key, []);
+    byParent.get(key).push(c);
+  });
+  byParent.forEach((arr) =>
+    arr.sort((a, b) => String(a.nh_ten).localeCompare(String(b.nh_ten), "vi")),
+  );
+
+  const out = [];
+  const seen = new Set();
+
+  const walk = (parent, depth) => {
+    (byParent.get(parent) || []).forEach((c) => {
+      if (seen.has(c.nh_ma)) return;
+      seen.add(c.nh_ma);
+      out.push({ ...c, depth });
+      walk(c.nh_ma, depth + 1);
+    });
+  };
+  walk("", 0);
+
+  // Dữ liệu mồ côi (nh_cha trỏ tới ngành không tồn tại) vẫn phải hiển thị
+  list.forEach((c) => {
+    if (!seen.has(c.nh_ma)) out.push({ ...c, depth: 0 });
+  });
+
+  return out;
+};
+
+const QuanLySanPhamAdmin = () => {
+  // Dữ liệu phân trang
+  const [products, setProducts] = useState([]);
+  const [total, setTotal] = useState(0);
+  const [totalPages, setTotalPages] = useState(1);
+  const [page, setPage] = useState(1);
+  const [limit, setLimit] = useState(24);
+  const [loading, setLoading] = useState(true);
+  const listTopRef = useRef(null);
+
+  // Bộ lọc
+  const [searchInput, setSearchInput] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [shops, setShops] = useState([]);
   const [filterShop, setFilterShop] = useState("");
   const [filterStatus, setFilterStatus] = useState("");
+  const [categories, setCategories] = useState([]);
+  const [filterCategory, setFilterCategory] = useState("");
 
-  // State Modal xem chi tiết
+  // Modal xem chi tiết
   const [selectedProduct, setSelectedProduct] = useState(null);
 
-  // State Modal Đình chỉ
+  // Modal đình chỉ
   const [modalAction, setModalAction] = useState({
     isOpen: false,
     ctsp_ma: null,
@@ -56,67 +107,146 @@ const QuanLySanPhamAdmin = () => {
     type: "success",
   });
 
-  const showToast = (message, type = "success") => {
+  const showToast = useCallback((message, type = "success") => {
     setToast({ show: true, message, type });
     setTimeout(
       () => setToast({ show: false, message: "", type: "success" }),
       3000,
     );
-  };
+  }, []);
 
-  const fetchData = async () => {
+  // ---- Danh sách shop: tải 1 lần ----
+  const fetchShops = useCallback(async () => {
+    try {
+      const res = await axiosClient.get("/admin/gian-hang");
+      setShops(res.data || []);
+    } catch {
+      /* giữ danh sách shop cũ nếu lỗi */
+    }
+  }, []);
+
+  // ---- Danh sách ngành hàng: tải 1 lần ----
+  const fetchCategories = useCallback(async () => {
+    try {
+      const res = await axiosClient.get("/nganh-hang");
+      setCategories(res.data || []);
+    } catch {
+      /* giữ danh sách ngành hàng cũ nếu lỗi */
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchShops();
+    fetchCategories();
+  }, [fetchShops, fetchCategories]);
+
+  // ---- Danh sách sản phẩm theo trang + bộ lọc ----
+  const fetchSanPham = useCallback(async () => {
     setLoading(true);
     try {
-      const [resData, resShops] = await Promise.all([
-        trangThaiChiTietSanPhamService.getAllSanPham(),
-        axiosClient.get("/admin/gian-hang").catch(() => ({ data: [] })),
-      ]);
-      setRawData(resData.data || []);
-      setShops(resShops.data || []);
+      const res = await trangThaiChiTietSanPhamService.getSanPhamPhanTrang({
+        q: searchTerm || undefined,
+        gh_ma: filterShop || undefined,
+        trang_thai: filterStatus || undefined,
+        nh_ma: filterCategory || undefined,
+        page,
+        limit,
+      });
+
+      const data = res.data || {};
+      const pages = data.total_pages || 1;
+
+      // Nếu trang hiện tại vượt quá tổng số trang (sau khi lọc/đình chỉ) thì lùi về trang cuối
+      if (pages < page) {
+        setPage(pages);
+        return;
+      }
+
+      setProducts(data.rows || []);
+      setTotal(data.total || 0);
+      setTotalPages(pages);
     } catch (error) {
       showToast("Lỗi khi tải danh sách sản phẩm", "error");
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    searchTerm,
+    filterShop,
+    filterStatus,
+    filterCategory,
+    page,
+    limit,
+    showToast,
+  ]);
 
   useEffect(() => {
-    fetchData();
-  }, []);
+    fetchSanPham();
+  }, [fetchSanPham]);
 
-  const groupedProducts = useMemo(() => {
-    const grouped = rawData.reduce((acc, item) => {
-      if (!acc[item.sp_ma]) {
-        acc[item.sp_ma] = {
-          sp_ma: item.sp_ma,
-          sp_ten: item.sp_ten,
-          gh_ma: item.gh_ma,
-          gh_ten: item.gh_ten,
-          variants: [],
-        };
-      }
-      acc[item.sp_ma].variants.push(item);
-      return acc;
-    }, {});
-    return Object.values(grouped);
-  }, [rawData]);
+  // ---- Debounce tìm kiếm 350ms ----
+  useEffect(() => {
+    const t = setTimeout(() => {
+      setSearchTerm(searchInput.trim());
+      setPage(1);
+    }, 350);
+    return () => clearTimeout(t);
+  }, [searchInput]);
 
-  const filteredProducts = useMemo(() => {
-    return groupedProducts.filter((product) => {
-      const matchSearch =
-        product.sp_ten.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        product.gh_ten.toLowerCase().includes(searchTerm.toLowerCase());
-      const matchShop = !filterShop || product.gh_ma === filterShop;
-      const matchStatus =
-        !filterStatus ||
-        product.variants.some((v) =>
-          filterStatus === "DEFAULT"
-            ? !v.ttctsp_ma
-            : v.ttctsp_ma === filterStatus,
-        );
-      return matchSearch && matchShop && matchStatus;
-    });
-  }, [groupedProducts, searchTerm, filterShop, filterStatus]);
+  const changeShop = (ma) => {
+    setFilterShop(ma);
+    setPage(1);
+  };
+
+  const changeStatus = (e) => {
+    setFilterStatus(e.target.value);
+    setPage(1);
+  };
+
+  const changeCategory = (e) => {
+    setFilterCategory(e.target.value);
+    setPage(1);
+  };
+
+  const changeLimit = (e) => {
+    setLimit(Number(e.target.value));
+    setPage(1);
+  };
+
+  const changePage = (p) => {
+    if (p === page) return;
+    setPage(p);
+    listTopRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  // Danh sách option ngành hàng, sắp theo cây để thụt lề trong select
+  const categoryOptions = useMemo(
+    () => buildCategoryOptions(categories),
+    [categories],
+  );
+
+  const pageNumbers = useMemo(() => {
+    const totalP = Math.max(1, totalPages);
+    const size = 5;
+    let start = Math.max(1, page - Math.floor(size / 2));
+    let end = Math.min(totalP, start + size - 1);
+    start = Math.max(1, end - size + 1);
+
+    const arr = [];
+    for (let i = start; i <= end; i++) arr.push(i);
+    return { arr, start, end, totalP };
+  }, [page, totalPages]);
+
+  const from = total === 0 ? 0 : (page - 1) * limit + 1;
+  const to = Math.min(page * limit, total);
+
+  // Ngành hàng của sản phẩm đang mở modal
+  const selectedCategories = useMemo(() => {
+    if (!selectedProduct) return [];
+    return [
+      ...new Set(selectedProduct.variants.map((v) => v.nh_ten).filter(Boolean)),
+    ];
+  }, [selectedProduct]);
 
   const handleOpenSuspend = (variant) => {
     setModalAction({
@@ -138,18 +268,20 @@ const QuanLySanPhamAdmin = () => {
       );
       showToast(`Đã đình chỉ phân loại "${modalAction.ctsp_ten}"`);
       setModalAction({ isOpen: false });
-      fetchData();
-      if (selectedProduct) {
-        setSelectedProduct((prev) => {
-          if (!prev) return null;
-          const updatedVariants = prev.variants.map((v) =>
-            v.ctsp_ma === modalAction.ctsp_ma
-              ? { ...v, ttctsp_ma: "TTCTSP0003" }
-              : v,
-          );
-          return { ...prev, variants: updatedVariants };
-        });
-      }
+
+      // Cập nhật ngay modal đang mở
+      setSelectedProduct((prev) => {
+        if (!prev) return null;
+        const updatedVariants = prev.variants.map((v) =>
+          v.ctsp_ma === modalAction.ctsp_ma
+            ? { ...v, ttctsp_ma: "TTCTSP0003" }
+            : v,
+        );
+        return { ...prev, variants: updatedVariants };
+      });
+
+      // Tải lại trang hiện tại để cập nhật số "bị đình chỉ" / bộ lọc trạng thái
+      fetchSanPham();
     } catch (error) {
       alert(error.response?.data?.message || "Đã xảy ra lỗi");
     } finally {
@@ -160,7 +292,7 @@ const QuanLySanPhamAdmin = () => {
   return (
     <div className="w-full space-y-6">
       {/* HEADER & BỘ LỌC CƠ BẢN */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-[#E2DED3] flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="bg-white p-5 rounded-2xl shadow-sm border border-[#E2DED3] flex flex-col xl:flex-row xl:items-center justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-[#14201C]">
             Quản lý Sản phẩm Toàn sàn
@@ -177,16 +309,31 @@ const QuanLySanPhamAdmin = () => {
             </span>
             <input
               type="text"
-              placeholder="Tìm tên SP..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              placeholder="Tìm tên SP / shop..."
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
               className="w-56 rounded-xl border border-[#D9CFC2] bg-[#FBFAF7] py-2 pl-10 pr-3 text-sm focus:border-[#F2A93B] focus:outline-none"
             />
           </div>
 
           <select
+            value={filterCategory}
+            onChange={changeCategory}
+            title="Lọc theo ngành hàng (bao gồm ngành hàng con)"
+            className="px-4 py-2 border border-[#E2DED3] rounded-xl text-sm font-medium text-[#3D4A44] outline-none hover:border-[#F2A93B] bg-white min-w-[180px] max-w-[240px]"
+          >
+            <option value="">Tất cả ngành hàng</option>
+            {categoryOptions.map((c) => (
+              <option key={c.nh_ma} value={c.nh_ma}>
+                {"— ".repeat(c.depth)}
+                {c.nh_ten}
+              </option>
+            ))}
+          </select>
+
+          <select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            onChange={changeStatus}
             className="px-4 py-2 border border-[#E2DED3] rounded-xl text-sm font-medium text-[#3D4A44] outline-none hover:border-[#F2A93B] bg-white min-w-[160px]"
           >
             <option value="">Tất cả Trạng thái</option>
@@ -197,7 +344,11 @@ const QuanLySanPhamAdmin = () => {
           </select>
 
           <button
-            onClick={fetchData}
+            onClick={() => {
+              fetchSanPham();
+              fetchShops();
+              fetchCategories();
+            }}
             className="inline-flex items-center justify-center w-10 h-10 rounded-xl border border-[#D9CFC2] bg-white text-[#3D4A44] hover:bg-[#F7F5F0] transition-colors"
             title="Làm mới"
           >
@@ -217,7 +368,7 @@ const QuanLySanPhamAdmin = () => {
           Lọc Shop:
         </span>
         <button
-          onClick={() => setFilterShop("")}
+          onClick={() => changeShop("")}
           className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold whitespace-nowrap transition-colors border-2 ${filterShop === "" ? "border-[#F2A93B] bg-[#FDF3E1] text-[#8A5A0B]" : "border-transparent bg-[#FBFAF7] text-[#5B6661] hover:border-[#E2DED3] hover:bg-[#F1EEE6]"}`}
         >
           <span className="material-symbols-outlined text-[18px]">
@@ -230,7 +381,7 @@ const QuanLySanPhamAdmin = () => {
           return (
             <button
               key={shop.gh_ma}
-              onClick={() => setFilterShop(shop.gh_ma)}
+              onClick={() => changeShop(shop.gh_ma)}
               className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-colors border-2 ${isActive ? "border-[#F2A93B] bg-[#FDF3E1] text-[#8A5A0B]" : "border-transparent bg-[#FBFAF7] text-[#3D4A44] hover:border-[#E2DED3] hover:bg-[#F1EEE6]"}`}
             >
               <div className="w-7 h-7 rounded-full border border-gray-200 overflow-hidden bg-white shrink-0">
@@ -238,6 +389,8 @@ const QuanLySanPhamAdmin = () => {
                   <img
                     src={imgUrl(shop.gh_hinhanh)}
                     alt={shop.gh_ten}
+                    loading="lazy"
+                    decoding="async"
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -252,12 +405,15 @@ const QuanLySanPhamAdmin = () => {
         })}
       </div>
 
+      {/* MỐC ĐẦU DANH SÁCH ĐỂ CUỘN VỀ KHI ĐỔI TRANG */}
+      <div ref={listTopRef} />
+
       {/* DANH SÁCH THẺ SẢN PHẨM */}
-      {loading ? (
+      {loading && products.length === 0 ? (
         <div className="py-20 text-center text-[#7A857F]">
           Đang tải dữ liệu...
         </div>
-      ) : filteredProducts.length === 0 ? (
+      ) : products.length === 0 ? (
         <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#E2DED3] bg-[#FBFAF7] py-16 text-center">
           <span className="material-symbols-outlined text-[48px] text-[#C9C3B5]">
             search_off
@@ -267,13 +423,20 @@ const QuanLySanPhamAdmin = () => {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {filteredProducts.map((product) => {
+        <div
+          className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 transition-opacity ${
+            loading ? "opacity-60 pointer-events-none" : ""
+          }`}
+        >
+          {products.map((product) => {
             const firstVariant = product.variants[0];
             const coverImg = firstVariant?.main_image;
             const countSuspended = product.variants.filter(
               (v) => v.ttctsp_ma === "TTCTSP0003",
             ).length;
+            const danhMuc = [
+              ...new Set(product.variants.map((v) => v.nh_ten).filter(Boolean)),
+            ];
 
             return (
               <div
@@ -285,6 +448,8 @@ const QuanLySanPhamAdmin = () => {
                     <img
                       src={imgUrl(coverImg)}
                       alt={product.sp_ten}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
                     />
                   ) : (
@@ -309,8 +474,19 @@ const QuanLySanPhamAdmin = () => {
                     <span className="material-symbols-outlined text-[14px]">
                       storefront
                     </span>
-                    {product.gh_ten}
+                    <span className="truncate">{product.gh_ten}</span>
                   </p>
+                  {danhMuc.length > 0 && (
+                    <p
+                      className="text-xs text-[#7A857F] mt-1 flex items-center gap-1"
+                      title={danhMuc.join(", ")}
+                    >
+                      <span className="material-symbols-outlined text-[14px]">
+                        category
+                      </span>
+                      <span className="truncate">{danhMuc.join(", ")}</span>
+                    </p>
+                  )}
                   <button
                     onClick={() => setSelectedProduct(product)}
                     className="mt-4 w-full py-2 bg-[#FBFAF7] border border-[#E2DED3] text-[#14201C] rounded-xl text-sm font-semibold hover:bg-[#F1EEE6] transition-colors"
@@ -321,6 +497,98 @@ const QuanLySanPhamAdmin = () => {
               </div>
             );
           })}
+        </div>
+      )}
+
+      {/* PHÂN TRANG */}
+      {total > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#E2DED3] bg-white px-5 py-3 shadow-sm">
+          <p className="text-sm text-[#7A857F]">
+            Hiển thị{" "}
+            <b className="text-[#14201C]">
+              {from}–{to}
+            </b>{" "}
+            / <b className="text-[#14201C]">{total}</b> sản phẩm
+          </p>
+
+          <div className="flex flex-wrap items-center gap-3">
+            <select
+              value={limit}
+              onChange={changeLimit}
+              className="rounded-xl border border-[#E2DED3] bg-white px-3 py-2 text-sm font-medium text-[#3D4A44] outline-none hover:border-[#F2A93B]"
+            >
+              {PAGE_SIZES.map((s) => (
+                <option key={s} value={s}>
+                  {s} / trang
+                </option>
+              ))}
+            </select>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => changePage(page - 1)}
+                disabled={page <= 1}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2DED3] bg-white text-[#3D4A44] hover:bg-[#F7F5F0] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <span className="material-symbols-outlined text-[20px]">
+                  chevron_left
+                </span>
+              </button>
+
+              {pageNumbers.start > 1 && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => changePage(1)}
+                    className={pageBtn(page === 1)}
+                  >
+                    1
+                  </button>
+                  {pageNumbers.start > 2 && (
+                    <span className="px-1 text-[#7A857F]">…</span>
+                  )}
+                </>
+              )}
+
+              {pageNumbers.arr.map((p) => (
+                <button
+                  key={p}
+                  type="button"
+                  onClick={() => changePage(p)}
+                  className={pageBtn(page === p)}
+                >
+                  {p}
+                </button>
+              ))}
+
+              {pageNumbers.end < pageNumbers.totalP && (
+                <>
+                  {pageNumbers.end < pageNumbers.totalP - 1 && (
+                    <span className="px-1 text-[#7A857F]">…</span>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => changePage(pageNumbers.totalP)}
+                    className={pageBtn(page === pageNumbers.totalP)}
+                  >
+                    {pageNumbers.totalP}
+                  </button>
+                </>
+              )}
+
+              <button
+                type="button"
+                onClick={() => changePage(page + 1)}
+                disabled={page >= totalPages}
+                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2DED3] bg-white text-[#3D4A44] hover:bg-[#F7F5F0] disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <span className="material-symbols-outlined text-[20px]">
+                  chevron_right
+                </span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -335,6 +603,8 @@ const QuanLySanPhamAdmin = () => {
                   {selectedProduct.variants[0]?.main_image ? (
                     <img
                       src={imgUrl(selectedProduct.variants[0].main_image)}
+                      loading="lazy"
+                      decoding="async"
                       className="w-full h-full object-cover"
                       alt=""
                     />
@@ -351,6 +621,14 @@ const QuanLySanPhamAdmin = () => {
                   <p className="text-sm text-[#7A857F]">
                     Shop: {selectedProduct.gh_ten} ({selectedProduct.gh_ma})
                   </p>
+                  {selectedCategories.length > 0 && (
+                    <p className="text-xs text-[#7A857F] mt-0.5">
+                      Ngành hàng:{" "}
+                      <b className="text-[#3D4A44]">
+                        {selectedCategories.join(", ")}
+                      </b>
+                    </p>
+                  )}
                 </div>
               </div>
               <button
@@ -363,7 +641,7 @@ const QuanLySanPhamAdmin = () => {
               </button>
             </div>
 
-            {/* Body Modal: Danh sách Phân loại dạng Thẻ (Card) chi tiết */}
+            {/* Body Modal */}
             <div className="p-6 overflow-y-auto custom-scrollbar bg-gray-50 flex-1 space-y-4">
               {selectedProduct.variants.map((item) => {
                 const statusCfg =
@@ -375,12 +653,14 @@ const QuanLySanPhamAdmin = () => {
                     key={item.ctsp_ma}
                     className="bg-white rounded-xl border border-gray-200 shadow-sm p-4 flex flex-col md:flex-row gap-6"
                   >
-                    {/* CỘT 1: Ảnh & Thông tin cơ bản */}
+                    {/* CỘT 1 */}
                     <div className="flex gap-4 shrink-0 md:w-1/3">
                       <div className="w-24 h-24 rounded-lg border border-gray-200 overflow-hidden bg-gray-50 shrink-0">
                         {item.main_image ? (
                           <img
                             src={imgUrl(item.main_image)}
+                            loading="lazy"
+                            decoding="async"
                             className="w-full h-full object-cover"
                             alt=""
                           />
@@ -402,6 +682,12 @@ const QuanLySanPhamAdmin = () => {
                         <p className="text-xs font-mono text-gray-500 mt-1">
                           Mã: {item.ctsp_ma}
                         </p>
+                        {item.nh_ten && (
+                          <p className="text-xs text-gray-500 mt-1">
+                            Ngành:{" "}
+                            <b className="text-gray-700">{item.nh_ten}</b>
+                          </p>
+                        )}
                         <p className="text-xl font-bold text-red-600 mt-2">
                           {formatVND(item.ctsp_gianban)}
                         </p>
@@ -414,7 +700,7 @@ const QuanLySanPhamAdmin = () => {
                       </div>
                     </div>
 
-                    {/* CỘT 2: Kích thước & Khối lượng & Tồn kho */}
+                    {/* CỘT 2 */}
                     <div className="flex-1 grid grid-cols-2 gap-4 text-sm bg-gray-50 p-3 rounded-lg border border-gray-100">
                       <div>
                         <p className="text-xs text-gray-500 mb-1">Tồn kho</p>
@@ -447,7 +733,7 @@ const QuanLySanPhamAdmin = () => {
                       </div>
                     </div>
 
-                    {/* CỘT 3: Thống kê & Đánh giá & Nút thao tác */}
+                    {/* CỘT 3 */}
                     <div className="shrink-0 md:w-48 flex flex-col justify-between">
                       <div className="grid grid-cols-3 gap-2 text-center">
                         <div className="bg-blue-50 rounded-lg p-2 border border-blue-100">

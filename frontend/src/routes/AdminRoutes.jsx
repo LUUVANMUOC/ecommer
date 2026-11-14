@@ -49,7 +49,7 @@ const AdminRoutes = () => {
           <Route path="thong-tin-san" element={<ThongTinSan />} />
           <Route path="quan-ly-don-hang" element={<QuanLyDonHangAdmin />} />
 
-          <Route path="quan-ly-dong-tien" element={<QuanLyDongTien />} />
+          <Route path="thong-ke-dong-tien" element={<QuanLyDongTien />} />
           <Route
             path="thanh-toan-van-chuyen"
             element={<ThanhToanVanChuyen />}

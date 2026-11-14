@@ -76,6 +76,22 @@ export const FilterBarTK = ({
       </label>
 
       <label className="flex flex-col gap-1">
+        <span className="text-xs font-medium text-slate-500">Thương hiệu</span>
+        <select
+          className={`${INPUT} min-w-[180px]`}
+          value={filters.th_ma}
+          onChange={(e) => set("th_ma", e.target.value)}
+        >
+          <option value="">Tất cả thương hiệu</option>
+          {(danhMuc.thuong_hieu || []).map((t) => (
+            <option key={t.th_ma} value={t.th_ma}>
+              {t.th_ten}
+            </option>
+          ))}
+        </select>
+      </label>
+
+      <label className="flex flex-col gap-1">
         <span className="text-xs font-medium text-slate-500">Shop</span>
         <select
           className={`${INPUT} min-w-[200px]`}

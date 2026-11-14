@@ -47,7 +47,7 @@ const DongTienController = {
     }
   },
 
-  // ================= API THỐNG KÊ MỚI =================
+  // ================= THỐNG KÊ DÒNG TIỀN KHO =================
   getDanhMucDongTien: async (req, res) => {
     try {
       const data = await DongTienService.getDanhMuc();
@@ -100,6 +100,68 @@ const DongTienController = {
     } catch (error) {
       console.error('Lỗi lấy chi tiết phiếu tất toán:', error);
       res.status(500).json({ message: 'Lỗi server khi lấy chi tiết phiếu tất toán.' });
+    }
+  },
+
+  // ================= THỐNG KÊ DOANH THU SÀN =================
+  getDanhMucDoanhThuSan: async (req, res) => {
+    try {
+      const data = await DongTienService.getDanhMucDoanhThuSan();
+      res.status(200).json(data);
+    } catch (error) {
+      console.error('Lỗi lấy danh mục doanh thu sàn:', error);
+      res.status(500).json({ message: 'Lỗi server khi lấy danh mục doanh thu sàn.' });
+    }
+  },
+
+  getTongQuanDoanhThuSan: async (req, res) => {
+    try {
+      const filters = chuanHoaKhoangNgay(req.query);
+      const data = await DongTienService.getTongQuanDoanhThuSan(filters);
+      res.status(200).json(data);
+    } catch (error) {
+      console.error('Lỗi lấy tổng quan doanh thu sàn:', error);
+      res.status(500).json({ message: 'Lỗi server khi lấy tổng quan doanh thu sàn.' });
+    }
+  },
+
+  getGiaoDichDoanhThuSan: async (req, res) => {
+    try {
+      const filters = chuanHoaKhoangNgay(req.query);
+      const page = Math.max(1, Number(req.query.page) || 1);
+      const limit = Math.min(100, Math.max(5, Number(req.query.limit) || 10));
+
+      const data = await DongTienService.getGiaoDichDoanhThuSan({
+        ...filters,
+        trang_thai: req.query.trang_thai || null,
+        q: req.query.q ? String(req.query.q).trim() : null,
+        page,
+        limit,
+      });
+
+      res.status(200).json(data);
+    } catch (error) {
+      console.error('Lỗi lấy danh sách giao dịch doanh thu sàn:', error);
+      res
+        .status(500)
+        .json({ message: 'Lỗi server khi lấy danh sách giao dịch doanh thu sàn.' });
+    }
+  },
+
+  getPhieuChiTietDoanhThuSan: async (req, res) => {
+    try {
+      const data = await DongTienService.getPhieuChiTietDoanhThuSan(
+        req.params.ptt_ma
+      );
+      if (!data) {
+        return res.status(404).json({ message: 'Không tìm thấy phiếu tất toán.' });
+      }
+      res.status(200).json(data);
+    } catch (error) {
+      console.error('Lỗi lấy chi tiết phiếu doanh thu sàn:', error);
+      res
+        .status(500)
+        .json({ message: 'Lỗi server khi lấy chi tiết phiếu doanh thu sàn.' });
     }
   },
 };
