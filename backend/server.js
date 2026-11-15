@@ -74,6 +74,7 @@ const shipperAuthRoutes = require('./src/routes/shipper/authRoutes');
 const shipperDonHangRoutes = require('./src/routes/shipper/donHangRoutes');
 const shipperTrungChuyenRoutes = require('./src/routes/shipper/trungChuyenRoutes');
 const shipperGiaoHangRoutes = require('./src/routes/shipper/giaoHangRoutes');
+const shipperTienDangGiuRoutes = require('./src/routes/shipper/tienDangGiuRoutes');
 
 // Khách hàng
 const thongTinNhanHangRoutes = require('./src/routes/khachhang/thongTinNhanHangRoutes');
@@ -203,6 +204,8 @@ app.use('/api/dvvc/shipper/auth', shipperAuthRoutes);
 app.use('/api/dvvc/shipper/don-hang', shipperDonHangRoutes);
 app.use('/api/dvvc/shipper/trung-chuyen', shipperTrungChuyenRoutes);
 app.use('/api/dvvc/shipper/giao-hang', shipperGiaoHangRoutes);
+// 🟢 Tiền đang giữ của shipper giao hàng (LSP03)
+app.use('/api/dvvc/tien-dang-giu', shipperTienDangGiuRoutes);
 
 // 8. Khách hàng
 app.use('/api/khach-hang/dia-chi-nhan-hang', thongTinNhanHangRoutes);

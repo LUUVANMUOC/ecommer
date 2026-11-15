@@ -52,6 +52,7 @@ export const LSP_UI_CONFIG = {
     menuItems: [
       { title: 'Trang chủ', path: '/shipper' },
       { title: 'Đơn cần giao', path: '/shipper/giao-hang' },
+      { title: 'Tiền đang giữ', path: '/shipper/tien-dang-giu' }, // 🟢 COD & lịch sử nộp
       { title: 'Tài khoản', path: '/shipper/tai-khoan' }, // 🟢 Thêm menu Tài khoản
     ],
   },

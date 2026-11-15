@@ -6,6 +6,7 @@ import ShipperHome from "../pages/shipper/dashboard/ShipperHome";
 import DonChoLay from "../pages/shipper/DonChoLay";
 import TrungChuyen from "../pages/shipper/TrungChuyen";
 import GiaoHang from "../pages/shipper/GiaoHang";
+import TienDangGiu from "../pages/shipper/TienDangGiu";
 import TaiKhoan from "../pages/shipper/TaiKhoan"; // 🟢 Import trang Tài Khoản mới
 
 // Guard check quyền truy cập theo lsp_ma (business key — quy ước cố định)
@@ -76,6 +77,16 @@ const ShipperRoutes = () => {
             element={
               <RoleGuard allowed={["LSP03"]}>
                 <GiaoHang />
+              </RoleGuard>
+            }
+          />
+
+          {/* LSP03 — Tiền đang giữ (COD + lịch sử nộp kho) */}
+          <Route
+            path="tien-dang-giu"
+            element={
+              <RoleGuard allowed={["LSP03"]}>
+                <TienDangGiu />
               </RoleGuard>
             }
           />
