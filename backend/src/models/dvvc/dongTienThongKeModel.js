@@ -85,7 +85,11 @@ const GIU = `
          CASE
            WHEN t.ttgh_da_nop_tien = false THEN 'SHIPPER'
            WHEN NOT EXISTS (
-             SELECT 1 FROM chitiet_tat_toan c WHERE c.dts_ma = o.dts_ma
+             SELECT 1
+             FROM chitiet_tat_toan c
+             JOIN phieu_tat_toan p ON p.ptt_ma = c.ptt_ma
+             WHERE c.dts_ma = o.dts_ma
+               AND p.ptt_trang_thai_thanh_toan = 'DA_THANH_TOAN'
            ) THEN 'KHO'
            ELSE NULL
          END AS dang_giu
@@ -216,7 +220,7 @@ const DongTienThongKeModel = {
         COALESCE(SUM(g.cod) FILTER (WHERE g.dang_giu = 'SHIPPER'), 0) AS shipper_giu,
         (COUNT(*) FILTER (WHERE g.dang_giu = 'SHIPPER'))::int AS shipper_so_don,
         (COUNT(DISTINCT g.shipper_ma) FILTER (WHERE g.dang_giu = 'SHIPPER'))::int AS shipper_so_shipper,
-        MIN(g.ttgh_thoidiem) FILTER (WHERE g.dang_giu = 'SHIPPER') AS shipper_cu_nhat,
+        MIN(g.thoi_diem_ghi_nhan) FILTER (WHERE g.dang_giu = 'SHIPPER') AS shipper_cu_nhat,
         COALESCE(SUM(g.cod) FILTER (WHERE g.dang_giu = 'KHO'), 0) AS kho_giu,
         (COUNT(*) FILTER (WHERE g.dang_giu = 'KHO'))::int AS kho_so_don,
         (COUNT(DISTINCT g.kho_ma) FILTER (WHERE g.dang_giu = 'KHO'))::int AS kho_so_kho,
@@ -287,7 +291,8 @@ const DongTienThongKeModel = {
              FROM chitiet_tat_toan c
              JOIN phieu_tat_toan p ON p.ptt_ma = c.ptt_ma
              WHERE c.dts_ma = g.dts_ma
-               AND p.ptt_ngay_tat_toan < ${MOC('m.moc_sau')}
+               AND p.ptt_trang_thai_thanh_toan = 'DA_THANH_TOAN'
+               AND p.ptt_thoi_diem_hoan_tat < ${MOC('m.moc_sau')}
            )
         ) AS kho_giu,
         (SELECT COALESCE(SUM(v.tien), 0)
@@ -373,7 +378,8 @@ const DongTienThongKeModel = {
              FROM chitiet_tat_toan c
              JOIN phieu_tat_toan p ON p.ptt_ma = c.ptt_ma
              WHERE c.dts_ma = g.dts_ma
-               AND p.ptt_ngay_tat_toan < ${MOC('m.moc_sau')}
+               AND p.ptt_trang_thai_thanh_toan = 'DA_THANH_TOAN'
+               AND p.ptt_thoi_diem_hoan_tat < ${MOC('m.moc_sau')}
            )
         ) AS kho_giu,
         (SELECT COALESCE(SUM(v.tien), 0)
@@ -473,8 +479,8 @@ const DongTienThongKeModel = {
              COALESCE(SUM(tra_shop), 0) AS tra_shop,
              COALESCE(SUM(tra_san), 0) AS tra_san,
              COALESCE(SUM(dvvc_giu), 0) AS dvvc_giu,
-             MIN(ttgh_thoidiem) AS don_cu_nhat,
-             FLOOR(EXTRACT(EPOCH FROM (NOW() - MIN(ttgh_thoidiem))) / 86400)::int AS so_ngay_giu
+             MIN(thoi_diem_ghi_nhan) AS don_cu_nhat,
+             FLOOR(EXTRACT(EPOCH FROM (NOW() - MIN(thoi_diem_ghi_nhan))) / 86400)::int AS so_ngay_giu
       FROM giu
       WHERE dang_giu = 'SHIPPER'
       GROUP BY shipper_ma, shipper_ten, shipper_sdt, kho_ma, kho_ten
@@ -618,13 +624,13 @@ const DongTienThongKeModel = {
       pool.query(
         `
         WITH giu AS (${GIU})
-        SELECT dts_ma, dts_ngaylap, ttgh_thoidiem,
+        SELECT dts_ma, dts_ngaylap, ttgh_thoidiem, thoi_diem_ghi_nhan,
                shipper_ma, shipper_ten, shipper_sdt,
                kho_ma, kho_ten, cod, tra_shop, tra_san, dvvc_giu, dang_giu,
-               FLOOR(EXTRACT(EPOCH FROM (NOW() - ttgh_thoidiem)) / 86400)::int AS so_ngay_giu
+               FLOOR(EXTRACT(EPOCH FROM (NOW() - thoi_diem_ghi_nhan)) / 86400)::int AS so_ngay_giu
         FROM giu
         ${where}
-        ORDER BY ttgh_thoidiem ASC, dts_ma ASC
+        ORDER BY thoi_diem_ghi_nhan ASC, dts_ma ASC
         LIMIT $5 OFFSET $6
         `,
         [dvvc_ma, khoFilter, ma, loai, l, offset]
@@ -668,7 +674,7 @@ const DongTienThongKeModel = {
 
     const base = `
       FROM donhangtheoshop o
-      JOIN gianhang g ON g.gh_ma = o.gh_ma
+      LEFT JOIN gianhang g ON g.gh_ma = o.gh_ma
       ${KHO_SHIPPER_CUA_DON}
       LEFT JOIN kho k ON k.kho_ma = kv.kho_ma
       WHERE o.dvvc_ma = $1
@@ -711,9 +717,6 @@ const DongTienThongKeModel = {
   },
 
   // =========================================================
-  // 5. DANH SÁCH PHIẾU SÀN ĐÃ CHUYỂN
-  // =========================================================
-    // =========================================================
   // 5. DANH SÁCH PHIẾU SÀN ĐÃ CHUYỂN
   // =========================================================
   getDanhSachPhieu: async ({ dvvc_ma, nam, thang = null, page = 1, limit = 10 }) => {

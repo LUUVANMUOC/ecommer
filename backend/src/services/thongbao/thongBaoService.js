@@ -20,9 +20,10 @@ const LOAI_HOP_LE = new Set([
   'CUOC_VAN_CHUYEN',
   'MA_GIAM_GIA',
   'HE_THONG',
+  'SU_CO',
 ]);
 const NGUON_HOP_LE = new Set(['SAN', 'DVVC', 'SHOP', 'HE_THONG']);
-const NN_HOP_LE = new Set(['SHOP', 'KHACHHANG', 'SAN', 'DVVC']);
+const NN_HOP_LE = new Set(['SHOP', 'KHACHHANG', 'SAN', 'DVVC', 'SHIPPER']);
 
 // Nhận mảng từ JSON body hoặc từ multipart (chuỗi JSON / 1 giá trị)
 const docMang = (value) => {

@@ -9,6 +9,8 @@ import QuanLyShipper from "../pages/dvvc/QuanLyShipper";
 import PhanCongShipper from "../pages/dvvc/PhanCongShipper";
 import TheoDoiDonHang from "../pages/dvvc/TheoDoiDonHang";
 import LichSuNhanTienShip from "../pages/dvvc/LichSuNhanTienShip";
+import SuCoPage from "../pages/suco/SuCoPage";
+import ChiTietSuCoPage from "../pages/suco/ChiTietSuCoPage";
 // Thêm vào <Routes>
 import HopThuThongBao from "../pages/common/HopThuThongBao";
 const DVVCRoutes = () => {
@@ -41,6 +43,14 @@ const DVVCRoutes = () => {
           <Route path="phan-cong-shipper" element={<PhanCongShipper />} />
           <Route path="theo-doi-don-hang" element={<TheoDoiDonHang />} />
           <Route path="lich-su-nhan-tien" element={<LichSuNhanTienShip />} />
+          <Route
+            path="su-co"
+            element={<SuCoPage vaiTro="dvvc" basePath="/dvvc/su-co" />}
+          />
+          <Route
+            path="su-co/:ycxlsc_ma"
+            element={<ChiTietSuCoPage vaiTro="dvvc" basePath="/dvvc/su-co" />}
+          />
         </Route>
       </Route>
     </Routes>

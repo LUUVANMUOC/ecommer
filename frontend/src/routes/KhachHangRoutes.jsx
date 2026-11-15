@@ -6,6 +6,8 @@ import ThongTinCaNhan from "../pages/khachhang/ThongTinCaNhan"; // ✅ Thêm imp
 import ThanhToan from "../pages/khachhang/ThanhToan";
 import DanhGiaSanPham from "../pages/khachhang/DanhGiaSanPham";
 import HopThuKhachHang from "../pages/khachhang/HopThuKhachHang";
+import SuCoPage from "../pages/suco/SuCoPage";
+import ChiTietSuCoPage from "../pages/suco/ChiTietSuCoPage";
 const KhachHangRoutes = () => {
   return (
     <Routes>
@@ -17,6 +19,16 @@ const KhachHangRoutes = () => {
         <Route path="thanh-toan" element={<ThanhToan />} />
         <Route path="danh-gia/:dts_ma" element={<DanhGiaSanPham />} />
         <Route path="thong-bao" element={<HopThuKhachHang />} />
+        <Route
+          path="su-co"
+          element={<SuCoPage vaiTro="khachhang" basePath="/khach-hang/su-co" />}
+        />
+        <Route
+          path="su-co/:ycxlsc_ma"
+          element={
+            <ChiTietSuCoPage vaiTro="khachhang" basePath="/khach-hang/su-co" />
+          }
+        />
       </Route>
     </Routes>
   );

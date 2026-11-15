@@ -58,6 +58,7 @@ const DVVCDashboard = () => {
       title: "Dòng tiền & tiền đang giữ",
       path: "/dvvc/lich-su-nhan-tien",
     },
+    { title: "Sự cố & khiếu nại", path: "/dvvc/su-co" },
     { title: "Hộp thư thông báo", path: "/dvvc/thong-bao" },
   ];
 

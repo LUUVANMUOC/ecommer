@@ -59,6 +59,7 @@ const AdminDashboard = () => {
       children: [
         { title: "Hộp thư thông báo", path: "/admin/thong-bao" },
         { title: "Gửi thông báo cho Shop", path: "/admin/gui-thong-bao" },
+        { title: "Xử lý sự cố", path: "/admin/su-co" },
       ],
     },
   ];

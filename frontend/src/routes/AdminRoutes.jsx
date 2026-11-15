@@ -20,7 +20,8 @@ import LichSuThanhToanVanChuyen from "../pages/admin/LichSuThanhToanVanChuyen";
 import QuanLyDongTien from "../pages/admin/QuanLyDongTien";
 import ThanhToanVanChuyen from "../pages/admin/ThanhToanVanChuyen";
 import GiaoDienCRUD from "../pages/admin/GiaoDienCRUD";
-
+import SuCoAdmin from "../pages/admin/SuCoAdmin";
+import ChiTietSuCoAdmin from "../pages/admin/ChiTietSuCoAdmin";
 const AdminRoutes = () => {
   return (
     <Routes>
@@ -71,6 +72,8 @@ const AdminRoutes = () => {
             element={<QuanLyPhiVanChuyen />}
           />
           <Route path="thong-ke-nganh-hang" element={<ThongKeNganhHang />} />
+          <Route path="su-co" element={<SuCoAdmin />} />
+          <Route path="su-co/:ycxlsc_ma" element={<ChiTietSuCoAdmin />} />
         </Route>
       </Route>
     </Routes>

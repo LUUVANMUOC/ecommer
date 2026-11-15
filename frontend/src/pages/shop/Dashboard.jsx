@@ -72,6 +72,7 @@ const ShopDashboard = () => {
       children: [
         { title: "Hộp thư thông báo", path: "/nguoi-ban/thong-bao" },
         { title: "Gửi thông báo cho khách", path: "/nguoi-ban/gui-thong-bao" },
+        { title: "Sự cố & khiếu nại", path: "/nguoi-ban/su-co" },
       ],
     },
   ];

@@ -8,7 +8,8 @@ import TrungChuyen from "../pages/shipper/TrungChuyen";
 import GiaoHang from "../pages/shipper/GiaoHang";
 import TienDangGiu from "../pages/shipper/TienDangGiu";
 import TaiKhoan from "../pages/shipper/TaiKhoan"; // 🟢 Import trang Tài Khoản mới
-
+import SuCoPage from "../pages/suco/SuCoPage";
+import ChiTietSuCoPage from "../pages/suco/ChiTietSuCoPage";
 // Guard check quyền truy cập theo lsp_ma (business key — quy ước cố định)
 const RoleGuard = ({ allowed, children }) => {
   let user = {};
@@ -93,6 +94,22 @@ const ShipperRoutes = () => {
 
           {/* 🟢 Tài khoản — Tất cả các loại Shipper đều có quyền truy cập */}
           <Route path="tai-khoan" element={<TaiKhoan />} />
+          <Route
+            path="su-co"
+            element={
+              <RoleGuard allowed={["LSP03"]}>
+                <SuCoPage vaiTro="shipper" basePath="/shipper/su-co" />
+              </RoleGuard>
+            }
+          />
+          <Route
+            path="su-co/:ycxlsc_ma"
+            element={
+              <RoleGuard allowed={["LSP03"]}>
+                <ChiTietSuCoPage vaiTro="shipper" basePath="/shipper/su-co" />
+              </RoleGuard>
+            }
+          />
         </Route>
       </Route>
     </Routes>

@@ -15,6 +15,8 @@ import LichSuDongTien from "../pages/shop/LichSuDongTien";
 import ThongKeDoanhThu from "../pages/shop/ThongKeDoanhThu";
 import HopThuThongBao from "../pages/common/HopThuThongBao";
 import GuiThongBaoKhachHang from "../pages/shop/GuiThongBaoKhachHang";
+import SuCoPage from "../pages/suco/SuCoPage";
+import ChiTietSuCoPage from "../pages/suco/ChiTietSuCoPage";
 const ShopRoutes = () => {
   return (
     <Routes>
@@ -40,7 +42,16 @@ const ShopRoutes = () => {
           <Route path="ma-giam-gia-shop" element={<MaGiamGiaShopCRUD />} />
           <Route path="gui-kien-nghi" element={<KienNghiShop />} />
           <Route path="van-chuyen" element={<QuanLyVanChuyen />} />
-
+          <Route
+            path="su-co"
+            element={<SuCoPage vaiTro="shop" basePath="/nguoi-ban/su-co" />}
+          />
+          <Route
+            path="su-co/:ycxlsc_ma"
+            element={
+              <ChiTietSuCoPage vaiTro="shop" basePath="/nguoi-ban/su-co" />
+            }
+          />
           {/* Quản lý sản phẩm: danh sách → chi tiết → cập nhật phân loại */}
           <Route path="quan-ly-san-pham" element={<QuanLySanPham />} />
           <Route path="quan-ly-san-pham/:sp_ma" element={<ChiTietSanPham />} />

@@ -101,7 +101,9 @@ const phiVanChuyenController = require('./src/controllers/khachhang/phiVanChuyen
 // Bổ sung Import cho Cron & Xử lý
 const TatToanModel = require('./src/models/quanlykho/tatToanModel');
 const quanLyDongTienRoutes = require('./src/routes/san/quanLyDongTienRoutes');
-
+const suCoRoutes = require('./src/routes/suco/suCoRoutes');
+const adminSuCoRoutes = require('./src/routes/suco/adminSuCoRoutes');
+const SuCoSlaService = require('./src/services/suco/suCoSlaService');
 // ================= 2. KHỞI TẠO APP =================
 const app = express(); 
 
@@ -199,6 +201,9 @@ app.use('/api/dvvc/shipper', shipperRoutes);
 app.use('/api/thong-bao', thongBaoRoutes);
 app.use('/api/nguoi-ban/thong-bao', thongBaoShopRoutes);
 app.use('/api/admin/thong-bao', thongBaoSanRoutes);
+// 🧾 Xử lý sự cố
+app.use('/api/su-co', suCoRoutes);
+app.use('/api/admin/su-co', adminSuCoRoutes);
 // 7. Shipper
 app.use('/api/dvvc/shipper/auth', shipperAuthRoutes);
 app.use('/api/dvvc/shipper/don-hang', shipperDonHangRoutes);
@@ -317,7 +322,7 @@ const io = new Server(httpServer, {
 });
 
 realtimeSocket.init(io);
-
+SuCoSlaService.start();
 httpServer.listen(PORT, () => {
   console.log(`🚀 Server Backend đang chạy ở cổng ${PORT}`);
   console.log(`🔗 API URL: http://localhost:${PORT}/api/auth`);

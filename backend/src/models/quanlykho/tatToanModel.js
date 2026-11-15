@@ -34,6 +34,9 @@ const TatToanModel = {
       WHERE dts.dvvc_ma = (SELECT dvvc_ma FROM kho WHERE kho_ma = $1)
         AND ttgh.ttgh_da_nop_tien = true
         AND dts.dts_ma NOT IN (SELECT dts_ma FROM chitiet_tat_toan)
+        AND dts.dts_ma NOT IN (
+          SELECT dts_ma FROM giu_tien_su_co WHERE gtsc_trang_thai = 'DANG_GIU'
+        )
     `;
     
     const ordersRes = await pool.query(query, [kho_ma]);
