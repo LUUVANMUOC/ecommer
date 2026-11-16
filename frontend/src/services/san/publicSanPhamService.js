@@ -67,6 +67,17 @@ const publicSanPhamService = {
 
   getShopVouchers: (gh_ma) =>
     axiosClient.get(`/san-pham/gian-hang/${gh_ma}/vouchers`),
+
+  /**
+   * Đánh giá của 1 sản phẩm.
+   * Trả về: { data, total, page, limit, total_pages, thong_ke }
+   *
+   * params: { page?, limit?, sao? (1-5), ctsp_ma? }
+   */
+  getDanhGia: (sp_ma, params = {}) =>
+    axiosClient.get(`/san-pham/${sp_ma}/danh-gia`, {
+      params: normalizeShopParams(params),
+    }),
 };
 
 export default publicSanPhamService;

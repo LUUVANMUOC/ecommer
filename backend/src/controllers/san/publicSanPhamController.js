@@ -89,6 +89,26 @@ const PublicSanPhamController = {
       res.status(500).json({ message: error.message });
     }
   },
+
+  // Đánh giá của 1 sản phẩm: page, limit, sao, ctsp_ma
+  getDanhGia: async (req, res) => {
+    try {
+      const { sp_ma } = req.params;
+      const { page, limit, sao, ctsp_ma } = req.query;
+
+      const data = await PublicSanPhamModel.getDanhGiaSanPham(sp_ma, {
+        page: parseInt(page, 10) || 1,
+        limit: Math.min(parseInt(limit, 10) || 5, 50),
+        sao: sao || "",
+        ctsp_ma: ctsp_ma || "",
+      });
+
+      res.status(200).json(data);
+    } catch (error) {
+      console.error("Lỗi lấy đánh giá sản phẩm:", error);
+      res.status(500).json({ message: error.message });
+    }
+  },
 };
 
 module.exports = PublicSanPhamController;

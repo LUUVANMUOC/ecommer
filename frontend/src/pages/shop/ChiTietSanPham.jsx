@@ -1,9 +1,10 @@
 // src/pages/shop/ChiTietSanPham.jsx
-import { useState, useEffect } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
 import sanPhamService from "../../services/gianhang/sanPhamService";
 import chiTietSanPhamService from "../../services/gianhang/chiTietSanPhamService";
 import trangThaiChiTietSanPhamService from "../../services/gianhang/trangThaiChiTietSanPhamService";
+import publicSanPhamService from "../../services/san/publicSanPhamService";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
 import {
   Card,
@@ -13,6 +14,7 @@ import {
   AttributeChips,
   SanPhamFormDrawer,
   formatVND,
+  imgUrl,
   getCurrentShopId,
   loadProductOptions,
 } from "../../components/shop/SanPhamShared";
@@ -229,6 +231,457 @@ const VariantPanel = ({
         </div>
       )}
     </Card>
+  );
+};
+
+/* --------------------------------------------------------------
+   KHỐI ĐÁNH GIÁ SẢN PHẨM (đặt cuối trang, chỉ đọc)
+   -------------------------------------------------------------- */
+const DG_LIMIT = 5;
+const DG_STAR_LEVELS = [5, 4, 3, 2, 1];
+
+const dgKeyOf = (r) => `${r.dts_ma}|${r.ctsp_ma}|${r.kh_ma}`;
+
+// dgsp_hinhanh là chuỗi JSON các đường dẫn ảnh
+const parseReviewImages = (raw) => {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw.filter(Boolean);
+  if (typeof raw !== "string") return [];
+
+  const value = raw.trim();
+  if (!value) return [];
+
+  if (value.startsWith("[") || value.startsWith('"')) {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) return parsed.filter(Boolean);
+      if (typeof parsed === "string" && parsed.trim()) return [parsed.trim()];
+    } catch {
+      // dữ liệu cũ không phải JSON hợp lệ -> coi như 1 đường dẫn
+    }
+  }
+
+  return [value];
+};
+
+const reviewImgUrl = (link) => {
+  if (!link) return "";
+  const s = String(link).trim();
+  if (!s) return "";
+  if (/^https?:\/\//i.test(s) || s.startsWith("data:")) return s;
+  return imgUrl(s.startsWith("/") ? s : `/${s}`);
+};
+
+const formatReviewDate = (value) => {
+  if (!value) return "";
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+};
+
+const getInitials = (name) => {
+  const parts = String(name || "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
+};
+
+// Danh sách số trang có dấu "…" (dùng chuỗi "gap-x" làm key)
+const buildPageList = (current, total) => {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
+
+  const pages = new Set([1, total, current, current - 1, current + 1]);
+  if (current <= 4) [2, 3, 4, 5].forEach((p) => pages.add(p));
+  if (current >= total - 3)
+    [total - 4, total - 3, total - 2, total - 1].forEach((p) => pages.add(p));
+
+  const sorted = [...pages]
+    .filter((p) => p >= 1 && p <= total)
+    .sort((a, b) => a - b);
+
+  const out = [];
+  sorted.forEach((p, i) => {
+    if (i > 0 && p - sorted[i - 1] > 1) out.push(`gap-${p}`);
+    out.push(p);
+  });
+  return out;
+};
+
+const StarRow = ({ value = 0, size = 16 }) => {
+  const filled = Math.round(Number(value) || 0);
+  return (
+    <span className="inline-flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <span
+          key={n}
+          className="material-symbols-outlined leading-none"
+          style={{
+            fontSize: `${size}px`,
+            color: n <= filled ? "#F2A93B" : "#DDD6C7",
+            fontVariationSettings: n <= filled ? "'FILL' 1" : "'FILL' 0",
+          }}
+        >
+          star
+        </span>
+      ))}
+    </span>
+  );
+};
+
+const DanhGiaSection = ({ sp_ma, variants }) => {
+  const [page, setPage] = useState(1);
+  const [sao, setSao] = useState("");
+  const [ctspMa, setCtspMa] = useState("");
+  const [state, setState] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+
+  const topRef = useRef(null);
+  const reqRef = useRef(0);
+
+  const load = useCallback(
+    async (targetPage, targetSao, targetCtsp) => {
+      const reqId = ++reqRef.current;
+      setLoading(true);
+      setError("");
+      try {
+        const res = await publicSanPhamService.getDanhGia(sp_ma, {
+          page: targetPage,
+          limit: DG_LIMIT,
+          sao: targetSao,
+          ctsp_ma: targetCtsp,
+        });
+        if (reqRef.current !== reqId) return;
+        setState(res.data);
+      } catch (err) {
+        if (reqRef.current !== reqId) return;
+        setError(
+          err.response?.data?.message || "Không tải được đánh giá sản phẩm.",
+        );
+      } finally {
+        if (reqRef.current === reqId) setLoading(false);
+      }
+    },
+    [sp_ma],
+  );
+
+  useEffect(() => {
+    setPage(1);
+    setSao("");
+    setCtspMa("");
+    setState(null);
+    load(1, "", "");
+  }, [sp_ma, load]);
+
+  const changeFilter = (next = {}) => {
+    const nextSao = next.sao !== undefined ? next.sao : sao;
+    const nextCtsp = next.ctsp_ma !== undefined ? next.ctsp_ma : ctspMa;
+    setSao(nextSao);
+    setCtspMa(nextCtsp);
+    setPage(1);
+    load(1, nextSao, nextCtsp);
+  };
+
+  const goPage = (nextPage) => {
+    const totalPages = state?.total_pages || 0;
+    if (nextPage < 1) return;
+    if (totalPages && nextPage > totalPages) return;
+    if (nextPage === page) return;
+
+    setPage(nextPage);
+    load(nextPage, sao, ctspMa);
+    topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const thongKe = state?.thong_ke || { trung_binh: 0, tong: 0, phan_bo: {} };
+  const phanBo = thongKe.phan_bo || {};
+  const reviews = state?.data || [];
+  const total = state?.total || 0;
+  const totalPages = state?.total_pages || 0;
+  const hasFilter = sao !== "" || ctspMa !== "";
+  const avg = Number(thongKe.trung_binh) || 0;
+
+  return (
+    <section ref={topRef} className="scroll-mt-24">
+      <Card className="overflow-hidden">
+        {/* Tiêu đề khối */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#EFEBE2] px-5 py-4">
+          <div>
+            <h2 className="text-base font-bold text-[#14201C]">
+              Đánh giá sản phẩm
+            </h2>
+            <p className="text-xs text-[#7A857F]">
+              Dựa trên đánh giá của khách đã mua hàng
+            </p>
+          </div>
+          <span className="rounded-full bg-[#FDF3E1] px-3 py-1 text-xs font-semibold text-[#8A5A0B]">
+            {thongKe.tong} đánh giá
+          </span>
+        </div>
+
+        {/* Tổng quan + bộ lọc */}
+        <div className="grid grid-cols-1 gap-6 border-b border-[#EFEBE2] px-5 py-5 lg:grid-cols-[260px_minmax(0,1fr)]">
+          <div className="flex flex-col items-start gap-2 rounded-2xl border border-[#F2A93B]/40 bg-gradient-to-br from-[#FDF3E1] to-[#FBFAF7] px-5 py-4">
+            <p className="text-3xl font-bold tabular-nums text-[#14201C]">
+              {thongKe.tong > 0 ? avg.toFixed(1) : "—"}
+              <span className="text-base font-medium text-[#7A857F]">/5</span>
+            </p>
+            <StarRow value={avg} size={20} />
+            <p className="text-xs text-[#7A857F]">
+              {thongKe.tong} đánh giá từ khách đã mua
+            </p>
+          </div>
+
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center gap-2">
+              <label
+                htmlFor="dg-ctsp"
+                className="text-xs font-semibold uppercase tracking-wide text-[#7A857F]"
+              >
+                Phân loại
+              </label>
+              <select
+                id="dg-ctsp"
+                value={ctspMa}
+                onChange={(e) => changeFilter({ ctsp_ma: e.target.value })}
+                className="max-w-full rounded-lg border border-[#D9CFC2] bg-white px-3 py-1.5 text-sm text-[#3D4A44] focus:border-[#F2A93B] focus:outline-none"
+              >
+                <option value="">Tất cả phân loại</option>
+                {variants.map((ct) => (
+                  <option key={ct.ctsp_ma} value={ct.ctsp_ma}>
+                    {ct.ctsp_ten}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => changeFilter({ sao: "" })}
+                className={`rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                  sao === ""
+                    ? "border-[#F2A93B] bg-[#FDF3E1] text-[#8A5A0B]"
+                    : "border-[#E2DED3] bg-white text-[#5B6661] hover:bg-[#F7F5F0]"
+                }`}
+              >
+                Tất cả ({thongKe.tong})
+              </button>
+
+              {DG_STAR_LEVELS.map((n) => {
+                const active = sao === String(n);
+                return (
+                  <button
+                    key={n}
+                    type="button"
+                    onClick={() => changeFilter({ sao: String(n) })}
+                    className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-semibold transition-colors ${
+                      active
+                        ? "border-[#F2A93B] bg-[#FDF3E1] text-[#8A5A0B]"
+                        : "border-[#E2DED3] bg-white text-[#5B6661] hover:bg-[#F7F5F0]"
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[14px] text-[#F2A93B]">
+                      star
+                    </span>
+                    {n} ({phanBo[n] ?? 0})
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        {/* Danh sách đánh giá */}
+        <div className="px-5 py-4">
+          {loading ? (
+            <div className="space-y-3">
+              {[1, 2, 3].map((i) => (
+                <div
+                  key={i}
+                  className="h-24 animate-pulse rounded-xl bg-[#F5F2EA]"
+                />
+              ))}
+            </div>
+          ) : error ? (
+            <div className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-[#F0C4AE] py-10 text-center">
+              <span className="material-symbols-outlined text-[32px] text-[#B42318]">
+                error
+              </span>
+              <p className="text-sm text-[#5B6661]">{error}</p>
+              <button
+                type="button"
+                onClick={() => load(page, sao, ctspMa)}
+                className="rounded-lg border border-[#D9CFC2] bg-white px-3.5 py-2 text-sm font-semibold text-[#3D4A44] hover:bg-[#F7F5F0]"
+              >
+                Thử lại
+              </button>
+            </div>
+          ) : reviews.length === 0 ? (
+            <div className="flex flex-col items-center gap-3 rounded-xl border-2 border-dashed border-[#E2DED3] py-10 text-center">
+              <span className="material-symbols-outlined text-[36px] text-[#C9C3B5]">
+                reviews
+              </span>
+              <p className="text-sm text-[#5B6661]">
+                {hasFilter
+                  ? "Không có đánh giá nào khớp bộ lọc."
+                  : "Sản phẩm chưa có đánh giá nào."}
+              </p>
+              {hasFilter && (
+                <button
+                  type="button"
+                  onClick={() => changeFilter({ sao: "", ctsp_ma: "" })}
+                  className="rounded-lg bg-[#8A5A0B] px-3.5 py-2 text-sm font-bold text-white hover:bg-[#6d470a]"
+                >
+                  Xóa bộ lọc
+                </button>
+              )}
+            </div>
+          ) : (
+            <ul className="divide-y divide-[#EFEBE2]">
+              {reviews.map((r) => {
+                const images = parseReviewImages(r.dgsp_hinhanh);
+                const key = dgKeyOf(r);
+
+                return (
+                  <li key={key} className="py-4 first:pt-0 last:pb-0">
+                    <div className="flex items-start gap-3">
+                      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-[#E2DED3] bg-[#F1EEE6]">
+                        {r.kh_avatar ? (
+                          <img
+                            src={reviewImgUrl(r.kh_avatar)}
+                            alt={r.kh_ten || "Khách hàng"}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <span className="flex h-full w-full items-center justify-center text-sm font-bold text-[#8A5A0B]">
+                            {getInitials(r.kh_ten)}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+                          <span className="text-sm font-bold text-[#14201C]">
+                            {r.kh_ten || "Khách hàng"}
+                          </span>
+                          <StarRow value={r.dgsp_sao} size={15} />
+                          {r.ctsp_ten && (
+                            <span className="rounded-full bg-[#EEF3F1] px-2 py-0.5 text-[11px] font-medium text-[#2F5D50]">
+                              {r.ctsp_ten}
+                            </span>
+                          )}
+                          <span className="text-xs text-[#9AA39E]">
+                            {formatReviewDate(r.dgsp_thoidiem)}
+                          </span>
+                        </div>
+
+                        <p className="mt-2 whitespace-pre-line text-sm leading-relaxed text-[#3D4A44]">
+                          {r.dgsp_mota || (
+                            <span className="italic text-[#9AA39E]">
+                              Khách không để lại nội dung.
+                            </span>
+                          )}
+                        </p>
+
+                        {images.length > 0 && (
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            {images.map((src, i) => (
+                              <img
+                                key={`${key}-img-${i}`}
+                                src={reviewImgUrl(src)}
+                                alt={`Ảnh đánh giá ${i + 1}`}
+                                loading="lazy"
+                                className="h-16 w-16 rounded-lg border border-[#E2DED3] object-cover"
+                              />
+                            ))}
+                          </div>
+                        )}
+
+                        {r.dgsp_phanhoi && (
+                          <div className="mt-3 rounded-xl border border-[#DCE7E2] bg-[#F4F8F6] px-3 py-2">
+                            <p className="text-xs font-bold text-[#2F5D50]">
+                              Phản hồi của shop
+                            </p>
+                            <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-[#3D4A44]">
+                              {r.dgsp_phanhoi}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+
+          {/* Phân trang */}
+          {!loading && !error && total > 0 && (
+            <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#EFEBE2] pt-4">
+              <p className="text-xs text-[#7A857F]">
+                Trang {page}/{totalPages || 1} · {total} đánh giá
+              </p>
+
+              {totalPages > 1 && (
+                <div className="flex flex-wrap items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => goPage(page - 1)}
+                    disabled={page <= 1}
+                    className="rounded-lg border border-[#D9CFC2] bg-white px-3 py-1.5 text-xs font-semibold text-[#3D4A44] hover:bg-[#F7F5F0] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Trước
+                  </button>
+
+                  {buildPageList(page, totalPages).map((p) =>
+                    typeof p === "string" ? (
+                      <span
+                        key={p}
+                        className="px-1 text-xs text-[#9AA39E] select-none"
+                      >
+                        …
+                      </span>
+                    ) : (
+                      <button
+                        key={p}
+                        type="button"
+                        onClick={() => goPage(p)}
+                        className={`min-w-[32px] rounded-lg border px-2.5 py-1.5 text-xs font-semibold tabular-nums transition-colors ${
+                          p === page
+                            ? "border-[#F2A93B] bg-[#FDF3E1] text-[#8A5A0B]"
+                            : "border-[#D9CFC2] bg-white text-[#3D4A44] hover:bg-[#F7F5F0]"
+                        }`}
+                      >
+                        {p}
+                      </button>
+                    ),
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => goPage(page + 1)}
+                    disabled={page >= totalPages}
+                    className="rounded-lg border border-[#D9CFC2] bg-white px-3 py-1.5 text-xs font-semibold text-[#3D4A44] hover:bg-[#F7F5F0] disabled:cursor-not-allowed disabled:opacity-40"
+                  >
+                    Sau
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </Card>
+    </section>
   );
 };
 
@@ -830,6 +1283,9 @@ const ChiTietSanPham = () => {
           />
         </aside>
       </div>
+
+      {/* KHỐI ĐÁNH GIÁ — cuối trang, full width, chỉ đọc */}
+      <DanhGiaSection sp_ma={sp_ma} variants={variants} />
 
       <SanPhamFormDrawer
         isOpen={drawerOpen}

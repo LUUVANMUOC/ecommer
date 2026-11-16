@@ -192,7 +192,7 @@ const TrangThaiChiTietSanPhamController = {
     },
 
     // ==========================================================
-    // G. ADMIN — Lấy tất cả sản phẩm toàn sàn (MỚI BỔ SUNG)
+    // G. ADMIN — Lấy tất cả sản phẩm toàn sàn
     // ==========================================================
     getAllSanPham: async (req, res) => {
         try {
@@ -203,7 +203,8 @@ const TrangThaiChiTietSanPhamController = {
             res.status(500).json({ message: error.message });
         }
     },
-        // 🟢 API Gửi duyệt hàng loạt
+
+    // 🟢 API Gửi duyệt hàng loạt
     submitAllForApproval: async (req, res) => {
         try {
             const { sp_ma } = req.body;
@@ -212,11 +213,11 @@ const TrangThaiChiTietSanPhamController = {
             }
 
             const result = await TrangThaiChiTietSanPhamModel.submitAllByProduct(sp_ma);
-            
+
             if (result.count === 0) {
-                return res.status(200).json({ 
+                return res.status(200).json({
                     message: 'Tất cả phân loại đã được gửi duyệt hoặc đang chờ duyệt. Không có phân loại nào cần gửi.',
-                    count: 0 
+                    count: 0
                 });
             }
 
@@ -229,11 +230,12 @@ const TrangThaiChiTietSanPhamController = {
             res.status(400).json({ message: error.message });
         }
     },
-        // ==========================================================
+
+    // ==========================================================
     // H. ADMIN — sản phẩm toàn sàn có phân trang + tìm kiếm + lọc
     //    GET /api/trang-thai-chi-tiet/admin/san-pham-phan-trang
     // ==========================================================
-        getSanPhamPhanTrang: async (req, res) => {
+    getSanPhamPhanTrang: async (req, res) => {
         try {
             const { q, gh_ma, trang_thai, nh_ma, page, limit } = req.query;
             const TRANG_THAI_HOP_LE = [
@@ -258,6 +260,29 @@ const TrangThaiChiTietSanPhamController = {
             res.status(200).json(data);
         } catch (error) {
             console.error('Lỗi lấy sản phẩm phân trang:', error);
+            res.status(500).json({ message: error.message });
+        }
+    },
+
+    // ==========================================================
+    // I. ADMIN — chi tiết đầy đủ 1 sản phẩm (mọi phân loại)
+    //    GET /api/trang-thai-chi-tiet/admin/san-pham/:sp_ma/chi-tiet
+    // ==========================================================
+    getChiTietSanPhamAdmin: async (req, res) => {
+        try {
+            const { sp_ma } = req.params;
+            if (!sp_ma) {
+                return res.status(400).json({ message: 'Thiếu mã sản phẩm.' });
+            }
+
+            const data = await TrangThaiChiTietSanPhamModel.getChiTietSanPhamAdmin(sp_ma);
+            if (!data) {
+                return res.status(404).json({ message: 'Không tìm thấy sản phẩm.' });
+            }
+
+            res.status(200).json(data);
+        } catch (error) {
+            console.error('Lỗi lấy chi tiết sản phẩm (admin):', error);
             res.status(500).json({ message: error.message });
         }
     },

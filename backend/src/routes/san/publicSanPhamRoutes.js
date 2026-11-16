@@ -27,6 +27,10 @@ router.put('/:id/like', PublicSanPhamController.toggleLike);
 // 🟢 Route lấy Voucher của Shop
 router.get('/gian-hang/:gh_ma/vouchers', PublicGianHangController.getShopVouchers);
 
+// 5. Route lấy đánh giá của sản phẩm (public)
+//    ?page=1&limit=5&sao=5&ctsp_ma=...
+router.get('/:sp_ma/danh-gia', PublicSanPhamController.getDanhGia);
+
 // ==========================================================
 // CÁC ROUTE CHUNG (ĐẶT Ở DƯỚI CÙNG)
 // ==========================================================

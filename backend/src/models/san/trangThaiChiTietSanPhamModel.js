@@ -357,6 +357,133 @@ const TrangThaiChiTietSanPhamModel = {
             total_pages: Math.max(1, Math.ceil(total / l)),
         };
     },
+
+    // ==========================================================
+    // I. ADMIN — CHI TIẾT ĐẦY ĐỦ 1 SẢN PHẨM
+    //    GET /api/trang-thai-chi-tiet/admin/san-pham/:sp_ma/chi-tiet
+    //    Trả về: { san_pham, phan_loai: [...] }
+    // ==========================================================
+    getChiTietSanPhamAdmin: async (sp_ma) => {
+        const sanPhamQuery = `
+            SELECT
+                sp.sp_ma, sp.sp_ten, sp.sp_mota,
+                sp.sp_luotxem, sp.sp_luotthich, sp.sp_luotmua, sp.sp_diemdanhgiatrungbinh,
+                sp.th_ma, th.th_ten, th.th_hinhanh,
+                sp.dmsp_ma, dm.dmsp_ten,
+                gh.gh_ma, gh.gh_ten, gh.gh_hinhanh, gh.gh_danhgia, gh.gh_theodoi,
+                (
+                    SELECT MIN(ctsp_ngaytao)
+                    FROM chitietsanpham
+                    WHERE sp_ma = sp.sp_ma
+                ) AS ngay_tao_som_nhat
+            FROM sanpham sp
+            JOIN gianhang gh ON sp.gh_ma = gh.gh_ma
+            LEFT JOIN thuonghieu th ON sp.th_ma = th.th_ma
+            LEFT JOIN danhmucsanpham dm ON sp.dmsp_ma = dm.dmsp_ma
+            WHERE sp.sp_ma = $1
+        `;
+
+        const phanLoaiQuery = `
+            WITH latest_status AS (
+                SELECT DISTINCT ON (ctsp_ma)
+                    ctsp_ma, ttctsp_ma
+                FROM chitiettrangthaisanpham
+                ORDER BY ctsp_ma, ctttsp_thoidiem DESC
+            )
+            SELECT
+                ctsp.ctsp_ma, ctsp.ctsp_ten, ctsp.ctsp_mota, ctsp.ctsp_gianban,
+                ctsp.ctsp_soluongton, ctsp.ctsp_chieudai, ctsp.ctsp_chieurong,
+                ctsp.ctsp_chieucao, ctsp.ctsp_khoiluong, ctsp.ctsp_ngaytao,
+                ctsp.ctsp_luotxem, ctsp.ctsp_luotthich, ctsp.ctsp_luotmua,
+                ctsp.ctsp_diemdanhgiatrungbinh,
+                ctsp.nh_ma, nh.nh_ten,
+                gb.gb_gia,
+                COALESCE(psck.psck_phantram, 0) AS psck_phantram,
+                ls.ttctsp_ma, tt.ttctsp_ten,
+                (
+                    SELECT COUNT(*)::int
+                    FROM danhgiasanpham dg
+                    WHERE dg.ctsp_ma = ctsp.ctsp_ma
+                ) AS so_danh_gia,
+                COALESCE(
+                    (
+                        SELECT json_agg(json_build_object(
+                            'hasp_ma', ha.hasp_ma,
+                            'hasp_link', ha.hasp_link,
+                            'hasp_mota', ha.hasp_mota,
+                            'hasp_laanhchinh', ha.hasp_laanhchinh,
+                            'hasp_thutu', ha.hasp_thutu
+                        ) ORDER BY ha.hasp_laanhchinh DESC, ha.hasp_thutu ASC, ha.hasp_ma ASC)
+                        FROM hinhanhsanpham ha
+                        WHERE ha.ctsp_ma = ctsp.ctsp_ma
+                    ),
+                    '[]'::json
+                ) AS images,
+                COALESCE(
+                    (
+                        SELECT json_agg(json_build_object(
+                            'ttsp_ma', gt.ttsp_ma,
+                            'ttsp_ten', ttsp.thsp_ten,
+                            'thsp_icon', ttsp.thsp_icon,
+                            'gttt_giatridinhtinh', gt.gttt_giatridinhtinh,
+                            'gttt_giatridinhluong', gt.gttt_giatridinhluong
+                        ) ORDER BY ttsp.thsp_ten)
+                        FROM giatrithuoctinh gt
+                        LEFT JOIN thuoctinhsanpham ttsp ON gt.ttsp_ma = ttsp.thsp_ma
+                        WHERE gt.ctsp_ma = ctsp.ctsp_ma
+                    ),
+                    '[]'::json
+                ) AS thuoctinh,
+                COALESCE(
+                    (
+                        SELECT json_agg(json_build_object(
+                            'ttctsp_ma', ct.ttctsp_ma,
+                            'ttctsp_ten', tttt.ttctsp_ten,
+                            'ctttsp_thoidiem', ct.ctttsp_thoidiem,
+                            'ctttsp_yeucau', ct.ctttsp_yeucau,
+                            'ctttsp_phanhoi', ct.ctttsp_phanhoi
+                        ) ORDER BY ct.ctttsp_thoidiem DESC)
+                        FROM chitiettrangthaisanpham ct
+                        LEFT JOIN trangthaichitietsanpham tttt ON ct.ttctsp_ma = tttt.ttctsp_ma
+                        WHERE ct.ctsp_ma = ctsp.ctsp_ma
+                    ),
+                    '[]'::json
+                ) AS trangthai_lichsu
+            FROM chitietsanpham ctsp
+            LEFT JOIN nganhhang nh ON ctsp.nh_ma = nh.nh_ma
+            LEFT JOIN latest_status ls ON ls.ctsp_ma = ctsp.ctsp_ma
+            LEFT JOIN trangthaichitietsanpham tt ON ls.ttctsp_ma = tt.ttctsp_ma
+            LEFT JOIN LATERAL (
+                SELECT gb_gia
+                FROM giabangoc
+                WHERE ctsp_ma = ctsp.ctsp_ma
+                ORDER BY gb_thoidiem DESC
+                LIMIT 1
+            ) gb ON true
+            LEFT JOIN LATERAL (
+                SELECT psck_phantram
+                FROM phisanchieckhau
+                WHERE nh_ma = ctsp.nh_ma
+                ORDER BY psck_thoidiem DESC
+                LIMIT 1
+            ) psck ON true
+            WHERE ctsp.sp_ma = $1
+            ORDER BY ctsp.ctsp_ma DESC
+        `;
+
+        const [sanPhamRes, phanLoaiRes] = await Promise.all([
+            pool.query(sanPhamQuery, [sp_ma]),
+            pool.query(phanLoaiQuery, [sp_ma]),
+        ]);
+
+        const sanPham = sanPhamRes.rows[0];
+        if (!sanPham) return null;
+
+        return {
+            san_pham: sanPham,
+            phan_loai: phanLoaiRes.rows,
+        };
+    },
 };
 
 module.exports = TrangThaiChiTietSanPhamModel;

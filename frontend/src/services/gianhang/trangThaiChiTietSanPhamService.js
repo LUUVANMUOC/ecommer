@@ -10,8 +10,8 @@ const trangThaiChiTietSanPhamService = {
     // Seller
     submitForApproval: (ctsp_ma, yeucau) =>
         axiosClient.post(`${BASE}/gui-duyet`, { ctsp_ma, yeucau }),
-    submitAllForApproval: (sp_ma) => 
-        axiosClient.post(`${BASE}/gui-duyet-hang-loat`, { sp_ma }), 
+    submitAllForApproval: (sp_ma) =>
+        axiosClient.post(`${BASE}/gui-duyet-hang-loat`, { sp_ma }),
     getByCtsp: (ctsp_ma) => axiosClient.get(`${BASE}/${ctsp_ma}/lichsu`),
     getLatestByCtsp: (ctsp_ma) => axiosClient.get(`${BASE}/${ctsp_ma}/latest`),
 
@@ -20,11 +20,13 @@ const trangThaiChiTietSanPhamService = {
     getAllSanPham: () => axiosClient.get(`${BASE}/admin/tat-ca-san-pham`),
     getSanPhamPhanTrang: (params) =>
         axiosClient.get(`${BASE}/admin/san-pham-phan-trang`, { params }),
+    // 🟢 Chi tiết đầy đủ 1 sản phẩm: { san_pham, phan_loai: [...] }
+    getChiTietSanPhamAdmin: (sp_ma) =>
+        axiosClient.get(`${BASE}/admin/san-pham/${sp_ma}/chi-tiet`),
     approve: (ctsp_ma, phanhoi) =>
         axiosClient.post(`${BASE}/admin/${ctsp_ma}/duyet`, { phanhoi }),
     suspend: (ctsp_ma, phanhoi) =>
         axiosClient.post(`${BASE}/admin/${ctsp_ma}/dinh-chi`, { phanhoi }),
-    
 };
 
 export default trangThaiChiTietSanPhamService;

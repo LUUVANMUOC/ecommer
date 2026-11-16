@@ -7,6 +7,10 @@ const TrangThaiChiTietSanPhamController = require('../../controllers/san/trangTh
 // ==========================================================
 router.get('/admin/cho-duyet', TrangThaiChiTietSanPhamController.getChoDuyet);
 router.get('/admin/tat-ca-san-pham', TrangThaiChiTietSanPhamController.getAllSanPham);
+router.get('/admin/san-pham-phan-trang', TrangThaiChiTietSanPhamController.getSanPhamPhanTrang);
+// 🟢 Chi tiết đầy đủ 1 sản phẩm (đặt trước các route có tham số)
+router.get('/admin/san-pham/:sp_ma/chi-tiet', TrangThaiChiTietSanPhamController.getChiTietSanPhamAdmin);
+
 router.post('/admin/:ctsp_ma/duyet', TrangThaiChiTietSanPhamController.approve);
 router.post('/admin/:ctsp_ma/dinh-chi', TrangThaiChiTietSanPhamController.suspend);
 
@@ -14,6 +18,7 @@ router.post('/admin/:ctsp_ma/dinh-chi', TrangThaiChiTietSanPhamController.suspen
 // SELLER ROUTES
 // ==========================================================
 router.post('/gui-duyet', TrangThaiChiTietSanPhamController.submitForApproval);
+router.post('/gui-duyet-hang-loat', TrangThaiChiTietSanPhamController.submitAllForApproval);
 
 // ==========================================================
 // TRUY VẤN LỊCH SỬ / TRẠNG THÁI HIỆN TẠI
@@ -26,12 +31,5 @@ router.get('/:ctsp_ma/latest', TrangThaiChiTietSanPhamController.getLatestByCtsp
 // ==========================================================
 router.get('/', TrangThaiChiTietSanPhamController.getAll);
 router.get('/:id', TrangThaiChiTietSanPhamController.getById);
-
-// ==========================================================
-// SELLER ROUTES
-// ==========================================================
-router.post('/gui-duyet', TrangThaiChiTietSanPhamController.submitForApproval);
-router.post('/gui-duyet-hang-loat', TrangThaiChiTietSanPhamController.submitAllForApproval); // 🟢 Thêm dòng này
-router.get('/admin/san-pham-phan-trang', TrangThaiChiTietSanPhamController.getSanPhamPhanTrang);
 
 module.exports = router;

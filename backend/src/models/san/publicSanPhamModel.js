@@ -316,6 +316,102 @@ const PublicSanPhamModel = {
 
     return { data: listRes.rows, total, page, limit };
   },
+
+  // ==========================================================
+  // ĐÁNH GIÁ SẢN PHẨM (public)
+  // - Lọc theo số sao và theo phân loại (ctsp_ma)
+  // - total / total_pages theo bộ lọc đang áp dụng
+  // - thong_ke luôn tính trên TOÀN BỘ đánh giá của sản phẩm
+  // ==========================================================
+  getDanhGiaSanPham: async (sp_ma, opts = {}) => {
+    const page = Math.max(1, parseInt(opts.page, 10) || 1);
+    const limit = Math.min(50, Math.max(1, parseInt(opts.limit, 10) || 5));
+    const offset = (page - 1) * limit;
+
+    const saoRaw = parseInt(opts.sao, 10);
+    const sao = saoRaw >= 1 && saoRaw <= 5 ? saoRaw : null;
+    const ctsp_ma = String(opts.ctsp_ma || "").trim() || null;
+
+    // Điều kiện lọc dựng động để không truyền tham số thừa cho PostgreSQL
+    const conds = [`sp.sp_ma = $1`];
+    const filterParams = [sp_ma];
+
+    if (sao !== null) {
+      filterParams.push(sao);
+      conds.push(`dg.dgsp_sao = $${filterParams.length}`);
+    }
+    if (ctsp_ma) {
+      filterParams.push(ctsp_ma);
+      conds.push(`dg.ctsp_ma = $${filterParams.length}`);
+    }
+    const where = conds.join(" AND ");
+
+    const listQuery = `
+      SELECT
+        dg.dts_ma, dg.ctsp_ma, dg.kh_ma,
+        dg.dgsp_sao, dg.dgsp_mota, dg.dgsp_hinhanh,
+        dg.dgsp_phanhoi, dg.dgsp_thoidiem,
+        ctsp.ctsp_ten,
+        kh.kh_ten, kh.kh_avatar
+      FROM danhgiasanpham dg
+      JOIN chitietsanpham ctsp ON ctsp.ctsp_ma = dg.ctsp_ma
+      JOIN sanpham sp ON sp.sp_ma = ctsp.sp_ma
+      LEFT JOIN khachhang kh ON kh.kh_ma = dg.kh_ma
+      WHERE ${where}
+      ORDER BY dg.dgsp_thoidiem DESC, dg.ctsp_ma ASC, dg.kh_ma ASC
+      LIMIT $${filterParams.length + 1} OFFSET $${filterParams.length + 2}
+    `;
+
+    const countQuery = `
+      SELECT COUNT(*)::int AS total
+      FROM danhgiasanpham dg
+      JOIN chitietsanpham ctsp ON ctsp.ctsp_ma = dg.ctsp_ma
+      JOIN sanpham sp ON sp.sp_ma = ctsp.sp_ma
+      WHERE ${where}
+    `;
+
+    const statsQuery = `
+      SELECT
+        COALESCE(AVG(dg.dgsp_sao), 0)::numeric(3,2) AS trung_binh,
+        COUNT(*)::int AS tong,
+        COUNT(*) FILTER (WHERE dg.dgsp_sao = 5)::int AS sao5,
+        COUNT(*) FILTER (WHERE dg.dgsp_sao = 4)::int AS sao4,
+        COUNT(*) FILTER (WHERE dg.dgsp_sao = 3)::int AS sao3,
+        COUNT(*) FILTER (WHERE dg.dgsp_sao = 2)::int AS sao2,
+        COUNT(*) FILTER (WHERE dg.dgsp_sao = 1)::int AS sao1
+      FROM danhgiasanpham dg
+      JOIN chitietsanpham ctsp ON ctsp.ctsp_ma = dg.ctsp_ma
+      WHERE ctsp.sp_ma = $1
+    `;
+
+    const [listRes, countRes, statsRes] = await Promise.all([
+      pool.query(listQuery, [...filterParams, limit, offset]),
+      pool.query(countQuery, filterParams),
+      pool.query(statsQuery, [sp_ma]),
+    ]);
+
+    const total = parseInt(countRes.rows[0]?.total, 10) || 0;
+    const s = statsRes.rows[0] || {};
+
+    return {
+      data: listRes.rows,
+      total,
+      page,
+      limit,
+      total_pages: total > 0 ? Math.ceil(total / limit) : 0,
+      thong_ke: {
+        trung_binh: Number(s.trung_binh) || 0,
+        tong: parseInt(s.tong, 10) || 0,
+        phan_bo: {
+          5: parseInt(s.sao5, 10) || 0,
+          4: parseInt(s.sao4, 10) || 0,
+          3: parseInt(s.sao3, 10) || 0,
+          2: parseInt(s.sao2, 10) || 0,
+          1: parseInt(s.sao1, 10) || 0,
+        },
+      },
+    };
+  },
 };
 
 module.exports = PublicSanPhamModel;
