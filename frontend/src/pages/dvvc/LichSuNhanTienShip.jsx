@@ -564,13 +564,6 @@ const LichSuNhanTienShip = () => {
           kpi.san_chua_lap || 0,
         )} · chờ QR ${money(kpi.san_cho_qr || 0)}`,
       },
-      {
-        icon: "savings",
-        label: "Tổng tiền đang giữ",
-        value: money(kpi.tong_dang_giu || 0),
-        tone: "emerald",
-        hint: "Shipper + kho + sàn chưa chuyển",
-      },
     ],
     [kpi],
   );
@@ -971,7 +964,7 @@ const LichSuNhanTienShip = () => {
         </NoteBox>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mx-auto grid max-w-5xl gap-3 sm:grid-cols-2 xl:grid-cols-3">
         {kpiCards.map((card) => (
           <KpiCard key={card.label} {...card} />
         ))}
@@ -1074,36 +1067,6 @@ const LichSuNhanTienShip = () => {
           </div>
         </SectionCard>
       </div>
-
-      <SectionCard
-        title="Số dư cuối kỳ & tiền sàn đã chuyển"
-        subtitle="Ba đường là số dư cuối tháng/năm; cột là tiền sàn đã chuyển trong kỳ."
-        action={
-          <ViewToggle
-            views={CHART_VIEWS}
-            active={chartMode}
-            onChange={setChartMode}
-          />
-        }
-      >
-        {loading ? (
-          <p className="py-10 text-center text-sm text-slate-500">
-            Đang tải biểu đồ...
-          </p>
-        ) : chartRows.length === 0 ? (
-          <EmptyState
-            icon="show_chart"
-            title="Chưa có dữ liệu biểu đồ"
-            hint="Thử đổi năm hoặc kiểm tra lại đơn hàng/phiếu chi."
-          />
-        ) : (
-          <BalanceChart
-            rows={chartRows}
-            mode={chartMode}
-            highlightThang={filters.thang ? Number(filters.thang) : null}
-          />
-        )}
-      </SectionCard>
 
       <SectionCard title={activeMeta.title} subtitle={activeMeta.subtitle}>
         <div className="mb-4">
