@@ -30,6 +30,7 @@ import { toAssetUrl, removeVietnameseTones } from "../../utils/accountUtils";
 const INITIAL_PROFILE = {
   gh_ten: "",
   gh_email: "",
+  gh_sdt: "",
   gh_mota: "",
   gh_danhgia: 0,
   gh_theodoi: 0,
@@ -226,6 +227,7 @@ const ThongTinCuaHang = () => {
       setFormData({
         gh_ten: data.gh_ten || "",
         gh_email: data.gh_email || "",
+        gh_sdt: data.gh_sdt || "",
         gh_mota: data.gh_mota || "",
         gh_danhgia: data.gh_danhgia || 0,
         gh_theodoi: data.gh_theodoi || 0,
@@ -266,6 +268,7 @@ const ThongTinCuaHang = () => {
     try {
       const dataToSend = new FormData();
       dataToSend.append("gh_ten", formData.gh_ten);
+      dataToSend.append("gh_sdt", formData.gh_sdt || "");
       dataToSend.append("gh_mota", formData.gh_mota);
       dataToSend.append("dc_mota", formData.dc_mota);
       dataToSend.append("xa_ma", selectedXa);

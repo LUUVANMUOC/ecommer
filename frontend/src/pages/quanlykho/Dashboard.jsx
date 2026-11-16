@@ -24,6 +24,7 @@ const QuanLyKhoDashboard = () => {
           path: "/quan-ly-kho/phan-cong-giao-hang",
         },
         { title: "Lịch sử kho", path: "/quan-ly-kho/lich-su" },
+        { title: "Hộp thư thông báo", path: "/quan-ly-kho/thong-bao" },
       ],
     },
     {

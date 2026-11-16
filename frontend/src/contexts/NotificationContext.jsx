@@ -18,6 +18,7 @@ const HOP_THU_PATH = {
   SHOP: "/nguoi-ban/thong-bao",
   KHACHHANG: "/khach-hang/thong-bao",
   DVVC: "/dvvc/thong-bao",
+  KHO: "/quan-ly-kho/thong-bao",
 };
 
 // Xác định người nhận thông báo dựa trên user đang đăng nhập
@@ -45,6 +46,12 @@ export const layNguoiNhan = (user) => {
   }
 
   // shipper / quanlykho: chưa dùng thông báo
+  if (user.role === "quanlykho") {
+    const ma = user.kho_ma || user.id;
+    return ma ? { loai: "KHO", ma } : null;
+  }
+
+  // shipper: chưa dùng thông báo
   return null;
 };
 

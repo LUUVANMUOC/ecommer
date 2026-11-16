@@ -91,6 +91,7 @@ const GianHangModel = {
                 SELECT 
                     gh.gh_ma, gh.gh_ten, gh.gh_mota, gh.gh_hinhanh, 
                     gh.gh_email, gh.gh_danhgia, gh.gh_theodoi, gh.dc_ma,
+                    gh.gh_sdt,
                     gh.gh_hashpass,
                     dc.dc_mota, 
                     dc.xa_ma,
@@ -131,11 +132,11 @@ const GianHangModel = {
 
             const updateShopQuery = `
                 UPDATE gianhang 
-                SET gh_ten = $1, gh_mota = $2, gh_hinhanh = $3 
-                WHERE gh_ma = $4 
+                SET gh_ten = $1, gh_mota = $2, gh_hinhanh = $3, gh_sdt = $4
+                WHERE gh_ma = $5 
                 RETURNING *
             `;
-            const result = await client.query(updateShopQuery, [data.gh_ten, data.gh_mota || null, finalImage, id]);
+            const result = await client.query(updateShopQuery, [data.gh_ten, data.gh_mota || null, finalImage, data.gh_sdt || null, id]);
 
             await client.query('COMMIT');
 

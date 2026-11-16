@@ -64,6 +64,7 @@ const GianHangAuthController = {
                 gh_ten: data.gh_ten,
                 gh_mota: data.gh_mota,
                 gh_hinhanh: data.gh_hinhanh || existing.gh_hinhanh,
+                gh_sdt: data.gh_sdt,
                 dc_mota: data.dc_mota,
                 xa_ma: data.xa_ma
             };

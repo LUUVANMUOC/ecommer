@@ -23,10 +23,11 @@ const norm = (expr) => `lower(translate(${expr}, $6::text, $7::text))`;
 const normKeyword = `lower(translate($2::text, $6::text, $7::text))`;
 
 /* =========================================================
-   CTE dùng chung: lọc + ảnh bìa + khoảng giá + trạng thái
+   CTE dùng chung: lọc + ảnh bìa + khoảng giá + trạng thái + ngày duyệt
    Tham số: $1 gh_ma, $2 q, $3 th_ma, $4 dmsp_ma,
             $5 status, $6 TU, $7 DEN
    (LIMIT/OFFSET là $8/$9, chỉ dùng ở câu chính)
+   Bộ lọc nâng cao KHÔNG thêm tham số — xem các bảng tra bên dưới.
    ========================================================= */
 const CTE = `
 WITH sp_loc AS (
@@ -101,22 +102,92 @@ trang_thai AS (
     WHERE c.sp_ma IN (SELECT sp_ma FROM sp_loc)
     GROUP BY c.sp_ma
 ),
+/* Thời điểm được duyệt gần nhất (TTCTSP0002 = Đang bán) */
+duyet AS (
+    SELECT
+        c.sp_ma,
+        MAX(x.ctttsp_thoidiem) AS duyet_luc
+    FROM chitietsanpham c
+    JOIN chitiettrangthaisanpham x ON x.ctsp_ma = c.ctsp_ma
+    WHERE c.sp_ma IN (SELECT sp_ma FROM sp_loc)
+      AND x.ttctsp_ma = 'TTCTSP0002'
+    GROUP BY c.sp_ma
+),
 base AS (
     SELECT
         s.*,
         COALESCE(tt.status, 'draft') AS status,
         COALESCE(tt.so_phan_loai, 0) AS so_phan_loai,
+        COALESCE(s.sp_diemdanhgiatrungbinh, 0) AS sao_tb,
         ab.cover_url,
         gb.min_price,
-        gb.max_price
+        gb.max_price,
+        dy.duyet_luc
     FROM sp_loc s
     LEFT JOIN trang_thai tt ON tt.sp_ma = s.sp_ma
     LEFT JOIN anh_bia ab ON ab.sp_ma = s.sp_ma
     LEFT JOIN gia_ban gb ON gb.sp_ma = s.sp_ma
+    LEFT JOIN duyet dy ON dy.sp_ma = s.sp_ma
 )
 `;
 
 const LOC_STATUS = `($5::text IS NULL OR status = $5)`;
+
+/* =========================================================
+   Bộ lọc nâng cao: mã lọc (whitelist ở controller) → điều kiện SQL
+   Không dùng thêm tham số nên $8/$9 vẫn là LIMIT/OFFSET.
+   ========================================================= */
+const SAO_LOC = {
+    '5': `base.sao_tb >= 4.5`,
+    '4': `base.sao_tb >= 4 AND base.sao_tb < 4.5`,
+    '3': `base.sao_tb >= 3 AND base.sao_tb < 4`,
+    '2': `base.sao_tb >= 2 AND base.sao_tb < 3`,
+    '1': `base.sao_tb > 0 AND base.sao_tb < 2`,
+    '0': `base.sao_tb = 0`,
+};
+
+const MUA_LOC = {
+    '0': `COALESCE(base.sp_luotmua, 0) = 0`,
+    '1-10': `base.sp_luotmua BETWEEN 1 AND 10`,
+    '11-50': `base.sp_luotmua BETWEEN 11 AND 50`,
+    '51-200': `base.sp_luotmua BETWEEN 51 AND 200`,
+    '200+': `base.sp_luotmua > 200`,
+};
+
+const XEM_LOC = {
+    '0': `COALESCE(base.sp_luotxem, 0) = 0`,
+    '1-100': `base.sp_luotxem BETWEEN 1 AND 100`,
+    '101-1000': `base.sp_luotxem BETWEEN 101 AND 1000`,
+    '1001-10000': `base.sp_luotxem BETWEEN 1001 AND 10000`,
+    '10000+': `base.sp_luotxem > 10000`,
+};
+
+// Giá: sản phẩm khớp khi KHOẢNG giá của nó giao với khoảng đang chọn
+const GIA_LOC = {
+    'duoi-100k': `base.min_price IS NOT NULL AND base.min_price <= 100000`,
+    '100k-500k': `base.max_price >= 100000 AND base.min_price <= 500000`,
+    '500k-1tr': `base.max_price >= 500000 AND base.min_price <= 1000000`,
+    '1tr-5tr': `base.max_price >= 1000000 AND base.min_price <= 5000000`,
+    'tren-5tr': `base.max_price >= 5000000`,
+};
+
+const DUYET_LOC = {
+    homnay: `base.duyet_luc >= date_trunc('day', NOW())`,
+    '7n': `base.duyet_luc >= NOW() - INTERVAL '7 days'`,
+    '30n': `base.duyet_luc >= NOW() - INTERVAL '30 days'`,
+    '90n': `base.duyet_luc >= NOW() - INTERVAL '90 days'`,
+    chua: `base.duyet_luc IS NULL`,
+};
+
+const SORT_MAP = {
+    moi: `base.sp_ma DESC`,
+    mua: `base.sp_luotmua DESC NULLS LAST, base.sp_ma DESC`,
+    xem: `base.sp_luotxem DESC NULLS LAST, base.sp_ma DESC`,
+    sao: `base.sao_tb DESC, base.sp_ma DESC`,
+    gia_tang: `base.min_price ASC NULLS LAST, base.sp_ma DESC`,
+    gia_giam: `base.max_price DESC NULLS LAST, base.sp_ma DESC`,
+    duyet: `base.duyet_luc DESC NULLS LAST, base.sp_ma DESC`,
+};
 
 const SanPhamModel = {
     // 1. Lấy tất cả sản phẩm của 1 Shop (giữ nguyên cho các trang khác dùng)
@@ -138,13 +209,19 @@ const SanPhamModel = {
         return result.rows;
     },
 
-    // 1b. Phân trang + tìm kiếm + lọc (1 request / 1 trang, kèm ảnh bìa & khoảng giá)
+    // 1b. Phân trang + tìm kiếm + lọc cơ bản + lọc nâng cao + sắp xếp
     getPhanTrang: async ({
         gh_ma,
         q = null,
         th_ma = null,
         dmsp_ma = null,
         status = null,
+        sao = null,
+        mua = null,
+        xem = null,
+        gia = null,
+        duyet = null,
+        sort = null,
         page = 1,
         limit = 12,
     }) => {
@@ -164,12 +241,23 @@ const SanPhamModel = {
             DEN,
         ];
 
+        // Ghép điều kiện lọc (chỉ nhận mã có trong whitelist)
+        const conds = [LOC_STATUS];
+        if (sao && SAO_LOC[sao]) conds.push(SAO_LOC[sao]);
+        if (mua && MUA_LOC[mua]) conds.push(MUA_LOC[mua]);
+        if (xem && XEM_LOC[xem]) conds.push(XEM_LOC[xem]);
+        if (gia && GIA_LOC[gia]) conds.push(GIA_LOC[gia]);
+        if (duyet && DUYET_LOC[duyet]) conds.push(DUYET_LOC[duyet]);
+
+        const where = conds.join(' AND ');
+        const orderBy = SORT_MAP[sort] || SORT_MAP.moi;
+
         const { rows } = await pool.query(
             `${CTE}
              SELECT base.*, COUNT(*) OVER() AS total
              FROM base
-             WHERE ${LOC_STATUS}
-             ORDER BY base.sp_ma DESC
+             WHERE ${where}
+             ORDER BY ${orderBy}
              LIMIT $8 OFFSET $9`,
             [...baseParams, limitNum, offset]
         );
@@ -180,7 +268,7 @@ const SanPhamModel = {
         } else {
             // Chỉ truyền 7 tham số CTE → không còn tham số $8/$9 "mồ côi"
             const countRes = await pool.query(
-                `${CTE} SELECT COUNT(*)::int AS total FROM base WHERE ${LOC_STATUS}`,
+                `${CTE} SELECT COUNT(*)::int AS total FROM base WHERE ${where}`,
                 baseParams
             );
             total = countRes.rows[0]?.total || 0;

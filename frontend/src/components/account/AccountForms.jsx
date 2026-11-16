@@ -2,7 +2,11 @@ import { useState } from "react";
 import ImageUpload from "../common/ImageUpload";
 import { FormField, fieldBase, btnPrimary } from "./AccountLayout";
 
-const EMPTY_PASSWORD = { oldPassword: "", newPassword: "", confirmPassword: "" };
+const EMPTY_PASSWORD = {
+  oldPassword: "",
+  newPassword: "",
+  confirmPassword: "",
+};
 
 const PASSWORD_FIELDS = [
   { name: "oldPassword", placeholder: "Mật khẩu hiện tại" },
@@ -49,7 +53,9 @@ export const ChangePasswordForm = ({ onSubmit, onNotify, minLength = 6 }) => {
   return (
     <div>
       <h3 className="mb-4 flex items-center gap-2 text-sm font-semibold text-[#14201C]">
-        <span className="material-symbols-outlined text-[18px] text-[#7A857F]">lock_reset</span>
+        <span className="material-symbols-outlined text-[18px] text-[#7A857F]">
+          lock_reset
+        </span>
         Đổi mật khẩu
       </h3>
       <form onSubmit={handleSubmit} className="space-y-3">
@@ -66,7 +72,11 @@ export const ChangePasswordForm = ({ onSubmit, onNotify, minLength = 6 }) => {
             required
           />
         ))}
-        <button type="submit" disabled={submitting} className={`${btnPrimary} w-full py-2 text-[13px]`}>
+        <button
+          type="submit"
+          disabled={submitting}
+          className={`${btnPrimary} w-full py-2 text-[13px]`}
+        >
           {submitting ? "Đang xử lý..." : "Cập nhật mật khẩu"}
         </button>
       </form>
@@ -75,8 +85,17 @@ export const ChangePasswordForm = ({ onSubmit, onNotify, minLength = 6 }) => {
 };
 
 // Chọn tỉnh → xã. Danh sách xã được lọc theo tỉnh đang chọn.
-export const AddressSelector = ({ tinhs, xas, selectedTinh, selectedXa, onTinhChange, onXaChange }) => {
-  const filteredXas = xas.filter((xa) => String(xa.tinh_ma) === String(selectedTinh));
+export const AddressSelector = ({
+  tinhs,
+  xas,
+  selectedTinh,
+  selectedXa,
+  onTinhChange,
+  onXaChange,
+}) => {
+  const filteredXas = xas.filter(
+    (xa) => String(xa.tinh_ma) === String(selectedTinh),
+  );
 
   return (
     <div className="grid gap-6 md:grid-cols-2">
@@ -147,16 +166,36 @@ export const ProfileInfoForm = ({
         />
       </FormField>
 
-      <FormField label="Email đăng nhập" hint="Email đăng nhập không thể thay đổi.">
+      <FormField
+        label="Email đăng nhập"
+        hint="Email đăng nhập không thể thay đổi."
+      >
         <div className="relative">
-          <input type="email" value={values.gh_email} disabled className={`${fieldBase} pr-10`} />
+          <input
+            type="email"
+            value={values.gh_email}
+            disabled
+            className={`${fieldBase} pr-10`}
+          />
           <span className="material-symbols-outlined pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[18px] text-[#9AA39E]">
             lock
           </span>
         </div>
       </FormField>
     </div>
-
+    <FormField
+      label="Số điện thoại cửa hàng"
+      hint="Shipper sẽ gọi số này khi đến lấy hàng."
+    >
+      <input
+        type="tel"
+        name="gh_sdt"
+        value={values.gh_sdt || ""}
+        onChange={onChange}
+        className={fieldBase}
+        placeholder="VD: 0901234567"
+      />{" "}
+    </FormField>
     <AddressSelector {...addressProps} />
 
     <FormField label="Số nhà, tên đường" required>
@@ -183,7 +222,9 @@ export const ProfileInfoForm = ({
     </FormField>
 
     <div className="space-y-1.5">
-      <span className="block text-sm font-semibold text-[#3D4A44]">Ảnh đại diện</span>
+      <span className="block text-sm font-semibold text-[#3D4A44]">
+        Ảnh đại diện
+      </span>
       <ImageUpload
         label="Logo cửa hàng"
         currentImage={logoUrl}
@@ -194,7 +235,9 @@ export const ProfileInfoForm = ({
 
     <div className="flex justify-end border-t border-[#EFEBE2] pt-6">
       <button type="submit" disabled={saving} className={btnPrimary}>
-        <span className={`material-symbols-outlined text-[18px] ${saving ? "animate-spin" : ""}`}>
+        <span
+          className={`material-symbols-outlined text-[18px] ${saving ? "animate-spin" : ""}`}
+        >
           {saving ? "progress_activity" : "save"}
         </span>
         {saving ? "Đang lưu..." : "Lưu thay đổi"}

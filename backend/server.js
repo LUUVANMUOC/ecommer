@@ -11,7 +11,7 @@ const axios = require('axios');
 // ================= 1. IMPORT ROUTES =================
 const thanhToanVanChuyenRoutes = require('./src/routes/san/thanhToanVanChuyenRoutes');
 const phiVanChuyenRoutes = require('./src/routes/san/phiVanChuyenRoutes');
-
+const danhGiaShopRoutes = require('./src/routes/gianhang/danhGiaShopRoutes');
 // Auth & Sàn
 const sanAuthRoutes = require('./src/routes/san/authRoutes');
 const gianHangAuthRoutes = require('./src/routes/gianhang/gianHangAuthRoutes'); 
@@ -173,7 +173,7 @@ app.use('/api/trang-thai-chi-tiet', trangThaiChiTietSanPhamRoutes);
 app.use('/api/nguoi-ban/van-chuyen', vanChuyenShopRoutes);
 app.use('/api/nguoi-ban/don-hang', donHangShopRoutes);
 app.use('/api/nguoi-ban/thong-ke-doanh-thu', thongKeShopRoutes);
-
+app.use('/api/nguoi-ban/danh-gia', danhGiaShopRoutes);
 app.use('/api/san-pham', publicSanPhamRoutes);
 app.use('/api/admin/thanh-toan-van-chuyen', thanhToanVanChuyenRoutes);
 

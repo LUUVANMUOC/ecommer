@@ -17,6 +17,8 @@ import HopThuThongBao from "../pages/common/HopThuThongBao";
 import GuiThongBaoKhachHang from "../pages/shop/GuiThongBaoKhachHang";
 import SuCoPage from "../pages/suco/SuCoPage";
 import ChiTietSuCoPage from "../pages/suco/ChiTietSuCoPage";
+import DanhGiaShop from "../pages/shop/DanhGiaShop";
+
 const ShopRoutes = () => {
   return (
     <Routes>
@@ -69,6 +71,7 @@ const ShopRoutes = () => {
           {/* Báo cáo & thống kê */}
           <Route path="lich-su-dong-tien" element={<LichSuDongTien />} />
           <Route path="thong-ke-doanh-thu" element={<ThongKeDoanhThu />} />
+          <Route path="danh-gia" element={<DanhGiaShop />} />
         </Route>
       </Route>
     </Routes>

@@ -32,7 +32,7 @@ const GianHangService = {
             gh_ten: data.gh_ten,
             gh_mota: data.gh_mota || null,
             gh_hinhanh: data.gh_hinhanh || existing.gh_hinhanh || null,
-            // BỔ SUNG: Dữ liệu địa chỉ để Model chạy Transaction
+            gh_sdt: data.gh_sdt,
             dc_mota: data.dc_mota, 
             xa_ma: data.xa_ma
         };

@@ -1,6 +1,6 @@
 // src/pages/khachhang/ThongTinCaNhan.jsx
 import { useState, useEffect, useContext, useCallback, useMemo } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { AuthContext } from "../../contexts/AuthContext";
 import axiosClient from "../../config/axiosClient";
 import khachHangProfileService from "../../services/khachhang/khachHangService";
@@ -17,7 +17,6 @@ import {
 import { DiaChiNhanHangSection } from "../../components/account/DiaChiNhanHangSection";
 import { toAssetUrl } from "../../utils/accountUtils";
 import { formatVND } from "../../components/shop/SanPhamShared";
-
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
 const EMPTY_BANK_FORM = {
@@ -51,6 +50,7 @@ const ORDER_TABS = [
 const ThongTinCaNhan = () => {
   const { user } = useContext(AuthContext);
   const kh_ma = user?.kh_ma;
+  const [searchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -60,8 +60,21 @@ const ThongTinCaNhan = () => {
     type: "success",
   });
 
-  const [activeTab, setActiveTab] = useState("ho-so");
-
+  const [activeTab, setActiveTab] = useState(() => {
+    const tab = searchParams.get("tab");
+    return [
+      "ho-so",
+      "don-hang",
+      "danh-gia",
+      "lich-su-xem",
+      "dia-chi",
+      "ngan-hang",
+      "shop-theo-doi",
+      "doi-mat-khau",
+    ].includes(tab)
+      ? tab
+      : "ho-so";
+  });
   const [profileData, setProfileData] = useState({
     kh_ten: "",
     kh_sdt: "",

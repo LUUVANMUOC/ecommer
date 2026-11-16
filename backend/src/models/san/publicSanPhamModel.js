@@ -350,7 +350,7 @@ const PublicSanPhamModel = {
       SELECT
         dg.dts_ma, dg.ctsp_ma, dg.kh_ma,
         dg.dgsp_sao, dg.dgsp_mota, dg.dgsp_hinhanh,
-        dg.dgsp_phanhoi, dg.dgsp_thoidiem,
+        dg.dgsp_phanhoi, dg.dgsp_thoidiemphanhoi, dg.dgsp_thoidiem,
         ctsp.ctsp_ten,
         kh.kh_ten, kh.kh_avatar
       FROM danhgiasanpham dg

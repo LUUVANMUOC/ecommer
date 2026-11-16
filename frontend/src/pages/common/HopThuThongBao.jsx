@@ -45,6 +45,7 @@ const NGUON = [
   { value: "SAN", label: "Sàn" },
   { value: "DVVC", label: "Đơn vị vận chuyển" },
   { value: "SHOP", label: "Shop" },
+  { value: "HE_THONG", label: "Hệ thống" },
 ];
 
 const docTep = (value) => {

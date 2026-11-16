@@ -26,6 +26,10 @@ const ShopDashboard = () => {
           path: "/nguoi-ban/quan-ly-don-hang",
         },
         {
+          title: "Đánh giá của khách",
+          path: "/nguoi-ban/danh-gia",
+        },
+        {
           title: "Mã giảm giá của Shop",
           path: "/nguoi-ban/ma-giam-gia-shop",
         },

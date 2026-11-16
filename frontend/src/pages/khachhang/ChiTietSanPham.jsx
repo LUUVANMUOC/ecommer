@@ -125,7 +125,7 @@ const StarRow = ({ value = 0, size = 16 }) => {
   );
 };
 
-const DanhGiaSanPhamSection = ({ sp_ma, variants = [] }) => {
+const DanhGiaSanPhamSection = ({ sp_ma, variants = [], shopName = "" }) => {
   const [page, setPage] = useState(1);
   const [sao, setSao] = useState("");
   const [ctspMa, setCtspMa] = useState("");
@@ -400,9 +400,16 @@ const DanhGiaSanPhamSection = ({ sp_ma, variants = [] }) => {
 
                       {r.dgsp_phanhoi && (
                         <div className="mt-3 rounded-xl border border-[#BBF7D0] bg-[#F0FDF4] px-3 py-2">
-                          <p className="text-xs font-bold text-[#16A34A]">
-                            Phản hồi của shop
-                          </p>
+                          <div className="flex flex-wrap items-center justify-between gap-2">
+                            <p className="text-xs font-bold text-[#16A34A]">
+                              Phản hồi từ {shopName || "shop"}
+                            </p>
+                            {r.dgsp_thoidiemphanhoi && (
+                              <p className="text-[11px] font-medium text-[#94A3B8]">
+                                {formatReviewDate(r.dgsp_thoidiemphanhoi)}
+                              </p>
+                            )}
+                          </div>
                           <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-[#334155]">
                             {r.dgsp_phanhoi}
                           </p>
@@ -1008,6 +1015,7 @@ const ChiTietSanPhamKhachHang = () => {
           <DanhGiaSanPhamSection
             sp_ma={sp_ma}
             variants={product.variants || []}
+            shopName={product.gh_ten}
           />
         </div>
       </div>

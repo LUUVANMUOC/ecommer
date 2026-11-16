@@ -92,6 +92,7 @@ const DatHangService = {
       console.log(`   - Ngày giao hàng dự kiến (Auto +5 ngày): ${formattedDeliveryDate}`);
 
       // 3. Duyệt qua từng Shop
+      const shopKetQua = [];
       for (const order of payload.orders) {
         console.log(formatLog(`2. XỬ LÝ ĐƠN CỦA SHOP: ${order.gh_ma}`));
 
@@ -196,11 +197,14 @@ const DatHangService = {
           INSERT INTO chitiettrangthaidonhang (dts_ma, ttdh_ma, ctttdh_thoidiem, ctttdh_ghichu)
           VALUES ($1, $2, NOW(), $3)
         `, [newDtsMa, 'TTDH01', 'Khách hàng đặt đơn']);
+        const shopInfo = await client.query(`SELECT gh_ten FROM gianhang WHERE gh_ma = $1`, [order.gh_ma]);
+        shopKetQua.push({ dts_ma: newDtsMa, gh_ma: order.gh_ma, gh_ten: shopInfo.rows[0]?.gh_ten || order.gh_ma, tong_thanh_toan: finalAmountForShop });
+       
       }
 
       await client.query('COMMIT');
       console.log(`\n✅✅✅ [THÀNH CÔNG] ĐÃ COMMIT TOÀN BỘ ĐƠN HÀNG ${newDmMa} VÀO DATABASE! ✅✅✅\n`);
-      return { message: "Đặt hàng thành công!", dm_ma: newDmMa };
+      return { message: "Đặt hàng thành công!", dm_ma: newDmMa, shops: shopKetQua };
 
     } catch (error) {
       await client.query('ROLLBACK');

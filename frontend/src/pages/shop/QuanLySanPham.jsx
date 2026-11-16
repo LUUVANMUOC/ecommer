@@ -56,6 +56,105 @@ const fmtRating = (v) => {
   return Number.isFinite(n) && n > 0 ? n.toFixed(1) : "—";
 };
 
+const fmtDate = (v) => {
+  if (!v) return "";
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("vi-VN", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+};
+
+/* =========================================================
+   BỘ LỌC NÂNG CAO — mã lọc phải khớp whitelist ở backend
+   ========================================================= */
+const ADVANCED_FILTERS = [
+  {
+    key: "sao",
+    icon: "star",
+    label: "Đánh giá",
+    options: [
+      { value: "", label: "Tất cả" },
+      { value: "5", label: "5 sao", title: "Điểm trung bình từ 4.5 đến 5" },
+      {
+        value: "4",
+        label: "4 sao",
+        title: "Điểm trung bình từ 4 đến dưới 4.5",
+      },
+      { value: "3", label: "3 sao", title: "Điểm trung bình từ 3 đến dưới 4" },
+      { value: "2", label: "2 sao", title: "Điểm trung bình từ 2 đến dưới 3" },
+      { value: "1", label: "1 sao", title: "Điểm trung bình dưới 2" },
+      { value: "0", label: "Chưa đánh giá", title: "Chưa có đánh giá nào" },
+    ],
+  },
+  {
+    key: "mua",
+    icon: "shopping_bag",
+    label: "Lượt mua",
+    options: [
+      { value: "", label: "Tất cả" },
+      { value: "0", label: "Chưa bán" },
+      { value: "1-10", label: "1 – 10" },
+      { value: "11-50", label: "11 – 50" },
+      { value: "51-200", label: "51 – 200" },
+      { value: "200+", label: "Trên 200" },
+    ],
+  },
+  {
+    key: "xem",
+    icon: "visibility",
+    label: "Lượt xem",
+    options: [
+      { value: "", label: "Tất cả" },
+      { value: "0", label: "Chưa xem" },
+      { value: "1-100", label: "1 – 100" },
+      { value: "101-1000", label: "101 – 1.000" },
+      { value: "1001-10000", label: "1.001 – 10.000" },
+      { value: "10000+", label: "Trên 10.000" },
+    ],
+  },
+  {
+    key: "gia",
+    icon: "payments",
+    label: "Giá bán",
+    options: [
+      { value: "", label: "Tất cả" },
+      { value: "duoi-100k", label: "Dưới 100k" },
+      { value: "100k-500k", label: "100k – 500k" },
+      { value: "500k-1tr", label: "500k – 1tr" },
+      { value: "1tr-5tr", label: "1tr – 5tr" },
+      { value: "tren-5tr", label: "Trên 5tr" },
+    ],
+  },
+  {
+    key: "duyet",
+    icon: "verified",
+    label: "Ngày duyệt",
+    options: [
+      { value: "", label: "Tất cả" },
+      { value: "homnay", label: "Hôm nay" },
+      { value: "7n", label: "7 ngày qua" },
+      { value: "30n", label: "30 ngày qua" },
+      { value: "90n", label: "90 ngày qua" },
+      { value: "chua", label: "Chưa từng duyệt" },
+    ],
+  },
+];
+
+const SORT_OPTIONS = [
+  { value: "moi", label: "Mới nhất" },
+  { value: "mua", label: "Bán chạy nhất" },
+  { value: "xem", label: "Xem nhiều nhất" },
+  { value: "sao", label: "Đánh giá cao nhất" },
+  { value: "gia_tang", label: "Giá thấp → cao" },
+  { value: "gia_giam", label: "Giá cao → thấp" },
+  { value: "duyet", label: "Duyệt gần nhất" },
+];
+
+const EMPTY_ADVANCED = { sao: "", mua: "", xem: "", gia: "", duyet: "" };
+
 /* Danh sách số trang có dấu "..." */
 const buildPageList = (page, totalPages) => {
   if (totalPages <= 7) {
@@ -84,6 +183,36 @@ const CardSkeleton = () => (
   </div>
 );
 
+/* Một hàng lọc: nhãn + các nút chọn nhanh */
+const FilterRow = ({ icon, label, options, value, onChange }) => (
+  <div className="flex flex-col gap-1.5 rounded-xl border border-[#F1EEE6] bg-[#FBFAF7] p-3">
+    <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-[#7A857F]">
+      <span className="material-symbols-outlined text-[15px]">{icon}</span>
+      {label}
+    </span>
+    <div className="flex flex-wrap gap-1.5">
+      {options.map((opt) => {
+        const on = value === opt.value;
+        return (
+          <button
+            key={opt.value || "__all__"}
+            type="button"
+            title={opt.title || opt.label}
+            onClick={() => onChange(opt.value)}
+            className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
+              on
+                ? "border-[#F2A93B] bg-[#FDF3E1] text-[#8A5A0B]"
+                : "border-[#D9CFC2] bg-white text-[#3D4A44] hover:border-[#14201C]/40"
+            }`}
+          >
+            {opt.label}
+          </button>
+        );
+      })}
+    </div>
+  </div>
+);
+
 const QuanLySanPham = () => {
   const navigate = useNavigate();
   const location = useLocation();
@@ -103,12 +232,16 @@ const QuanLySanPham = () => {
   const [searchInput, setSearchInput] = useState("");
   const [q, setQ] = useState("");
 
-  // ---- Bộ lọc ----
+  // ---- Bộ lọc cơ bản ----
   const [filters, setFilters] = useState({
     th_ma: "",
     dmsp_ma: "",
     status: "",
   });
+
+  // ---- Bộ lọc nâng cao + sắp xếp ----
+  const [advanced, setAdvanced] = useState(EMPTY_ADVANCED);
+  const [sort, setSort] = useState("moi");
 
   // ---- Tuỳ chọn cho form / bộ lọc ----
   const [brands, setBrands] = useState([]);
@@ -157,6 +290,12 @@ const QuanLySanPham = () => {
         th_ma: filters.th_ma || undefined,
         dmsp_ma: filters.dmsp_ma || undefined,
         status: filters.status || undefined,
+        sao: advanced.sao || undefined,
+        mua: advanced.mua || undefined,
+        xem: advanced.xem || undefined,
+        gia: advanced.gia || undefined,
+        duyet: advanced.duyet || undefined,
+        sort: sort || undefined,
         page,
         limit,
       });
@@ -181,7 +320,7 @@ const QuanLySanPham = () => {
     } finally {
       if (rid === requestId.current) setLoading(false);
     }
-  }, [shopId, q, filters, page, limit, showToast]);
+  }, [shopId, q, filters, advanced, sort, page, limit, showToast]);
 
   useEffect(() => {
     fetchPage();
@@ -233,7 +372,7 @@ const QuanLySanPham = () => {
   }, [location.state, location.pathname, navigate, showToast]);
 
   /* =========================================================
-     ẢNH BÌA + KHOẢNG GIÁ + TRẠNG THÁI (đã có sẵn từ server)
+     ẢNH BÌA + KHOẢNG GIÁ + TRẠNG THÁI + NGÀY DUYỆT
      ========================================================= */
   const covers = useMemo(() => {
     const out = {};
@@ -244,6 +383,7 @@ const QuanLySanPham = () => {
         maxPrice: sp.max_price != null ? Number(sp.max_price) : null,
         status: sp.status || "draft",
         soPhanLoai: Number(sp.so_phan_loai) || 0,
+        duyetLuc: sp.duyet_luc || null,
       };
     });
     return out;
@@ -320,6 +460,24 @@ const QuanLySanPham = () => {
 
   const handleClearFilter = () => {
     setFilters({ th_ma: "", dmsp_ma: "", status: "" });
+    setAdvanced(EMPTY_ADVANCED);
+    setSort("moi");
+    setPage(1);
+  };
+
+  const handleAdvancedChange = (key, value) => {
+    setAdvanced((prev) => ({ ...prev, [key]: value }));
+    setPage(1);
+  };
+
+  const handleClearAdvanced = () => {
+    setAdvanced(EMPTY_ADVANCED);
+    setSort("moi");
+    setPage(1);
+  };
+
+  const handleSortChange = (e) => {
+    setSort(e.target.value);
     setPage(1);
   };
 
@@ -329,7 +487,7 @@ const QuanLySanPham = () => {
   };
 
   /* =========================================================
-     CẤU HÌNH BỘ LỌC
+     CẤU HÌNH BỘ LỌC CƠ BẢN
      ========================================================= */
   const filterConfig = [
     {
@@ -368,6 +526,19 @@ const QuanLySanPham = () => {
   const tuDong = total === 0 ? 0 : (page - 1) * limit + 1;
   const denDong = Math.min(page * limit, total);
 
+  const advancedCount = Object.values(advanced).filter(Boolean).length;
+  const hasAnyFilter = Boolean(
+    q ||
+    filters.th_ma ||
+    filters.dmsp_ma ||
+    filters.status ||
+    advanced.sao ||
+    advanced.mua ||
+    advanced.xem ||
+    advanced.gia ||
+    advanced.duyet,
+  );
+
   if (!shopId)
     return (
       <div className="p-10 text-center text-sm text-gray-500">
@@ -402,6 +573,63 @@ const QuanLySanPham = () => {
         }`}
       />
 
+      {/* ===== BỘ LỌC NÂNG CAO + SẮP XẾP ===== */}
+      <div className="rounded-2xl border border-[#E2DED3] bg-white p-4 shadow-sm">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-[#14201C] px-3.5 py-2 text-sm font-semibold text-[#14201C]">
+            <span className="material-symbols-outlined text-[18px]">tune</span>
+            Lọc nâng cao
+            {advancedCount > 0 && (
+              <span className="grid h-5 min-w-[20px] place-items-center rounded-full bg-[#F2A93B] px-1.5 text-[11px] font-bold text-[#14201C]">
+                {advancedCount}
+              </span>
+            )}
+          </span>
+
+          <label className="ml-auto flex items-center gap-2 text-sm text-[#5B6661]">
+            <span className="material-symbols-outlined text-[18px]">sort</span>
+            <span className="font-semibold text-[#3D4A44]">Sắp xếp</span>
+            <select
+              value={sort}
+              onChange={handleSortChange}
+              className="rounded-lg border border-[#D9D4C7] bg-[#FBFAF7] px-2 py-1.5 text-sm text-[#14201C] outline-none focus:border-[#F2A93B] focus:ring-2 focus:ring-[#F2A93B]/20"
+            >
+              {SORT_OPTIONS.map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {advancedCount > 0 && (
+            <button
+              type="button"
+              onClick={handleClearAdvanced}
+              className="inline-flex items-center gap-1 text-sm font-semibold text-[#B42318] underline-offset-2 hover:underline"
+            >
+              <span className="material-symbols-outlined text-[16px]">
+                close
+              </span>
+              Xóa lọc nâng cao
+            </button>
+          )}
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 border-t border-[#EFEBE2] pt-4 xl:grid-cols-2">
+          {ADVANCED_FILTERS.map((f) => (
+            <FilterRow
+              key={f.key}
+              icon={f.icon}
+              label={f.label}
+              options={f.options}
+              value={advanced[f.key]}
+              onChange={(v) => handleAdvancedChange(f.key, v)}
+            />
+          ))}
+        </div>
+      </div>
+
       {/* ===== Lưới sản phẩm ===== */}
       <div
         aria-busy={loading}
@@ -419,11 +647,11 @@ const QuanLySanPham = () => {
               inventory_2
             </span>
             <p className="text-sm font-semibold text-[#3D4A44]">
-              {q || filters.th_ma || filters.dmsp_ma || filters.status
+              {hasAnyFilter
                 ? "Không có sản phẩm nào phù hợp với bộ lọc."
                 : "Gian hàng chưa có sản phẩm nào."}
             </p>
-            {(q || filters.th_ma || filters.dmsp_ma || filters.status) && (
+            {hasAnyFilter && (
               <button
                 type="button"
                 onClick={() => {
@@ -581,6 +809,15 @@ const QuanLySanPham = () => {
                       label="Đánh giá"
                     />
                   </div>
+
+                  {cover.duyetLuc && (
+                    <p className="mt-3 flex items-center gap-1 text-[11px] font-medium text-[#7A857F]">
+                      <span className="material-symbols-outlined text-[13px]">
+                        verified
+                      </span>
+                      Duyệt: {fmtDate(cover.duyetLuc)}
+                    </p>
+                  )}
                 </div>
               </article>
             );

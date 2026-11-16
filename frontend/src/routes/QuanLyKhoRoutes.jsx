@@ -10,6 +10,7 @@ import PhanCongGiaoHang from "../pages/quanlykho/PhanCongGiaoHang";
 import LichSuKho from "../pages/quanlykho/LichSuKho";
 import ThuTienShipper from "../pages/quanlykho/ThuTienShipper";
 import TatToan from "../pages/quanlykho/TatToan";
+import HopThuThongBao from "../pages/common/HopThuThongBao";
 
 // Import file mới thay thế NhapKhoChoXacNhan
 import QuanLyPhieuKho from "../pages/quanlykho/QuanLyPhieuKho";
@@ -39,6 +40,7 @@ const QuanLyKhoRoutes = () => {
               </div>
             }
           />
+          <Route path="thong-bao" element={<HopThuThongBao />} />
           <Route path="quan-ly-shipper" element={<QuanLyShipper />} />
           <Route path="phan-cong-shipper" element={<PhanCongShipper />} />
           <Route path="gui-trung-chuyen" element={<GuiTrungChuyen />} />

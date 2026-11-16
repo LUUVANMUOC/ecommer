@@ -10,6 +10,7 @@ const LOAI_THEO_ROLE = {
   khachhang: 'KHACHHANG',
   dvvc: 'DVVC',
   shipper: 'SHIPPER',
+  quanlykho: 'KHO',
 };
 
 const tenPhong = (loai, ma) => `notify:${loai}:${ma}`;

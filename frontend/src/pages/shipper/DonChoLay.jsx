@@ -6,18 +6,411 @@ import DateGroupedList from "../../components/common/DateGroupedList";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import { toAssetUrl } from "../../utils/accountUtils";
 
+const formatDate = (value) => {
+  if (!value) return "—";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleDateString("vi-VN");
+};
+
+const formatDateTime = (value) => {
+  if (!value) return "—";
+  const d = new Date(value);
+  return Number.isNaN(d.getTime()) ? "—" : d.toLocaleString("vi-VN");
+};
+
+const telHref = (sdt) => `tel:${String(sdt || "").replace(/\s+/g, "")}`;
+
+const fullPickupAddress = (order) =>
+  [order.DiaChiLayHang, order.XaLayHang, order.TinhLayHang]
+    .filter(Boolean)
+    .join(", ");
+
+const InfoRow = ({ icon, label, children, strong = false }) => (
+  <div className="flex items-start gap-2.5 py-1.5">
+    <span className="material-symbols-outlined mt-0.5 text-[18px] text-[#94A3B8]">
+      {icon}
+    </span>
+    <div className="min-w-0">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-[#94A3B8]">
+        {label}
+      </p>
+      <div
+        className={`break-words text-sm ${
+          strong ? "font-bold text-[#0F172A]" : "text-[#334155]"
+        }`}
+      >
+        {children || "—"}
+      </div>
+    </div>
+  </div>
+);
+
+const Section = ({ icon, title, children }) => (
+  <div className="rounded-2xl border border-[#E2E8F0] bg-white p-4">
+    <h4 className="mb-2 flex items-center gap-2 text-sm font-bold text-[#0F172A]">
+      <span className="material-symbols-outlined text-[18px] text-[#16a34a]">
+        {icon}
+      </span>
+      {title}
+    </h4>
+    <div className="divide-y divide-[#F1F5F9]">{children}</div>
+  </div>
+);
+
+const MoneyRow = ({ label, value, strong = false, highlight = false }) => (
+  <div className="flex items-center justify-between gap-3 py-1.5">
+    <span
+      className={`text-sm ${
+        strong ? "font-bold text-[#0F172A]" : "text-[#64748B]"
+      }`}
+    >
+      {label}
+    </span>
+    <span
+      className={`shrink-0 ${
+        highlight
+          ? "text-lg font-bold text-[#DC2626]"
+          : strong
+            ? "text-sm font-bold text-[#0F172A]"
+            : "text-sm font-semibold text-[#334155]"
+      }`}
+    >
+      {value}
+    </span>
+  </div>
+);
+
+const OrderDetailModal = ({
+  order,
+  isHistory,
+  onClose,
+  onSubmit,
+  submitting,
+  onPhotoChange,
+  note,
+  onNoteChange,
+}) => {
+  const items = order.items || [];
+  const isPaid = !!order.TrangThaiThanhToan;
+
+  return (
+    <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
+      <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl bg-[#F8FAFC] shadow-xl sm:rounded-3xl">
+        {/* HEADER */}
+        <div className="flex items-start justify-between gap-3 border-b border-[#E2E8F0] bg-white px-5 py-4">
+          <div className="min-w-0">
+            <h3 className="text-lg font-bold text-[#0F172A]">
+              Đơn {order.DTS_Ma}
+            </h3>
+            <p className="mt-0.5 text-xs text-[#64748B]">
+              Lập ngày {formatDateTime(order.NgayLap)}
+              {order.ThoiDiemPhanCong
+                ? ` • Phân công ${formatDateTime(order.ThoiDiemPhanCong)}`
+                : ""}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            disabled={submitting}
+            className="shrink-0 text-gray-400 hover:text-red-500 disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined">close</span>
+          </button>
+        </div>
+
+        {/* BODY */}
+        <div className="flex-1 space-y-3 overflow-y-auto p-4 sm:p-5">
+          <Section icon="storefront" title="Lấy hàng tại shop">
+            <InfoRow icon="store" label="Cửa hàng" strong>
+              {order.TenShop}
+            </InfoRow>
+            <InfoRow icon="call" label="Số điện thoại shop">
+              {order.SdtShop ? (
+                <a
+                  href={telHref(order.SdtShop)}
+                  className="font-semibold text-[#2563EB] hover:underline"
+                >
+                  {order.SdtShop}
+                </a>
+              ) : (
+                <span className="italic text-[#94A3B8]">
+                  Shop chưa cập nhật SĐT
+                </span>
+              )}
+            </InfoRow>
+            <InfoRow icon="mail" label="Email shop">
+              {order.EmailShop}
+            </InfoRow>
+            <InfoRow icon="location_on" label="Địa chỉ lấy hàng" strong>
+              {fullPickupAddress(order)}
+            </InfoRow>
+            {order.GpsLayHang && (
+              <InfoRow icon="my_location" label="Vị trí GPS">
+                <a
+                  href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+                    order.GpsLayHang,
+                  )}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[#2563EB] hover:underline"
+                >
+                  Xem trên bản đồ
+                </a>
+              </InfoRow>
+            )}
+          </Section>
+
+          <Section icon="local_shipping" title="Giao cho khách">
+            <InfoRow icon="person" label="Người nhận" strong>
+              {order.TenNguoiNhan}
+            </InfoRow>
+            <InfoRow icon="call" label="Số điện thoại người nhận">
+              {order.SdtNguoiNhan ? (
+                <a
+                  href={telHref(order.SdtNguoiNhan)}
+                  className="font-semibold text-[#2563EB] hover:underline"
+                >
+                  {order.SdtNguoiNhan}
+                </a>
+              ) : (
+                "—"
+              )}
+            </InfoRow>
+            <InfoRow icon="home_pin" label="Địa chỉ giao" strong>
+              {order.DiaChiGiao}
+            </InfoRow>
+            <InfoRow icon="sticky_note_2" label="Ghi chú của khách">
+              {order.GhiChuKhach}
+            </InfoRow>
+          </Section>
+
+          <Section icon="inventory_2" title={`Sản phẩm (${items.length})`}>
+            {items.length === 0 ? (
+              <p className="py-2 text-sm italic text-[#94A3B8]">
+                Đơn không có sản phẩm.
+              </p>
+            ) : (
+              items.map((item, idx) => (
+                <div
+                  key={`${item.Ctsp_Ma}-${idx}`}
+                  className="flex gap-3 py-2.5"
+                >
+                  {item.Image ? (
+                    <img
+                      src={toAssetUrl(item.Image)}
+                      alt={item.TenSanPham}
+                      className="h-12 w-12 shrink-0 rounded-lg border border-[#E2E8F0] object-cover"
+                    />
+                  ) : (
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-[#F1F5F9] text-[#94A3B8]">
+                      <span className="material-symbols-outlined text-[20px]">
+                        image
+                      </span>
+                    </div>
+                  )}
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words text-sm font-semibold text-[#0F172A]">
+                      {item.TenSanPham}
+                    </p>
+                    {item.TenPhanLoai && (
+                      <p className="text-xs text-[#64748B]">
+                        Phân loại: {item.TenPhanLoai}
+                      </p>
+                    )}
+                    <p className="text-xs text-[#64748B]">
+                      {item.SoLuong} × {formatVND(item.DonGia)}
+                    </p>
+                  </div>
+                  <p className="shrink-0 text-sm font-bold text-[#DC2626]">
+                    {formatVND(item.ThanhTien)}
+                  </p>
+                </div>
+              ))
+            )}
+          </Section>
+
+          <Section icon="payments" title="Chi phí & thanh toán">
+            <MoneyRow label="Tiền hàng" value={formatVND(order.TongTienHang)} />
+            <MoneyRow
+              label="Phí vận chuyển"
+              value={formatVND(order.TienVanChuyen)}
+            />
+            {Number(order.GiamGiaShop) > 0 && (
+              <MoneyRow
+                label="Giảm giá shop"
+                value={`- ${formatVND(order.GiamGiaShop)}`}
+              />
+            )}
+            {Number(order.GiamGiaVanChuyen) > 0 && (
+              <MoneyRow
+                label="Giảm giá vận chuyển"
+                value={`- ${formatVND(order.GiamGiaVanChuyen)}`}
+              />
+            )}
+            {Number(order.TongTienGiamGia) > 0 && (
+              <MoneyRow
+                label="Tổng giảm giá"
+                value={`- ${formatVND(order.TongTienGiamGia)}`}
+              />
+            )}
+            <MoneyRow
+              label={isPaid ? "Khách đã thanh toán" : "Thu hộ khi giao (COD)"}
+              value={formatVND(order.TongTien)}
+              strong
+              highlight={!isPaid}
+            />
+            <div className="pt-2">
+              <span
+                className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs font-bold ${
+                  isPaid
+                    ? "bg-green-50 text-green-700"
+                    : "bg-amber-50 text-amber-700"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[16px]">
+                  {isPaid ? "check_circle" : "payments"}
+                </span>
+                {isPaid
+                  ? "Đã thanh toán – không thu tiền khi giao"
+                  : "Chưa thanh toán – thu tiền khi giao"}
+              </span>
+            </div>
+          </Section>
+
+          <Section icon="route" title="Thông tin vận chuyển">
+            <InfoRow icon="local_shipping" label="Đơn vị vận chuyển">
+              {order.TenDVVC}
+            </InfoRow>
+            <InfoRow icon="scale" label="Mốc khối lượng">
+              {order.TenMocKhoiLuong}
+            </InfoRow>
+            <InfoRow icon="event" label="Ngày giao dự kiến">
+              {formatDate(order.NgayGiaoDuKien)}
+            </InfoRow>
+            <InfoRow icon="sticky_note_2" label="Ghi chú đơn hàng">
+              {order.GhiChuDon}
+            </InfoRow>
+            {order.TenVoucherShop && (
+              <InfoRow icon="sell" label="Voucher shop">
+                {order.TenVoucherShop}
+              </InfoRow>
+            )}
+            {order.TenVoucherVC && (
+              <InfoRow icon="local_offer" label="Voucher vận chuyển">
+                {order.TenVoucherVC}
+              </InfoRow>
+            )}
+          </Section>
+
+          {isHistory && (
+            <Section icon="photo_camera" title="Minh chứng lấy hàng">
+              <InfoRow icon="schedule" label="Thời điểm lấy hàng" strong>
+                {formatDateTime(order.ThoiGian)}
+              </InfoRow>
+              <InfoRow icon="sticky_note_2" label="Ghi chú của shipper">
+                {order.GhiChuLayHang}
+              </InfoRow>
+              {order.HinhAnh && (
+                <div className="pt-2">
+                  <img
+                    src={toAssetUrl(order.HinhAnh)}
+                    alt="Minh chứng lấy hàng"
+                    className="max-h-72 w-full rounded-xl border border-[#E2E8F0] bg-white object-contain"
+                  />
+                </div>
+              )}
+            </Section>
+          )}
+        </div>
+
+        {/* FOOTER */}
+        {isHistory ? (
+          <div className="border-t border-[#E2E8F0] bg-white px-5 py-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="w-full rounded-xl bg-[#0F172A] py-2.5 font-bold text-white hover:bg-[#1E293B]"
+            >
+              Đóng
+            </button>
+          </div>
+        ) : (
+          <form
+            onSubmit={onSubmit}
+            className="space-y-3 border-t border-[#E2E8F0] bg-white px-4 py-4 sm:px-5"
+          >
+            <div className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+              <span className="material-symbols-outlined shrink-0 text-[18px]">
+                warning
+              </span>
+              <p>
+                Sau khi xác nhận, đơn chuyển sang <b>"Đang vận chuyển"</b> và{" "}
+                <b>không thể hoàn tác</b>.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-[#334155]">
+                  Ảnh minh chứng <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  required
+                  onChange={(e) => onPhotoChange(e.target.files[0])}
+                  className="w-full text-xs text-[#64748B] file:mr-3 file:rounded-lg file:border-0 file:bg-green-50 file:px-3 file:py-2 file:font-semibold file:text-[#16a34a]"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs font-semibold text-[#334155]">
+                  Ghi chú (không bắt buộc)
+                </label>
+                <textarea
+                  rows={2}
+                  value={note}
+                  onChange={(e) => onNoteChange(e.target.value)}
+                  placeholder="VD: Hàng đóng gói cẩn thận, 3 kiện..."
+                  className="w-full resize-none rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm outline-none focus:border-[#16a34a]"
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                disabled={submitting}
+                className="rounded-xl px-5 py-2.5 font-semibold text-[#64748B] hover:bg-gray-100 disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                type="submit"
+                disabled={submitting}
+                className="rounded-xl bg-[#16a34a] px-6 py-2.5 font-bold text-white hover:bg-[#15803d] disabled:bg-gray-400"
+              >
+                {submitting ? "Đang xử lý..." : "Xác nhận đã lấy"}
+              </button>
+            </div>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+};
+
 const DonChoLay = () => {
   const { user } = useContext(AuthContext);
   const shipper_ma = user?.shipper_ma;
 
-  // State quản lý Tab
   const [activeTab, setActiveTab] = useState("processing");
 
   const [orders, setOrders] = useState([]);
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  // Modal state
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [modalPhoto, setModalPhoto] = useState(null);
   const [modalNote, setModalNote] = useState("");
@@ -41,7 +434,6 @@ const DonChoLay = () => {
         const res = await shipperDonHangService.getChoLay(shipper_ma);
         setOrders(res.data);
       } else {
-        // Gọi API lấy lịch sử (Bạn cần đảm bảo service đã có hàm getLichSu)
         const res = await shipperDonHangService.getLichSu(shipper_ma);
         setHistory(res.data);
       }
@@ -56,7 +448,7 @@ const DonChoLay = () => {
     fetchData();
   }, [shipper_ma, activeTab]);
 
-  const handleOpenModal = (order) => {
+  const handleOpenDetail = (order) => {
     setSelectedOrder(order);
     setModalPhoto(null);
     setModalNote("");
@@ -87,7 +479,7 @@ const DonChoLay = () => {
       setSelectedOrder(null);
       setModalPhoto(null);
       setModalNote("");
-      fetchData(); // Load lại danh sách
+      fetchData();
     } catch (err) {
       showToast(err.response?.data?.message || "Lỗi lấy hàng", "error");
     } finally {
@@ -96,24 +488,24 @@ const DonChoLay = () => {
   };
 
   return (
-    <div className="p-6 bg-[#F8FAFC] min-h-screen">
+    <div className="min-h-screen bg-[#F8FAFC] p-4 sm:p-6">
       {/* HEADER */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#0F172A]">
           Quản Lý Đơn Lấy Hàng
         </h1>
-        <p className="text-sm text-[#64748B] mt-1">
-          Danh sách đơn bạn được phân công đến shop lấy hàng
+        <p className="mt-1 text-sm text-[#64748B]">
+          Bấm vào đơn để xem đầy đủ thông tin lấy hàng và thông tin giao hàng.
         </p>
       </div>
 
       {/* TABS */}
-      <div className="flex border-b border-gray-200 mb-6 bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="mb-6 flex overflow-hidden rounded-xl border-b border-gray-200 bg-white shadow-sm">
         <button
           onClick={() => setActiveTab("processing")}
-          className={`flex-1 py-3 text-center font-bold text-sm transition-colors ${
+          className={`flex-1 py-3 text-center text-sm font-bold transition-colors ${
             activeTab === "processing"
-              ? "bg-green-50 text-green-700 border-b-2 border-green-600"
+              ? "border-b-2 border-green-600 bg-green-50 text-green-700"
               : "text-gray-500 hover:bg-gray-50"
           }`}
         >
@@ -121,9 +513,9 @@ const DonChoLay = () => {
         </button>
         <button
           onClick={() => setActiveTab("history")}
-          className={`flex-1 py-3 text-center font-bold text-sm transition-colors ${
+          className={`flex-1 py-3 text-center text-sm font-bold transition-colors ${
             activeTab === "history"
-              ? "bg-green-50 text-green-700 border-b-2 border-green-600"
+              ? "border-b-2 border-green-600 bg-green-50 text-green-700"
               : "text-gray-500 hover:bg-gray-50"
           }`}
         >
@@ -137,215 +529,171 @@ const DonChoLay = () => {
           Đang tải dữ liệu...
         </div>
       ) : activeTab === "processing" ? (
-        /* --- TAB ĐANG XỬ LÝ --- */
         orders.length === 0 ? (
-          <div className="text-center py-20 bg-white rounded-2xl border border-dashed border-[#E2E8F0]">
-            <span className="material-symbols-outlined text-6xl text-gray-300 mb-4">
+          <div className="rounded-2xl border border-dashed border-[#E2E8F0] bg-white py-20 text-center">
+            <span className="material-symbols-outlined mb-4 text-6xl text-gray-300">
               inventory
             </span>
             <p className="text-lg font-bold text-gray-700">
               Không có đơn nào cần lấy.
             </p>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="mt-1 text-sm text-gray-500">
               Vui lòng chờ ĐVVC phân công đơn mới.
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {orders.map((o) => (
-              <div
-                key={o.DTS_Ma}
-                className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] p-5 flex flex-col hover:shadow-md transition-shadow"
-              >
-                <div className="flex justify-between items-center mb-3 border-b pb-2">
-                  <span className="font-bold text-[#16a34a]">{o.DTS_Ma}</span>
-                  <span className="text-xs bg-yellow-50 text-yellow-600 px-2 py-1 rounded font-bold">
-                    Chờ lấy
-                  </span>
-                </div>
+          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
+            {orders.map((o) => {
+              const items = o.items || [];
+              const totalQty = items.reduce(
+                (sum, item) => sum + Number(item.SoLuong || 0),
+                0,
+              );
 
-                <div className="space-y-2 text-sm flex-1">
-                  <p>
-                    <b className="text-[#334155]">Shop:</b> {o.TenShop}
-                  </p>
-                  <p className="text-[#64748B]">
-                    <b>Lấy tại:</b> {o.DiaChiLayHang}
-                  </p>
-                  <p className="text-[#64748B]">
-                    <b>Giao đến:</b> {o.DiaChiGiao}
-                  </p>
-                  <p className="text-[#64748B]">
-                    <b>Tổng tiền:</b>{" "}
-                    <span className="text-[#DC2626] font-bold">
-                      {formatVND(o.TongTien)}
+              return (
+                <div
+                  key={o.DTS_Ma}
+                  className="flex flex-col rounded-2xl border border-[#E2E8F0] bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+                >
+                  <div className="mb-3 flex items-center justify-between border-b pb-2">
+                    <span className="font-bold text-[#16a34a]">{o.DTS_Ma}</span>
+                    <span className="rounded bg-yellow-50 px-2 py-1 text-xs font-bold text-yellow-600">
+                      Chờ lấy
                     </span>
-                  </p>
+                  </div>
 
-                  {o.items && o.items.length > 0 && (
-                    <div className="mt-3 pt-3 border-t border-[#F1F5F9]">
-                      <p className="text-xs font-semibold text-gray-500 mb-1.5">
-                        Sản phẩm ({o.items.length}):
-                      </p>
-                      {o.items.slice(0, 3).map((item) => (
-                        <p
-                          key={item.Ctsp_Ma}
-                          className="text-xs text-gray-600 truncate leading-5"
+                  <div className="flex-1 space-y-2 text-sm">
+                    <p>
+                      <b className="text-[#334155]">Shop:</b> {o.TenShop}
+                    </p>
+                    <p className="text-[#64748B]">
+                      <b>SĐT shop:</b>{" "}
+                      {o.SdtShop ? (
+                        <a
+                          href={telHref(o.SdtShop)}
+                          className="font-semibold text-[#2563EB] hover:underline"
                         >
-                          • {item.TenSanPham}
-                          {item.TenPhanLoai
-                            ? ` (${item.TenPhanLoai})`
-                            : ""} × {item.SoLuong}
-                        </p>
-                      ))}
-                      {o.items.length > 3 && (
-                        <p className="text-xs text-gray-400 italic mt-1">
-                          ... và {o.items.length - 3} sản phẩm khác
-                        </p>
+                          {o.SdtShop}
+                        </a>
+                      ) : (
+                        <span className="italic text-[#94A3B8]">
+                          Chưa cập nhật
+                        </span>
                       )}
-                    </div>
-                  )}
-                </div>
+                    </p>
+                    <p className="text-[#64748B]">
+                      <b>Lấy tại:</b> {fullPickupAddress(o)}
+                    </p>
+                    <p className="text-[#64748B]">
+                      <b>Giao đến:</b> {o.DiaChiGiao}
+                    </p>
+                    <p className="text-[#64748B]">
+                      <b>Người nhận:</b> {o.TenNguoiNhan}
+                      {o.SdtNguoiNhan ? ` • ${o.SdtNguoiNhan}` : ""}
+                    </p>
+                    <p className="text-[#64748B]">
+                      <b>Tổng tiền:</b>{" "}
+                      <span className="font-bold text-[#DC2626]">
+                        {formatVND(o.TongTien)}
+                      </span>
+                    </p>
 
-                <div className="mt-4 pt-4 border-t border-[#F1F5F9]">
-                  <button
-                    onClick={() => handleOpenModal(o)}
-                    className="w-full py-2.5 bg-[#16a34a] text-white rounded-xl font-bold hover:bg-[#15803d] transition-colors flex items-center justify-center gap-2"
-                  >
-                    <span className="material-symbols-outlined text-[20px]">
-                      check_circle
-                    </span>
-                    Đã lấy hàng
-                  </button>
+                    {items.length > 0 && (
+                      <div className="mt-3 border-t border-[#F1F5F9] pt-3">
+                        <p className="mb-1.5 text-xs font-semibold text-gray-500">
+                          Sản phẩm ({items.length} loại • {totalQty} món):
+                        </p>
+                        {items.slice(0, 3).map((item, idx) => (
+                          <p
+                            key={`${item.Ctsp_Ma}-${idx}`}
+                            className="truncate text-xs leading-5 text-gray-600"
+                          >
+                            • {item.TenSanPham}
+                            {item.TenPhanLoai
+                              ? ` (${item.TenPhanLoai})`
+                              : ""} × {item.SoLuong}
+                          </p>
+                        ))}
+                        {items.length > 3 && (
+                          <p className="mt-1 text-xs italic text-gray-400">
+                            ... và {items.length - 3} sản phẩm khác
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-4 border-t border-[#F1F5F9] pt-4">
+                    <button
+                      onClick={() => handleOpenDetail(o)}
+                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#16a34a] py-2.5 font-bold text-white transition-colors hover:bg-[#15803d]"
+                    >
+                      <span className="material-symbols-outlined text-[20px]">
+                        visibility
+                      </span>
+                      Xem chi tiết & lấy hàng
+                    </button>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         )
       ) : (
-        /* --- TAB LỊCH SỬ --- */
         <DateGroupedList
           items={history}
           dateField="ThoiGian"
           renderItem={(item) => (
-            <div
+            <button
               key={item.DTS_Ma}
-              className="flex items-center justify-between p-4 bg-white border border-gray-100 rounded-lg hover:shadow-md transition-shadow"
+              type="button"
+              onClick={() => handleOpenDetail(item)}
+              className="flex w-full items-center justify-between gap-3 rounded-lg border border-gray-100 bg-white p-4 text-left transition-shadow hover:shadow-md"
             >
               <div className="flex items-center gap-4">
                 {item.HinhAnh ? (
                   <img
                     src={toAssetUrl(item.HinhAnh)}
                     alt="Minh chứng"
-                    className="w-14 h-14 rounded-lg object-cover border border-gray-200"
+                    className="h-14 w-14 rounded-lg border border-gray-200 object-cover"
                   />
                 ) : (
-                  <div className="w-14 h-14 rounded-lg bg-green-50 flex items-center justify-center text-green-600">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-lg bg-green-50 text-green-600">
                     <span className="material-symbols-outlined">image</span>
                   </div>
                 )}
-                <div>
+                <div className="min-w-0">
                   <p className="font-bold text-[#0F172A]">Đơn: {item.DTS_Ma}</p>
                   <p className="text-sm text-gray-500">Shop: {item.TenShop}</p>
+                  <p className="truncate text-xs text-gray-400">
+                    Giao: {item.TenNguoiNhan} • {formatVND(item.TongTien)}
+                  </p>
                 </div>
               </div>
-              <div className="text-right">
-                <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded">
+              <div className="shrink-0 text-right">
+                <span className="rounded bg-green-50 px-2 py-1 text-xs font-bold text-green-600">
                   Đã lấy
                 </span>
-                <p className="text-xs text-gray-400 mt-1">
+                <p className="mt-1 text-xs text-gray-400">
                   {new Date(item.ThoiGian).toLocaleTimeString("vi-VN")}
                 </p>
               </div>
-            </div>
+            </button>
           )}
         />
       )}
 
-      {/* MODAL XÁC NHẬN LẤY HÀNG (Giữ nguyên) */}
       {selectedOrder && (
-        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
-          <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-xl">
-            <div className="p-6 border-b border-[#E2E8F0] flex justify-between items-center">
-              <div>
-                <h3 className="text-xl font-bold text-[#0F172A]">
-                  Xác Nhận Lấy Hàng
-                </h3>
-                <p className="text-sm text-gray-500 mt-0.5">
-                  Đơn: {selectedOrder.DTS_Ma}
-                </p>
-              </div>
-              <button
-                onClick={handleCloseModal}
-                disabled={submitting}
-                className="text-gray-400 hover:text-red-500 disabled:opacity-50"
-              >
-                <span className="material-symbols-outlined">close</span>
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-sm text-yellow-800 flex gap-2">
-                <span className="material-symbols-outlined text-[20px] shrink-0">
-                  warning
-                </span>
-                <div>
-                  <p className="font-semibold mb-0.5">Lưu ý:</p>
-                  <p>
-                    Sau khi xác nhận, đơn sẽ chuyển sang trạng thái{" "}
-                    <b>"Đang vận chuyển"</b> và <b>không thể hoàn tác</b>.
-                  </p>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold mb-1">
-                  Ảnh minh chứng <span className="text-red-500">*</span>
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  required
-                  onChange={(e) => setModalPhoto(e.target.files[0])}
-                  className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-green-50 file:text-[#16a34a] file:font-semibold"
-                />
-                <p className="text-xs text-gray-400 mt-1">
-                  Chụp ảnh kiện hàng tại shop để làm bằng chứng
-                </p>
-              </div>
-
-              <div>
-                <label className="block text-sm font-semibold mb-1">
-                  Ghi chú (không bắt buộc)
-                </label>
-                <textarea
-                  rows={3}
-                  value={modalNote}
-                  onChange={(e) => setModalNote(e.target.value)}
-                  placeholder="VD: Hàng đóng gói cẩn thận, 3 kiện..."
-                  className="w-full px-4 py-2.5 rounded-xl border border-[#E2E8F0] outline-none focus:border-[#16a34a] resize-none"
-                />
-              </div>
-
-              <div className="flex justify-end gap-3 pt-4 border-t">
-                <button
-                  type="button"
-                  onClick={handleCloseModal}
-                  disabled={submitting}
-                  className="px-6 py-2.5 rounded-xl font-semibold text-[#64748B] hover:bg-gray-100 disabled:opacity-50"
-                >
-                  Hủy
-                </button>
-                <button
-                  type="submit"
-                  disabled={submitting}
-                  className="px-8 py-2.5 bg-[#16a34a] text-white rounded-xl font-bold hover:bg-[#15803d] disabled:bg-gray-400"
-                >
-                  {submitting ? "Đang xử lý..." : "Xác Nhận Đã Lấy"}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <OrderDetailModal
+          order={selectedOrder}
+          isHistory={activeTab === "history"}
+          onClose={handleCloseModal}
+          onSubmit={handleSubmit}
+          submitting={submitting}
+          onPhotoChange={setModalPhoto}
+          note={modalNote}
+          onNoteChange={setModalNote}
+        />
       )}
 
       <ToastNotification toast={toast} />
