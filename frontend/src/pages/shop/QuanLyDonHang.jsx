@@ -444,14 +444,17 @@ const QuanLyDonHang = () => {
                         </span>{" "}
                         Lịch Sử Trạng Thái
                       </h4>
-                      <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
+
+                      {/* 🟢 FIX: Thêm pl-2 vào class của div cuộn này */}
+                      <div className="space-y-3 max-h-60 overflow-y-auto pl-2 pr-2 custom-scrollbar">
                         {orderDetail.lich_su_trang_thai?.map((log, index) => (
                           <div
                             key={index}
                             className="flex gap-3 relative pb-3 border-l-2 border-gray-200 pl-4 last:pb-0 last:border-transparent"
                           >
+                            {/* 🟢 FIX: Đổi -left-1.5 thành -left-[5px], thêm top-1.5, viền trắng và đổ bóng nhẹ */}
                             <div
-                              className={`absolute -left-1.5 top-1 w-3 h-3 rounded-full ${index === 0 ? "bg-[#2563EB]" : "bg-gray-300"}`}
+                              className={`absolute -left-[5px] top-1.5 w-3 h-3 rounded-full border-2 border-white shadow-sm z-10 ${index === 0 ? "bg-[#2563EB]" : "bg-gray-300"}`}
                             ></div>
                             <div>
                               <p

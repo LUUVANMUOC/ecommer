@@ -4,7 +4,7 @@ const ThanhToanVanChuyenThongKeModel = require('../../models/san/thanhToanVanChu
 const ThanhToanVanChuyenService = {
   getDanhSachNo: async () => await ThanhToanVanChuyenModel.getDanhSachNo(),
   getChiTietNo: async (dvvc_ma) => await ThanhToanVanChuyenModel.getChiTietNo(dvvc_ma),
-  taoPhieuChi: async (dvvc_ma) => await ThanhToanVanChuyenModel.taoPhieuChi(dvvc_ma),
+  taoPhieuChi: async (dvvc_ma, dts_ma_list) => await ThanhToanVanChuyenModel.taoPhieuChi(dvvc_ma, dts_ma_list),
   getBankInfo: async (dvvc_ma) => await ThanhToanVanChuyenModel.getBankInfo(dvvc_ma),
   huyPhieuChi: async (pcd_ma) => await ThanhToanVanChuyenModel.huyPhieuChi(pcd_ma),
 

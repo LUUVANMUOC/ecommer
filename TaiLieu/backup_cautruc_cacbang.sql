@@ -2,7 +2,7 @@
 -- PostgreSQL database dump
 --
 
-\restrict fyRzXSS4VcVgktVJLOm0cw8mtdUekjCabjNZlk9FJAN9uuPNgnseabcRadtdFiZ
+\restrict R8P7wl3JfWNmCvnapxcyLVIZaLxQ04Zcc9OhfP1zg2batW2eog4wjDgboQ0rLL6
 
 -- Dumped from database version 18.6
 -- Dumped by pg_dump version 18.6
@@ -289,6 +289,7 @@ CREATE TABLE public.danhgiasanpham (
     dgsp_mota text,
     dgsp_phanhoi text,
     dts_ma character varying(10) NOT NULL,
+    dgsp_thoidiemphanhoi timestamp with time zone,
     CONSTRAINT danhgiasanpham_dgsp_sao_check CHECK (((dgsp_sao >= 1) AND (dgsp_sao <= 5)))
 );
 
@@ -456,7 +457,8 @@ CREATE TABLE public.gianhang (
     ct_ma character varying(10) NOT NULL,
     dc_ma character varying(10),
     gh_danhgia double precision,
-    gh_theodoi integer
+    gh_theodoi integer,
+    gh_sdt character varying(15)
 );
 
 
@@ -3816,5 +3818,5 @@ ALTER TABLE ONLY public.yeucauxulysuco
 -- PostgreSQL database dump complete
 --
 
-\unrestrict fyRzXSS4VcVgktVJLOm0cw8mtdUekjCabjNZlk9FJAN9uuPNgnseabcRadtdFiZ
+\unrestrict R8P7wl3JfWNmCvnapxcyLVIZaLxQ04Zcc9OhfP1zg2batW2eog4wjDgboQ0rLL6
 

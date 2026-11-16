@@ -43,7 +43,7 @@ const TH =
   "whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500";
 const TD = "px-3 py-2.5 text-sm text-slate-700";
 const BTN_PRIMARY =
-  "inline-flex items-center gap-1.5 rounded-lg bg-[#1e3a5f] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#2a4b73]";
+  "inline-flex items-center gap-1.5 rounded-lg bg-[#1e3a5f] px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-[#2a4b73] disabled:opacity-50 disabled:cursor-not-allowed";
 const BTN_GHOST =
   "inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50";
 
@@ -72,6 +72,9 @@ const ThanhToanVanChuyen = () => {
   const [expandedDvvc, setExpandedDvvc] = useState(null);
   const [chiTietNo, setChiTietNo] = useState({});
   const [loadingDetail, setLoadingDetail] = useState(false);
+
+  // 🟢 STATE MỚI: Lưu các đơn hàng được chọn thanh toán
+  const [selectedOrders, setSelectedOrders] = useState({});
 
   const [phieu, setPhieu] = useState({
     rows: [],
@@ -217,22 +220,57 @@ const ThanhToanVanChuyen = () => {
     }
   };
 
+  // 🟢 LOGIC CHỌN ĐƠN HÀNG
+  const toggleOrder = (dvvc_ma, dts_ma) => {
+    setSelectedOrders((prev) => {
+      const current = prev[dvvc_ma] || [];
+      const updated = current.includes(dts_ma)
+        ? current.filter((id) => id !== dts_ma)
+        : [...current, dts_ma];
+      return { ...prev, [dvvc_ma]: updated };
+    });
+  };
+
+  const toggleAllOrders = (dvvc_ma, orders) => {
+    setSelectedOrders((prev) => {
+      const current = prev[dvvc_ma] || [];
+      const allSelected = current.length === orders.length && orders.length > 0;
+      return {
+        ...prev,
+        [dvvc_ma]: allSelected ? [] : orders.map((o) => o.dts_ma),
+      };
+    });
+  };
+
   // ---- Tạo QR ----
   const handleTaoPhieuChi = async (dvvc_ma) => {
-    if (
-      !window.confirm("Tạo phiếu chi thanh toán toàn bộ đơn nợ cho ĐVVC này?")
-    )
-      return;
+    const selected = selectedOrders[dvvc_ma] || [];
+    const isPartial = selected.length > 0;
+
+    const confirmMsg = isPartial
+      ? `Tạo phiếu chi cho ${selected.length} đơn hàng đã chọn của ĐVVC này?`
+      : "Tạo phiếu chi thanh toán TOÀN BỘ đơn nợ cho ĐVVC này?";
+
+    if (!window.confirm(confirmMsg)) return;
+
     try {
-      const res = await thanhToanVanChuyenService.taoPhieuChi(dvvc_ma);
+      // Truyền thêm mảng selected
+      const res = await thanhToanVanChuyenService.taoPhieuChi(
+        dvvc_ma,
+        selected,
+      );
       cancellingRef.current = false;
       setShowQR(res.data);
       setTimeLeft(300);
+
+      // Reset dữ liệu chi tiết và selected của ĐVVC này
       setChiTietNo((p) => {
         const n = { ...p };
         delete n[dvvc_ma];
         return n;
       });
+      setSelectedOrders((p) => ({ ...p, [dvvc_ma]: [] }));
+
       loadTongQuan();
       showToast("Đã tạo phiếu chi, quét QR để thanh toán");
     } catch (e) {
@@ -566,6 +604,9 @@ const ThanhToanVanChuyen = () => {
                   {dsCongNo.map((d) => {
                     const pending = pendingByDvvc[d.dvvc_ma];
                     const open = expandedDvvc === d.dvvc_ma;
+                    const selectedCount = (selectedOrders[d.dvvc_ma] || [])
+                      .length;
+
                     return (
                       <Fragment key={d.dvvc_ma}>
                         <tr
@@ -623,7 +664,10 @@ const ThanhToanVanChuyen = () => {
                                 <span className="material-symbols-outlined text-[16px]">
                                   qr_code_2
                                 </span>
-                                Tạo QR thanh toán
+                                {/* 🟢 Cập nhật text nếu có chọn đơn */}
+                                {selectedCount > 0
+                                  ? `Thanh toán ${selectedCount} đơn`
+                                  : "Tạo QR thanh toán"}
                               </button>
                             )}
                           </td>
@@ -645,6 +689,29 @@ const ThanhToanVanChuyen = () => {
                                   <table className="w-full min-w-[520px] border-collapse">
                                     <thead className="border-b border-slate-200 bg-slate-50">
                                       <tr>
+                                        {/* 🟢 Cột Checkbox chọn tất cả */}
+                                        <th
+                                          className={`${TH} w-10 text-center`}
+                                        >
+                                          <input
+                                            type="checkbox"
+                                            className="h-4 w-4 cursor-pointer accent-indigo-600"
+                                            checked={
+                                              (chiTietNo[d.dvvc_ma] || [])
+                                                .length > 0 &&
+                                              (selectedOrders[d.dvvc_ma] || [])
+                                                .length ===
+                                                (chiTietNo[d.dvvc_ma] || [])
+                                                  .length
+                                            }
+                                            onChange={() =>
+                                              toggleAllOrders(
+                                                d.dvvc_ma,
+                                                chiTietNo[d.dvvc_ma],
+                                              )
+                                            }
+                                          />
+                                        </th>
                                         <th className={TH}>Mã đơn</th>
                                         <th className={TH}>Ngày lập</th>
                                         <th className={`${TH} text-right`}>
@@ -655,7 +722,27 @@ const ThanhToanVanChuyen = () => {
                                     <tbody className="divide-y divide-slate-100">
                                       {(chiTietNo[d.dvvc_ma] || []).map(
                                         (don) => (
-                                          <tr key={don.dts_ma}>
+                                          <tr
+                                            key={don.dts_ma}
+                                            className="hover:bg-slate-50"
+                                          >
+                                            {/* 🟢 Checkbox từng đơn */}
+                                            <td className={`${TD} text-center`}>
+                                              <input
+                                                type="checkbox"
+                                                className="h-4 w-4 cursor-pointer accent-indigo-600"
+                                                checked={(
+                                                  selectedOrders[d.dvvc_ma] ||
+                                                  []
+                                                ).includes(don.dts_ma)}
+                                                onChange={() =>
+                                                  toggleOrder(
+                                                    d.dvvc_ma,
+                                                    don.dts_ma,
+                                                  )
+                                                }
+                                              />
+                                            </td>
                                             <td
                                               className={`${TD} font-mono font-semibold text-indigo-600`}
                                             >

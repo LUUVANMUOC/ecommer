@@ -15,8 +15,8 @@ const thanhToanVanChuyenService = {
   getDanhSachNo: () => axiosClient.get(`${BASE}/danh-sach-no`),
   getChiTietNo: (dvvc_ma) =>
     axiosClient.get(`${BASE}/chi-tiet-no/${dvvc_ma}`),
-  taoPhieuChi: (dvvc_ma) =>
-    axiosClient.post(`${BASE}/tao-phieu/${dvvc_ma}`),
+  taoPhieuChi: (dvvc_ma, dts_ma_list) =>
+    axiosClient.post(`${BASE}/tao-phieu/${dvvc_ma}`, { dts_ma_list }),
   huyPhieuChi: (pcd_ma) =>
     axiosClient.delete(`${BASE}/huy-phieu/${pcd_ma}`),
   checkTrangThai: (pcd_ma) =>

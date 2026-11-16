@@ -694,7 +694,7 @@ const QuanLySanPham = () => {
       />
 
       {/* ===== BỘ LỌC NÂNG CAO (khoảng động) + SẮP XẾP ===== */}
-      <div className="rounded-2xl border border-[#E2DED3] bg-white p-4 shadow-sm">
+      <div className="isolate relative z-0 rounded-2xl border border-[#E2DED3] bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-[#14201C] px-3.5 py-2 text-sm font-semibold text-[#14201C]">
             <span className="material-symbols-outlined text-[18px]">tune</span>

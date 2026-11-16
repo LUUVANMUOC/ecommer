@@ -31,18 +31,33 @@ const ThanhToanVanChuyenModel = {
   },
 
   // 3. Tạo phiếu chi
-  taoPhieuChi: async (dvvc_ma) => {
+    // 3. Tạo phiếu chi (Cập nhật để nhận danh sách đơn hàng cụ thể)
+  taoPhieuChi: async (dvvc_ma, dts_ma_list = []) => {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const donHangRes = await client.query(`
+      
+      // Xây dựng câu query linh hoạt
+      let queryStr = `
         SELECT o.dts_ma, o.dts_tonggiamgiavanchuyen 
         FROM donhangtheoshop o
         WHERE o.dvvc_ma = $1 AND o.dts_tonggiamgiavanchuyen > 0
         AND o.dts_ma NOT IN (SELECT dts_ma FROM chitiet_chi_dvvc)
-      `, [dvvc_ma]);
+      `;
+      let queryParams = [dvvc_ma];
 
-      if (donHangRes.rows.length === 0) throw new Error("Không có đơn nào cần thanh toán");
+      // Nếu có truyền danh sách đơn hàng, chỉ lấy các đơn đó
+      if (dts_ma_list && dts_ma_list.length > 0) {
+        queryStr += ` AND o.dts_ma = ANY($2)`;
+        queryParams.push(dts_ma_list);
+      }
+
+      const donHangRes = await client.query(queryStr, queryParams);
+
+      if (donHangRes.rows.length === 0) {
+        throw new Error("Không có đơn nào hợp lệ cần thanh toán (có thể đã được lập phiếu trước đó)");
+      }
+      
       const tongTien = donHangRes.rows.reduce((sum, row) => sum + Number(row.dts_tonggiamgiavanchuyen), 0);
 
       const pcdRes = await client.query(`SELECT pcd_ma FROM phieu_chi_dvvc ORDER BY pcd_ma DESC LIMIT 1`);
@@ -53,9 +68,11 @@ const ThanhToanVanChuyenModel = {
       }
 
       await client.query(`INSERT INTO phieu_chi_dvvc (pcd_ma, dvvc_ma, pcd_tong_tien) VALUES ($1, $2, $3)`, [newPcdMa, dvvc_ma, tongTien]);
+      
       for (const row of donHangRes.rows) {
         await client.query(`INSERT INTO chitiet_chi_dvvc (pcd_ma, dts_ma, ccd_so_tien) VALUES ($1, $2, $3)`, [newPcdMa, row.dts_ma, row.dts_tonggiamgiavanchuyen]);
       }
+      
       await client.query(`INSERT INTO qr_chi_dvvc (qr_ma, pcd_ma, qr_so_tien) VALUES ($1, $2, $3)`, [newPcdMa, newPcdMa, tongTien]);
 
       await client.query('COMMIT');

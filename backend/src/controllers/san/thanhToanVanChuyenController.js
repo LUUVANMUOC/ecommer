@@ -1,7 +1,5 @@
 const ThanhToanVanChuyenService = require('../../services/san/thanhToanVanChuyenService');
 
-// nam rỗng ('') => null: xem tất cả các năm
-// không truyền (undefined) => giữ mặc định năm hiện tại như trước
 const parseNam = (value) => {
   if (value === undefined) return new Date().getFullYear();
   if (value === null || value === '') return null;
@@ -22,12 +20,16 @@ const ThanhToanVanChuyenController = {
 
   taoPhieuChi: async (req, res) => {
     try {
-      const result = await ThanhToanVanChuyenService.taoPhieuChi(req.params.dvvc_ma);
+      const { dts_ma_list } = req.body; 
+      const result = await ThanhToanVanChuyenService.taoPhieuChi(req.params.dvvc_ma, dts_ma_list);
       const thongTinNganHang = await ThanhToanVanChuyenService.getBankInfo(req.params.dvvc_ma);
       res.status(200).json({ ...result, thongTinNganHang });
-    } catch (error) { res.status(400).json({ message: error.message }); }
+    } catch (error) { 
+      res.status(400).json({ message: error.message }); 
+    }
   },
 
+  // 🔴 CHÚ Ý: Hàm này phải nằm trong object, có dấu phẩy ngăn cách với hàm trên
   huyPhieuChi: async (req, res) => {
     try {
       await ThanhToanVanChuyenService.huyPhieuChi(req.params.pcd_ma);
@@ -40,7 +42,6 @@ const ThanhToanVanChuyenController = {
     catch (error) { res.status(500).json({ message: error.message }); }
   },
 
-  // 🟢 Các hàm lịch sử
   getLichSuAdmin: async (req, res) => {
     try { res.status(200).json(await ThanhToanVanChuyenService.getLichSuAdmin()); }
     catch (error) {
@@ -59,7 +60,6 @@ const ThanhToanVanChuyenController = {
     catch (error) { res.status(500).json({ message: error.message }); }
   },
 
-  // ================= THỐNG KÊ =================
   getDanhMuc: async (req, res) => {
     try { res.status(200).json(await ThanhToanVanChuyenService.getDanhMuc()); }
     catch (error) { res.status(500).json({ message: error.message }); }
@@ -112,4 +112,5 @@ const ThanhToanVanChuyenController = {
   },
 };
 
+// 🔴 Đảm bảo xuất đúng object ra ngoài
 module.exports = ThanhToanVanChuyenController;
