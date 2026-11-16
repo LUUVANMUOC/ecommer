@@ -167,7 +167,7 @@ const MaGiamGiaShopModel = {
       finalStatus, // ✅ Dùng trạng thái đã tính toán
       MGG_Shop_ThoiDiemBatDau || null, MGG_Shop_ThoiDiemKetThuc || null,
       MGG_Shop_GiaTriDonToiThieu, MGG_Shop_SoLuongConLai, MGG_Shop_PhanTramGiam,
-      MGG_Shop_SoLuongBandau, MGG_Shop_SoTienToiDaMoiLan, id 
+      MGG_Shop_SoLuongBanDau, MGG_Shop_SoTienToiDaMoiLan, id 
     ];
 
     const result = await pool.query(query, values);

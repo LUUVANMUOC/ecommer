@@ -32,28 +32,7 @@ const ShopDashboard = () => {
         // 🟢 Thêm mục Lịch sử nhận tiền vào đây
       ],
     },
-    {
-      title: "Hỗ trợ",
-      children: [
-        {
-          title: "Kiến nghị / Khiếu nại",
-          path: "/nguoi-ban/gui-kien-nghi",
-        },
-      ],
-    },
-    {
-      title: "Thông tin cửa hàng",
-      children: [
-        {
-          title: "Hồ sơ cửa hàng",
-          path: "/nguoi-ban/thong-tin-cua-hang",
-        },
-        {
-          title: "Vận chuyển",
-          path: "/nguoi-ban/van-chuyen",
-        },
-      ],
-    },
+
     {
       title: "Báo cáo và Thống kê",
       children: [
@@ -73,6 +52,29 @@ const ShopDashboard = () => {
         { title: "Hộp thư thông báo", path: "/nguoi-ban/thong-bao" },
         { title: "Gửi thông báo cho khách", path: "/nguoi-ban/gui-thong-bao" },
         { title: "Sự cố & khiếu nại", path: "/nguoi-ban/su-co" },
+      ],
+    },
+    {
+      title: "Hỗ trợ",
+      children: [
+        {
+          title: "Kiến nghị / Khiếu nại",
+          path: "/nguoi-ban/gui-kien-nghi",
+        },
+      ],
+    },
+
+    {
+      title: "Thông tin cửa hàng",
+      children: [
+        {
+          title: "Hồ sơ cửa hàng",
+          path: "/nguoi-ban/thong-tin-cua-hang",
+        },
+        {
+          title: "Vận chuyển",
+          path: "/nguoi-ban/van-chuyen",
+        },
       ],
     },
   ];

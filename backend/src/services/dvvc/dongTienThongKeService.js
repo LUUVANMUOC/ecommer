@@ -48,18 +48,22 @@ const DongTienThongKeService = {
     return DongTienThongKeModel.getDanhMuc(dvvcHopLe(dvvc_ma));
   },
 
-  getTongQuan: async (dvvc_ma, query = {}) => {
-    const nam = namHopLe(query.nam);
-    const thang = thangHopLe(query.thang);
-    const kho_ma = chuoi(query.kho_ma) || null;
+     getTongQuan: async (dvvc_ma, query = {}) => {
+     const nam = namHopLe(query.nam);
+     const thang = thangHopLe(query.thang);
+     const kho_ma = chuoi(query.kho_ma) || null;
+    const tinh_ma = chuoi(query.tinh_ma) || null;
+    const xa_ma = chuoi(query.xa_ma) || null;
 
-    return DongTienThongKeModel.getTongQuan({
-      dvvc_ma: dvvcHopLe(dvvc_ma),
-      kho_ma,
-      nam,
-      thang,
-    });
-  },
+     return DongTienThongKeModel.getTongQuan({
+       dvvc_ma: dvvcHopLe(dvvc_ma),
+       kho_ma,
+      tinh_ma,
+      xa_ma,
+       nam,
+       thang,
+     });
+   },
 
   getDonDangGiu: async (dvvc_ma, query = {}) => {
     const loai = chuoi(query.loai).toLowerCase();

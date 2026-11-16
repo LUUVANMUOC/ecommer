@@ -6,6 +6,7 @@ import ToastNotification from "../../components/common/Crud/ToastNotification";
 import {
   money,
   fmtDate,
+  INPUT,
   KpiCard,
   FilterBar,
   SectionCard,
@@ -51,6 +52,10 @@ const CHART_VIEWS = [
   { id: "nam", label: "Theo năm", icon: "event_note" },
 ];
 
+// So sánh chuỗi tiếng Việt để sắp xếp tỉnh/xã
+const soSanhTen = (a, b) =>
+  String(a || "").localeCompare(String(b || ""), "vi");
+
 const LichSuNhanTienShip = () => {
   const { user, loading: authLoading } = useContext(AuthContext);
   const dvvc_ma = user?.dvvc_ma || user?.DVVC_Ma || user?.id;
@@ -61,6 +66,8 @@ const LichSuNhanTienShip = () => {
     nam_hien_tai: NAM_HIEN_TAI,
   });
   const [filters, setFilters] = useState({
+    tinh_ma: "",
+    xa_ma: "",
     kho_ma: "",
     nam: String(NAM_HIEN_TAI),
     thang: "",
@@ -165,6 +172,8 @@ const LichSuNhanTienShip = () => {
 
     dongTienThongKeService
       .getTongQuan(dvvc_ma, {
+        tinh_ma: filters.tinh_ma || undefined,
+        xa_ma: filters.xa_ma || undefined,
         kho_ma: filters.kho_ma || undefined,
         nam: filters.nam,
         thang: filters.thang || undefined,
@@ -189,6 +198,8 @@ const LichSuNhanTienShip = () => {
     };
   }, [
     dvvc_ma,
+    filters.tinh_ma,
+    filters.xa_ma,
     filters.kho_ma,
     filters.nam,
     filters.thang,
@@ -206,7 +217,13 @@ const LichSuNhanTienShip = () => {
     setExpandedPcd(null);
     setOrderState({});
     setPhieuDetail({});
-  }, [filters.kho_ma, filters.nam, filters.thang]);
+  }, [
+    filters.tinh_ma,
+    filters.xa_ma,
+    filters.kho_ma,
+    filters.nam,
+    filters.thang,
+  ]);
 
   // Đổi tab -> đóng dòng đang mở
   useEffect(() => {
@@ -390,10 +407,109 @@ const LichSuNhanTienShip = () => {
 
   const reloadAll = () => {
     setReloadKey((key) => key + 1);
+    setKhoPage(1);
+    setShipperPage(1);
+    setDonChuaLapPage(1);
+    setPhieuPage(1);
     setExpanded(null);
     setExpandedPcd(null);
     setOrderState({});
     setPhieuDetail({});
+  };
+
+  // ===== Danh sách kho + địa chỉ (tỉnh/xã) =====
+  const dsKho = danhMuc.kho || EMPTY;
+
+  const dsTinh = useMemo(() => {
+    const map = new Map();
+
+    dsKho.forEach((k) => {
+      if (!k.tinh_ma || map.has(k.tinh_ma)) return;
+      map.set(k.tinh_ma, {
+        tinh_ma: k.tinh_ma,
+        tinh_ten: k.tinh_ten || k.tinh_ma,
+      });
+    });
+
+    return Array.from(map.values()).sort((a, b) =>
+      soSanhTen(a.tinh_ten, b.tinh_ten),
+    );
+  }, [dsKho]);
+
+  const dsXa = useMemo(() => {
+    const map = new Map();
+
+    dsKho
+      .filter((k) => !filters.tinh_ma || k.tinh_ma === filters.tinh_ma)
+      .forEach((k) => {
+        if (!k.xa_ma || map.has(k.xa_ma)) return;
+        map.set(k.xa_ma, {
+          xa_ma: k.xa_ma,
+          xa_ten: k.xa_ten || k.xa_ma,
+        });
+      });
+
+    return Array.from(map.values()).sort((a, b) =>
+      soSanhTen(a.xa_ten, b.xa_ten),
+    );
+  }, [dsKho, filters.tinh_ma]);
+
+  const khoTheoDiaChi = useMemo(
+    () =>
+      dsKho.filter(
+        (k) =>
+          (!filters.tinh_ma || k.tinh_ma === filters.tinh_ma) &&
+          (!filters.xa_ma || k.xa_ma === filters.xa_ma),
+      ),
+    [dsKho, filters.tinh_ma, filters.xa_ma],
+  );
+
+  const danhMucLoc = useMemo(
+    () => ({ ...danhMuc, kho: khoTheoDiaChi }),
+    [danhMuc, khoTheoDiaChi],
+  );
+
+  const coLocDiaChi = Boolean(filters.tinh_ma || filters.xa_ma);
+  const tinhDangChon = dsTinh.find((t) => t.tinh_ma === filters.tinh_ma);
+  const xaDangChon = dsXa.find((x) => x.xa_ma === filters.xa_ma);
+
+  // Đổi tỉnh: bỏ xã đã chọn, bỏ kho nếu kho không thuộc tỉnh mới
+  const doiTinh = (value) => {
+    setFilters((prev) => {
+      const conLai = dsKho.filter((k) => !value || k.tinh_ma === value);
+      const giuKho =
+        prev.kho_ma && conLai.some((k) => k.kho_ma === prev.kho_ma);
+
+      return {
+        ...prev,
+        tinh_ma: value,
+        xa_ma: "",
+        kho_ma: giuKho ? prev.kho_ma : "",
+      };
+    });
+  };
+
+  // Đổi xã: bỏ kho nếu kho không thuộc xã mới
+  const doiXa = (value) => {
+    setFilters((prev) => {
+      const conLai = dsKho.filter(
+        (k) =>
+          (!prev.tinh_ma || k.tinh_ma === prev.tinh_ma) &&
+          (!value || k.xa_ma === value),
+      );
+      const giuKho =
+        prev.kho_ma && conLai.some((k) => k.kho_ma === prev.kho_ma);
+
+      return {
+        ...prev,
+        xa_ma: value,
+        kho_ma: giuKho ? prev.kho_ma : "",
+      };
+    });
+  };
+
+  const xoaLocDiaChi = () => {
+    setFilters((prev) => ({ ...prev, tinh_ma: "", xa_ma: "" }));
   };
 
   // ===== Dữ liệu dẫn xuất =====
@@ -486,27 +602,30 @@ const LichSuNhanTienShip = () => {
   );
 
   const khoDangChon = useMemo(
-    () => (danhMuc.kho || EMPTY).find((kho) => kho.kho_ma === filters.kho_ma),
-    [danhMuc.kho, filters.kho_ma],
+    () => dsKho.find((kho) => kho.kho_ma === filters.kho_ma),
+    [dsKho, filters.kho_ma],
   );
 
-  const tabMeta = useMemo(
-    () => ({
+  const tabMeta = useMemo(() => {
+    const phamViKho = filters.kho_ma
+      ? "Đang lọc 1 kho."
+      : coLocDiaChi
+        ? `Đang lọc ${khoTheoDiaChi.length} kho theo địa chỉ.`
+        : "Tất cả kho.";
+
+    return {
       "theo-kho": {
         title: "Tiền đang giữ theo kho",
-        subtitle: `Bấm vào kho để xem danh sách đơn đang giữ. ${
-          filters.kho_ma ? "Đang lọc 1 kho." : "Tất cả kho."
-        }`,
+        subtitle: `Bấm vào kho để xem danh sách đơn đang giữ. ${phamViKho}`,
       },
       "theo-shipper": {
         title: "Tiền đang giữ theo shipper",
-        subtitle: `Bấm vào shipper để xem danh sách đơn đang giữ. ${
-          filters.kho_ma ? "Đang lọc theo kho." : "Tất cả kho."
-        }`,
+        subtitle: `Bấm vào shipper để xem danh sách đơn đang giữ. ${phamViKho}`,
       },
       "san-chua-chuyen": {
         title: "Sàn chưa chuyển tiền voucher ship",
-        subtitle: "Toàn ĐVVC · tồn hiện tại · không áp dụng bộ lọc kho.",
+        subtitle:
+          "Toàn ĐVVC · tồn hiện tại · không áp dụng bộ lọc kho/địa chỉ.",
       },
       "san-da-chuyen": {
         title: "Sàn đã chuyển tiền voucher ship",
@@ -516,9 +635,14 @@ const LichSuNhanTienShip = () => {
             : `năm ${filters.nam}`
         }.`,
       },
-    }),
-    [filters.kho_ma, filters.nam, filters.thang],
-  );
+    };
+  }, [
+    filters.kho_ma,
+    filters.nam,
+    filters.thang,
+    coLocDiaChi,
+    khoTheoDiaChi.length,
+  ]);
 
   const activeMeta = tabMeta[activeTab] || tabMeta["theo-kho"];
   const chartRows = chartMode === "thang" ? theoThang : theoNam;
@@ -544,6 +668,8 @@ const LichSuNhanTienShip = () => {
         [
           "Mã kho",
           "Tên kho",
+          "Tỉnh/Thành",
+          "Xã/Phường",
           "Số shipper",
           "Đơn đang giữ",
           "Shipper giữ",
@@ -560,6 +686,8 @@ const LichSuNhanTienShip = () => {
         theoKho.map((k) => [
           k.kho_ma,
           k.kho_ten,
+          k.tinh_ten || "",
+          k.xa_ten || "",
           k.so_shipper,
           k.so_don_giu,
           k.shipper_giu,
@@ -742,17 +870,101 @@ const LichSuNhanTienShip = () => {
       </div>
 
       <FilterBar
-        danhMuc={danhMuc}
+        danhMuc={danhMucLoc}
         filters={filters}
         onChange={setFilters}
         onReload={reloadAll}
         loading={busy}
         onExport={exportCsv}
+        extra={
+          <>
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-slate-500">
+                Tỉnh/Thành
+              </span>
+              <select
+                className={`${INPUT} min-w-[170px]`}
+                value={filters.tinh_ma || ""}
+                onChange={(e) => doiTinh(e.target.value)}
+              >
+                <option value="">Tất cả tỉnh/thành</option>
+                {dsTinh.map((t) => (
+                  <option key={t.tinh_ma} value={t.tinh_ma}>
+                    {t.tinh_ten}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-slate-500">
+                Xã/Phường
+              </span>
+              <select
+                className={`${INPUT} min-w-[170px]`}
+                value={filters.xa_ma || ""}
+                onChange={(e) => doiXa(e.target.value)}
+                disabled={dsXa.length === 0}
+              >
+                <option value="">Tất cả xã/phường</option>
+                {dsXa.map((x) => (
+                  <option key={x.xa_ma} value={x.xa_ma}>
+                    {x.xa_ten}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <div className="flex flex-col gap-1">
+              <span className="text-xs font-medium text-slate-500">
+                Kho khớp địa chỉ
+              </span>
+              <div className="flex h-10 items-center gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 text-sm text-slate-600">
+                <span className="material-symbols-outlined text-[18px] text-slate-400">
+                  warehouse
+                </span>
+                <strong className="text-slate-800">
+                  {khoTheoDiaChi.length}
+                </strong>
+                <span className="text-slate-400">/ {dsKho.length} kho</span>
+              </div>
+            </div>
+
+            {coLocDiaChi && (
+              <button
+                type="button"
+                onClick={xoaLocDiaChi}
+                className="flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 hover:bg-slate-50"
+              >
+                <span className="material-symbols-outlined text-[18px]">
+                  filter_alt_off
+                </span>
+                Bỏ lọc địa chỉ
+              </button>
+            )}
+          </>
+        }
       />
+
+      {coLocDiaChi && (
+        <NoteBox tone="sky">
+          Đang lọc địa chỉ:{" "}
+          <strong>{tinhDangChon?.tinh_ten || "Tất cả tỉnh/thành"}</strong>
+          {filters.xa_ma ? ` · ${xaDangChon?.xa_ten || filters.xa_ma}` : ""}. Có{" "}
+          <strong>{khoTheoDiaChi.length}</strong> kho khớp. Bộ lọc tỉnh/xã chỉ
+          áp dụng cho tab <strong>Theo kho</strong> và{" "}
+          <strong>Theo shipper</strong>.
+        </NoteBox>
+      )}
 
       {filters.kho_ma && (
         <NoteBox tone="amber">
           Đang lọc kho <strong>{khoDangChon?.kho_ten || filters.kho_ma}</strong>
+          {khoDangChon?.tinh_ten
+            ? ` (${khoDangChon.tinh_ten}${
+                khoDangChon.xa_ten ? ` · ${khoDangChon.xa_ten}` : ""
+              })`
+            : ""}
           . Bộ lọc kho chỉ áp dụng cho tab <strong>Theo kho</strong> và{" "}
           <strong>Theo shipper</strong>. Số liệu sàn luôn tính toàn ĐVVC vì
           phiếu chi không gắn kho.

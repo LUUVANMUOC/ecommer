@@ -11,6 +11,8 @@
 //  - Kho của đơn lấy theo shipper đã nộp tiền, sau đó chuyến giao mới nhất.
 //  - Loại đơn hủy (trạng thái mới nhất TTDH06) khỏi công nợ sàn.
 //  - phieu_chi_dvvc không có kho_ma nên số liệu sàn luôn là toàn ĐVVC.
+//  - Lọc theo tỉnh/xã: quy đổi ra danh sách kho_ma (kho_scope) rồi dùng
+//    chung tham số $2 của các câu SQL bên dưới.
 
 const pool = require('../../config/db');
 
@@ -38,6 +40,28 @@ const khoangThoiGian = (nam, thang) => {
     };
   }
   return { nam: y, thang: null, tu_ngay: `${y}-01-01`, den_ngay: `${y}-12-31` };
+};
+
+// Quy đổi bộ lọc địa chỉ (tỉnh/xã) thành danh sách kho_ma.
+//  - Có kho_ma cụ thể -> chỉ kho đó.
+//  - Không lọc địa chỉ   -> null (không giới hạn).
+//  - Có tỉnh/xã          -> mảng kho_ma khớp (rỗng nghĩa là không có kho nào).
+const layKhoScope = async (dvvc_ma, kho_ma, tinh_ma, xa_ma) => {
+  if (kho_ma) return [kho_ma];
+  if (!tinh_ma && !xa_ma) return null;
+
+  const { rows } = await pool.query(
+    `SELECT k.kho_ma
+     FROM kho k
+     LEFT JOIN diachi d ON d.dc_ma = k.dc_ma
+     LEFT JOIN xaphuong x ON x.xa_ma = d.xa_ma
+     WHERE k.dvvc_ma = $1
+       AND ($2::varchar IS NULL OR x.tinh_ma = $2)
+       AND ($3::varchar IS NULL OR x.xa_ma = $3)`,
+    [dvvc_ma, tinh_ma, xa_ma]
+  );
+
+  return rows.map((r) => r.kho_ma);
 };
 
 // Đơn không bị hủy: trạng thái mới nhất khác TTDH06
@@ -68,6 +92,7 @@ const TTGH_CHON = `
 `;
 
 // Tiền đang giữ (shipper hoặc kho)
+// $2 là danh sách kho_ma (varchar[]) hoặc NULL.
 const GIU = `
   SELECT o.dts_ma, o.dts_ngaylap,
          COALESCE(o.dts_tongtienkhachhangthanhtoan, 0) AS cod,
@@ -100,7 +125,7 @@ const GIU = `
   WHERE o.dvvc_ma = $1
     AND o.dts_trangthaithanhtoan = true
     AND k.dvvc_ma = $1
-    AND ($2::varchar IS NULL OR s.kho_ma = $2)
+    AND ($2::varchar[] IS NULL OR s.kho_ma = ANY($2))
 `;
 
 // Kho + shipper của đơn, dùng cho danh sách đơn chưa lập phiếu
@@ -124,10 +149,15 @@ const DongTienThongKeModel = {
   getDanhMuc: async (dvvc_ma) => {
     const [khoRes, namRes] = await Promise.all([
       pool.query(
-        `SELECT kho_ma, kho_ten
-         FROM kho
-         WHERE dvvc_ma = $1
-         ORDER BY kho_ten ASC`,
+        `SELECT k.kho_ma, k.kho_ten,
+                x.xa_ma, x.xa_ten,
+                t.tinh_ma, t.tinh_ten
+         FROM kho k
+         LEFT JOIN diachi d ON d.dc_ma = k.dc_ma
+         LEFT JOIN xaphuong x ON x.xa_ma = d.xa_ma
+         LEFT JOIN tinhtp t ON t.tinh_ma = x.tinh_ma
+         WHERE k.dvvc_ma = $1
+         ORDER BY k.kho_ten ASC`,
         [dvvc_ma]
       ),
       pool.query(
@@ -168,13 +198,23 @@ const DongTienThongKeModel = {
   // =========================================================
   // 2. TỔNG QUAN
   // =========================================================
-  getTongQuan: async ({ dvvc_ma, kho_ma = null, nam, thang = null }) => {
+  getTongQuan: async ({
+    dvvc_ma,
+    kho_ma = null,
+    tinh_ma = null,
+    xa_ma = null,
+    nam,
+    thang = null,
+  }) => {
     const {
       nam: namSo,
       thang: thangSo,
       tu_ngay,
       den_ngay,
     } = khoangThoiGian(nam, thang);
+
+    // Phạm vi kho: 1 kho cụ thể, hoặc các kho thuộc tỉnh/xã, hoặc tất cả.
+    const khoScope = await layKhoScope(dvvc_ma, kho_ma, tinh_ma, xa_ma);
 
     // ---------- 2.1. KPI ----------
     const kpiSql = `
@@ -446,6 +486,8 @@ const DongTienThongKeModel = {
         GROUP BY p.kho_ma
       )
       SELECT k.kho_ma, k.kho_ten,
+             kx.xa_ma, kx.xa_ten,
+             kt.tinh_ma, kt.tinh_ten,
              COALESCE(g.so_shipper, 0) AS so_shipper,
              COALESCE(g.so_don_shipper, 0) AS so_don_shipper,
              COALESCE(g.so_don_kho, 0) AS so_don_kho,
@@ -462,11 +504,14 @@ const DongTienThongKeModel = {
              COALESCE(t.so_phieu, 0) AS so_phieu,
              COALESCE(t.so_don_tat_toan, 0) AS so_don_tat_toan
       FROM kho k
+      LEFT JOIN diachi kd ON kd.dc_ma = k.dc_ma
+      LEFT JOIN xaphuong kx ON kx.xa_ma = kd.xa_ma
+      LEFT JOIN tinhtp kt ON kt.tinh_ma = kx.tinh_ma
       LEFT JOIN giu_agg g ON g.kho_ma = k.kho_ma
       LEFT JOIN nhan n ON n.kho_ma = k.kho_ma
       LEFT JOIN tat_toan t ON t.kho_ma = k.kho_ma
       WHERE k.dvvc_ma = $1
-        AND ($2::varchar IS NULL OR k.kho_ma = $2)
+        AND ($2::varchar[] IS NULL OR k.kho_ma = ANY($2))
       ORDER BY tong_giu DESC, k.kho_ten ASC
     `;
 
@@ -502,11 +547,11 @@ const DongTienThongKeModel = {
 
     const [kpiRes, thangRes, namRes, khoRes, shipperRes, phieuChoRes] =
       await Promise.all([
-        pool.query(kpiSql, [dvvc_ma, kho_ma, tu_ngay, den_ngay]),
-        pool.query(thangSql, [dvvc_ma, kho_ma, namSo]),
-        pool.query(namSql, [dvvc_ma, kho_ma]),
-        pool.query(khoSql, [dvvc_ma, kho_ma, tu_ngay, den_ngay]),
-        pool.query(shipperSql, [dvvc_ma, kho_ma]),
+        pool.query(kpiSql, [dvvc_ma, khoScope, tu_ngay, den_ngay]),
+        pool.query(thangSql, [dvvc_ma, khoScope, namSo]),
+        pool.query(namSql, [dvvc_ma, khoScope]),
+        pool.query(khoSql, [dvvc_ma, khoScope, tu_ngay, den_ngay]),
+        pool.query(shipperSql, [dvvc_ma, khoScope]),
         pool.query(phieuChoSql, [dvvc_ma]),
       ]);
 
@@ -521,7 +566,17 @@ const DongTienThongKeModel = {
         : 0;
 
     return {
-      pham_vi: { dvvc_ma, kho_ma, nam: namSo, thang: thangSo, tu_ngay, den_ngay },
+      pham_vi: {
+        dvvc_ma,
+        kho_ma,
+        tinh_ma,
+        xa_ma,
+        kho_scope: khoScope,
+        nam: namSo,
+        thang: thangSo,
+        tu_ngay,
+        den_ngay,
+      },
       kpi: {
         shipper_giu,
         shipper_so_don: num(k.shipper_so_don),
@@ -565,6 +620,10 @@ const DongTienThongKeModel = {
       theo_kho: khoRes.rows.map((r) => ({
         kho_ma: r.kho_ma,
         kho_ten: r.kho_ten,
+        tinh_ma: r.tinh_ma || null,
+        tinh_ten: r.tinh_ten || null,
+        xa_ma: r.xa_ma || null,
+        xa_ten: r.xa_ten || null,
         so_shipper: num(r.so_shipper),
         so_don_shipper: num(r.so_don_shipper),
         so_don_kho: num(r.so_don_kho),
@@ -611,7 +670,7 @@ const DongTienThongKeModel = {
     const p = Math.max(1, Number(page) || 1);
     const l = Math.min(100, Math.max(1, Number(limit) || 10));
     const offset = (p - 1) * l;
-    const khoFilter = loai === 'kho' ? ma : null;
+    const khoFilter = loai === 'kho' ? [ma] : null;
 
     const where = `
       WHERE (

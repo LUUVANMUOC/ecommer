@@ -69,11 +69,21 @@ const PublicSanPhamController = {
     }
   },
 
+  // Sản phẩm theo shop: hỗ trợ dmsp_ma, search, brand, sort, page, limit
   getByShop: async (req, res) => {
     try {
       const { gh_ma } = req.params;
-      const { dmsp_ma } = req.query; 
-      const data = await PublicSanPhamModel.getByShop(gh_ma, dmsp_ma);
+      const { dmsp_ma, page, limit, search, brand, sort } = req.query;
+
+      const data = await PublicSanPhamModel.getByShop(gh_ma, {
+        dmsp_ma: dmsp_ma || "",
+        page: parseInt(page) || 1,
+        limit: Math.min(parseInt(limit) || 20, 100),
+        search: search || "",
+        brand: brand || "",
+        sort: sort || "newest",
+      });
+
       res.status(200).json(data);
     } catch (error) {
       res.status(500).json({ message: error.message });

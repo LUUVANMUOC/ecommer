@@ -30,14 +30,7 @@ const AdminDashboard = () => {
       title: "Trả lời kiến nghị",
       path: "/admin/tra-loi-kien-nghi",
     },
-    {
-      title: "Thông tin sàn",
-      path: "/admin/thong-tin-san",
-    },
-    {
-      title: "Giao diện Header & Footer",
-      path: "/admin/giao-dien",
-    },
+
     {
       title: "Thanh toán Vận chuyển",
       path: "/admin/thanh-toan-van-chuyen",
@@ -61,6 +54,14 @@ const AdminDashboard = () => {
         { title: "Gửi thông báo cho Shop", path: "/admin/gui-thong-bao" },
         { title: "Xử lý sự cố", path: "/admin/su-co" },
       ],
+    },
+    {
+      title: "Giao diện Header & Footer",
+      path: "/admin/giao-dien",
+    },
+    {
+      title: "Thông tin sàn",
+      path: "/admin/thong-tin-san",
     },
   ];
 

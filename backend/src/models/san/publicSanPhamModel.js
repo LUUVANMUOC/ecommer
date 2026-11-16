@@ -209,8 +209,48 @@ const PublicSanPhamModel = {
     return result.rows;
   },
 
-  getByShop: async (gh_ma, dmsp_ma) => {
-    let query = `
+  // Danh sách sản phẩm của 1 shop.
+  // Hỗ trợ tìm kiếm / lọc thương hiệu / sắp xếp / phân trang giống getAllActive.
+  // Tương thích ngược: getByShop(gh_ma, "DMSP001") vẫn chạy.
+  getByShop: async (gh_ma, opts = {}) => {
+    const o = typeof opts === "string" ? { dmsp_ma: opts } : opts || {};
+
+    const dmsp_ma = o.dmsp_ma || "";
+    const search = String(o.search || "").trim();
+    const brand = String(o.brand || "").trim();
+    const sort = o.sort || "newest";
+    const page = Math.max(1, parseInt(o.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, parseInt(o.limit, 10) || 20));
+    const offset = (page - 1) * limit;
+
+    // $1 luôn là gh_ma, các điều kiện lọc bắt đầu từ $2
+    const buildFilter = () => {
+      let where = "";
+      const params = [];
+      let i = 2;
+
+      if (dmsp_ma) {
+        where += ` AND sp.dmsp_ma = $${i}`;
+        params.push(dmsp_ma);
+        i++;
+      }
+
+      if (brand) {
+        where += ` AND th.th_ma = $${i}`;
+        params.push(brand);
+        i++;
+      }
+
+      if (search) {
+        where += ` AND (sp.sp_ten ILIKE $${i} OR sp.sp_mota ILIKE $${i} OR dm.dmsp_ten ILIKE $${i})`;
+        params.push(`%${search}%`);
+        i++;
+      }
+
+      return { where, params, next: i };
+    };
+
+    const approved = `
       WITH approved_variants AS (
           SELECT ctsp.sp_ma, ctsp.ctsp_ma, ctsp.ctsp_gianban, ctsp.ctsp_ten, ctsp.ctsp_soluongton,
                  (SELECT hasp_link FROM hinhanhsanpham WHERE ctsp_ma = ctsp.ctsp_ma ORDER BY hasp_laanhchinh DESC LIMIT 1) AS image
@@ -221,6 +261,18 @@ const PublicSanPhamModel = {
           ) status ON true
           WHERE status.ttctsp_ma = 'TTCTSP0002' AND ctsp.ctsp_soluongton > 0
       )
+    `;
+
+    // ---------- Lấy dữ liệu ----------
+    const filter = buildFilter();
+
+    let orderBy = "sp.sp_ma DESC";
+    if (sort === "price_asc") orderBy = "min_price ASC, sp.sp_ma DESC";
+    else if (sort === "price_desc") orderBy = "max_price DESC, sp.sp_ma DESC";
+    else if (sort === "popular") orderBy = "sp.sp_luotmua DESC, sp.sp_ma DESC";
+
+    const listQuery = `
+      ${approved}
       SELECT 
           sp.sp_ma, sp.sp_ten, sp.sp_mota, sp.sp_luotmua, sp.sp_diemdanhgiatrungbinh,
           th.th_ma, th.th_ten,
@@ -233,24 +285,36 @@ const PublicSanPhamModel = {
       LEFT JOIN thuonghieu th ON sp.th_ma = th.th_ma
       LEFT JOIN danhmucsanpham dm ON sp.dmsp_ma = dm.dmsp_ma
       WHERE sp.gh_ma = $1
-    `;
-    
-    const params = [gh_ma];
-
-    if (dmsp_ma) {
-        query += ` AND sp.dmsp_ma = $2`;
-        params.push(dmsp_ma);
-    }
-
-    query += `
+      ${filter.where}
       GROUP BY 
           sp.sp_ma, sp.sp_ten, sp.sp_mota, sp.sp_luotmua, sp.sp_diemdanhgiatrungbinh,
           th.th_ma, th.th_ten, dm.dmsp_ma, dm.dmsp_ten
-      ORDER BY sp.sp_ma DESC
+      ORDER BY ${orderBy}
+      LIMIT $${filter.next} OFFSET $${filter.next + 1}
     `;
 
-    const result = await pool.query(query, params);
-    return result.rows;
+    // ---------- Đếm tổng (cùng điều kiện lọc) ----------
+    const countFilter = buildFilter();
+
+    const countQuery = `
+      ${approved}
+      SELECT COUNT(DISTINCT sp.sp_ma) AS count
+      FROM sanpham sp
+      JOIN approved_variants av ON sp.sp_ma = av.sp_ma
+      LEFT JOIN thuonghieu th ON sp.th_ma = th.th_ma
+      LEFT JOIN danhmucsanpham dm ON sp.dmsp_ma = dm.dmsp_ma
+      WHERE sp.gh_ma = $1
+      ${countFilter.where}
+    `;
+
+    const [listRes, countRes] = await Promise.all([
+      pool.query(listQuery, [gh_ma, ...filter.params, limit, offset]),
+      pool.query(countQuery, [gh_ma, ...countFilter.params]),
+    ]);
+
+    const total = parseInt(countRes.rows[0]?.count, 10) || 0;
+
+    return { data: listRes.rows, total, page, limit };
   },
 };
 
