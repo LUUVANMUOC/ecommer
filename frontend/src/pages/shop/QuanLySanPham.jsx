@@ -19,6 +19,7 @@ const imgUrl = (link) => (link ? `${BACKEND_URL}${link}` : "");
 
 const PAGE_SIZES = [12, 24, 48, 96];
 const SEARCH_DEBOUNCE = 350; // ms
+const SLIDER_DEBOUNCE = 400; // ms — ngừng kéo mới gọi API
 
 const STATUS_MAP = {
   active: {
@@ -67,81 +68,24 @@ const fmtDate = (v) => {
   });
 };
 
-/* =========================================================
-   BỘ LỌC NÂNG CAO — mã lọc phải khớp whitelist ở backend
-   ========================================================= */
-const ADVANCED_FILTERS = [
-  {
-    key: "sao",
-    icon: "star",
-    label: "Đánh giá",
-    options: [
-      { value: "", label: "Tất cả" },
-      { value: "5", label: "5 sao", title: "Điểm trung bình từ 4.5 đến 5" },
-      {
-        value: "4",
-        label: "4 sao",
-        title: "Điểm trung bình từ 4 đến dưới 4.5",
-      },
-      { value: "3", label: "3 sao", title: "Điểm trung bình từ 3 đến dưới 4" },
-      { value: "2", label: "2 sao", title: "Điểm trung bình từ 2 đến dưới 3" },
-      { value: "1", label: "1 sao", title: "Điểm trung bình dưới 2" },
-      { value: "0", label: "Chưa đánh giá", title: "Chưa có đánh giá nào" },
-    ],
-  },
-  {
-    key: "mua",
-    icon: "shopping_bag",
-    label: "Lượt mua",
-    options: [
-      { value: "", label: "Tất cả" },
-      { value: "0", label: "Chưa bán" },
-      { value: "1-10", label: "1 – 10" },
-      { value: "11-50", label: "11 – 50" },
-      { value: "51-200", label: "51 – 200" },
-      { value: "200+", label: "Trên 200" },
-    ],
-  },
-  {
-    key: "xem",
-    icon: "visibility",
-    label: "Lượt xem",
-    options: [
-      { value: "", label: "Tất cả" },
-      { value: "0", label: "Chưa xem" },
-      { value: "1-100", label: "1 – 100" },
-      { value: "101-1000", label: "101 – 1.000" },
-      { value: "1001-10000", label: "1.001 – 10.000" },
-      { value: "10000+", label: "Trên 10.000" },
-    ],
-  },
-  {
-    key: "gia",
-    icon: "payments",
-    label: "Giá bán",
-    options: [
-      { value: "", label: "Tất cả" },
-      { value: "duoi-100k", label: "Dưới 100k" },
-      { value: "100k-500k", label: "100k – 500k" },
-      { value: "500k-1tr", label: "500k – 1tr" },
-      { value: "1tr-5tr", label: "1tr – 5tr" },
-      { value: "tren-5tr", label: "Trên 5tr" },
-    ],
-  },
-  {
-    key: "duyet",
-    icon: "verified",
-    label: "Ngày duyệt",
-    options: [
-      { value: "", label: "Tất cả" },
-      { value: "homnay", label: "Hôm nay" },
-      { value: "7n", label: "7 ngày qua" },
-      { value: "30n", label: "30 ngày qua" },
-      { value: "90n", label: "90 ngày qua" },
-      { value: "chua", label: "Chưa từng duyệt" },
-    ],
-  },
-];
+const fmtTien = (v) => `${fmtSo(v)} đ`;
+
+/* Bước nhảy thanh trượt co giãn theo độ lớn dữ liệu */
+const stepTheoMax = (max) => {
+  if (max <= 20) return 1;
+  if (max <= 200) return 5;
+  if (max <= 2000) return 10;
+  if (max <= 20000) return 100;
+  if (max <= 200000) return 1000;
+  return 10000;
+};
+
+const stepTheoGia = (max) => {
+  if (max <= 1000000) return 10000;
+  if (max <= 10000000) return 50000;
+  if (max <= 50000000) return 100000;
+  return 500000;
+};
 
 const SORT_OPTIONS = [
   { value: "moi", label: "Mới nhất" },
@@ -150,10 +94,12 @@ const SORT_OPTIONS = [
   { value: "sao", label: "Đánh giá cao nhất" },
   { value: "gia_tang", label: "Giá thấp → cao" },
   { value: "gia_giam", label: "Giá cao → thấp" },
-  { value: "duyet", label: "Duyệt gần nhất" },
+  { value: "duyet", label: "Duyệt mới nhất" },
+  { value: "duyet_cu", label: "Duyệt muộn nhất" },
 ];
 
-const EMPTY_ADVANCED = { sao: "", mua: "", xem: "", gia: "", duyet: "" };
+// null = không lọc (thanh trượt đang ở hết dải)
+const EMPTY_APPLIED = { mua: null, xem: null, gia: null, sao: null };
 
 /* Danh sách số trang có dấu "..." */
 const buildPageList = (page, totalPages) => {
@@ -183,35 +129,129 @@ const CardSkeleton = () => (
   </div>
 );
 
-/* Một hàng lọc: nhãn + các nút chọn nhanh */
-const FilterRow = ({ icon, label, options, value, onChange }) => (
-  <div className="flex flex-col gap-1.5 rounded-xl border border-[#F1EEE6] bg-[#FBFAF7] p-3">
-    <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-[#7A857F]">
-      <span className="material-symbols-outlined text-[15px]">{icon}</span>
-      {label}
-    </span>
-    <div className="flex flex-wrap gap-1.5">
-      {options.map((opt) => {
-        const on = value === opt.value;
-        return (
-          <button
-            key={opt.value || "__all__"}
-            type="button"
-            title={opt.title || opt.label}
-            onClick={() => onChange(opt.value)}
-            className={`rounded-full border px-2.5 py-1 text-xs font-semibold transition-colors ${
-              on
-                ? "border-[#F2A93B] bg-[#FDF3E1] text-[#8A5A0B]"
-                : "border-[#D9CFC2] bg-white text-[#3D4A44] hover:border-[#14201C]/40"
-            }`}
-          >
-            {opt.label}
-          </button>
-        );
-      })}
+/* Thanh trượt 2 đầu (không cần thư viện ngoài) */
+const RangeSlider = ({ min, max, step, value, onChange, format }) => {
+  const [lo, hi] = value;
+  const span = max - min;
+  const disabled = !(span > 0);
+  const safeMax = disabled ? min + 1 : max;
+  const total = safeMax - min;
+
+  const pct = (v) => Math.max(0, Math.min(100, ((v - min) / total) * 100));
+  const leftPct = pct(lo);
+  const rightPct = pct(hi);
+
+  // Núm nào nằm nửa phải thì cho lên trên để luôn kéo được khi 2 núm trùng nhau
+  const loOnTop = lo > (min + safeMax) / 2;
+
+  const thumbClass =
+    "pointer-events-none absolute inset-0 h-6 w-full appearance-none bg-transparent outline-none " +
+    "[&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 " +
+    "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full " +
+    "[&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-[#14201C] " +
+    "[&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow-md " +
+    "[&::-webkit-slider-thumb]:cursor-pointer " +
+    "[&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 " +
+    "[&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 " +
+    "[&::-moz-range-thumb]:border-[#14201C] [&::-moz-range-thumb]:bg-white " +
+    "[&::-moz-range-thumb]:cursor-pointer";
+
+  return (
+    <div>
+      <div className="mb-2 flex items-center justify-between gap-2 text-xs font-semibold text-[#3D4A44]">
+        <span className="rounded-md border border-[#EFEBE2] bg-white px-2 py-0.5 tabular-nums">
+          {format(lo)}
+        </span>
+        <span className="text-[#9AA39E]">→</span>
+        <span className="rounded-md border border-[#EFEBE2] bg-white px-2 py-0.5 tabular-nums">
+          {format(hi)}
+        </span>
+      </div>
+
+      <div className="relative h-6">
+        <div className="absolute top-1/2 h-1.5 w-full -translate-y-1/2 rounded-full bg-[#EFEBE2]" />
+        <div
+          className="absolute top-1/2 h-1.5 -translate-y-1/2 rounded-full bg-[#F2A93B]"
+          style={{ left: `${leftPct}%`, right: `${100 - rightPct}%` }}
+        />
+
+        <input
+          type="range"
+          min={min}
+          max={safeMax}
+          step={step}
+          value={Math.min(lo, safeMax)}
+          disabled={disabled}
+          aria-label="Giá trị nhỏ nhất"
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            onChange([Math.min(v, hi), hi]);
+          }}
+          className={`${thumbClass} ${loOnTop ? "z-30" : "z-10"}`}
+        />
+        <input
+          type="range"
+          min={min}
+          max={safeMax}
+          step={step}
+          value={Math.min(hi, safeMax)}
+          disabled={disabled}
+          aria-label="Giá trị lớn nhất"
+          onChange={(e) => {
+            const v = Number(e.target.value);
+            onChange([lo, Math.max(v, lo)]);
+          }}
+          className={`${thumbClass} ${loOnTop ? "z-10" : "z-30"}`}
+        />
+      </div>
     </div>
-  </div>
-);
+  );
+};
+
+/* Một thẻ lọc: tiêu đề + khoảng thật của shop + thanh trượt */
+const RangeFilterCard = ({
+  icon,
+  label,
+  hint,
+  bounds,
+  value,
+  step,
+  format,
+  onChange,
+}) => {
+  const ready = Boolean(bounds && value && bounds.max > bounds.min);
+
+  return (
+    <div className="rounded-xl border border-[#F1EEE6] bg-[#FBFAF7] p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-[#7A857F]">
+          <span className="material-symbols-outlined text-[15px]">{icon}</span>
+          {label}
+        </span>
+        <span className="text-[11px] font-medium text-[#9AA39E]">{hint}</span>
+      </div>
+
+      {ready ? (
+        <div className="mt-2">
+          <RangeSlider
+            min={bounds.min}
+            max={bounds.max}
+            step={step}
+            value={value}
+            onChange={onChange}
+            format={format}
+          />
+        </div>
+      ) : (
+        <p className="mt-3 text-xs font-medium text-[#9AA39E]">
+          {bounds
+            ? "Shop chỉ có một mức — không cần lọc."
+            : "Đang tải khoảng dữ liệu..."}
+        </p>
+      )}
+    </div>
+  );
+};
 
 const QuanLySanPham = () => {
   const navigate = useNavigate();
@@ -239,8 +279,13 @@ const QuanLySanPham = () => {
     status: "",
   });
 
-  // ---- Bộ lọc nâng cao + sắp xếp ----
-  const [advanced, setAdvanced] = useState(EMPTY_ADVANCED);
+  // ---- Bộ lọc nâng cao: khoảng thật của shop + vị trí 2 núm + giá trị đã áp dụng ----
+  const [ranges, setRanges] = useState(null);
+  const [slider, setSlider] = useState(null);
+  const [applied, setApplied] = useState(EMPTY_APPLIED);
+  const appliedRef = useRef(EMPTY_APPLIED);
+
+  // ---- Sắp xếp ----
   const [sort, setSort] = useState("moi");
 
   // ---- Tuỳ chọn cho form / bộ lọc ----
@@ -290,11 +335,14 @@ const QuanLySanPham = () => {
         th_ma: filters.th_ma || undefined,
         dmsp_ma: filters.dmsp_ma || undefined,
         status: filters.status || undefined,
-        sao: advanced.sao || undefined,
-        mua: advanced.mua || undefined,
-        xem: advanced.xem || undefined,
-        gia: advanced.gia || undefined,
-        duyet: advanced.duyet || undefined,
+        mua_tu: applied.mua?.[0],
+        mua_den: applied.mua?.[1],
+        xem_tu: applied.xem?.[0],
+        xem_den: applied.xem?.[1],
+        gia_tu: applied.gia?.[0],
+        gia_den: applied.gia?.[1],
+        sao_tu: applied.sao?.[0],
+        sao_den: applied.sao?.[1],
         sort: sort || undefined,
         page,
         limit,
@@ -320,7 +368,7 @@ const QuanLySanPham = () => {
     } finally {
       if (rid === requestId.current) setLoading(false);
     }
-  }, [shopId, q, filters, advanced, sort, page, limit, showToast]);
+  }, [shopId, q, filters, applied, sort, page, limit, showToast]);
 
   useEffect(() => {
     fetchPage();
@@ -337,6 +385,76 @@ const QuanLySanPham = () => {
     }, SEARCH_DEBOUNCE);
     return () => clearTimeout(timer);
   }, [searchInput]);
+
+  /* =========================================================
+     KHOẢNG THỰC TẾ CỦA SHOP → mốc cho thanh trượt
+     ========================================================= */
+  useEffect(() => {
+    if (!shopId) return;
+    let alive = true;
+
+    sanPhamService
+      .getKhoangLoc(shopId)
+      .then((res) => {
+        if (!alive) return;
+        const d = res.data || {};
+        const b = {
+          mua: {
+            min: Number(d.mua?.min) || 0,
+            max: Number(d.mua?.max) || 0,
+          },
+          xem: {
+            min: Number(d.xem?.min) || 0,
+            max: Number(d.xem?.max) || 0,
+          },
+          gia: {
+            min: Number(d.gia?.min) || 0,
+            max: Number(d.gia?.max) || 0,
+          },
+          sao: { min: 0, max: 5 },
+        };
+        setRanges(b);
+        setSlider({
+          mua: [b.mua.min, b.mua.max],
+          xem: [b.xem.min, b.xem.max],
+          gia: [b.gia.min, b.gia.max],
+          sao: [0, 5],
+        });
+      })
+      .catch(() => {
+        if (!alive) return;
+        showToast("Không tải được khoảng dữ liệu để lọc", "error");
+      });
+
+    return () => {
+      alive = false;
+    };
+  }, [shopId, showToast]);
+
+  /* =========================================================
+     KÉO THANH TRƯỢT: ngừng kéo 400ms mới áp dụng
+     ========================================================= */
+  useEffect(() => {
+    if (!ranges || !slider) return;
+
+    const timer = setTimeout(() => {
+      const next = {};
+      ["mua", "xem", "gia", "sao"].forEach((key) => {
+        const [lo, hi] = slider[key];
+        const { min, max } = ranges[key];
+        // Hết dải = không lọc; shop chỉ có 1 mức cũng = không lọc
+        next[key] = max <= min || (lo <= min && hi >= max) ? null : [lo, hi];
+      });
+
+      if (JSON.stringify(next) !== JSON.stringify(appliedRef.current)) {
+        appliedRef.current = next;
+        setApplied(next);
+        setPage(1);
+      }
+    }, SLIDER_DEBOUNCE);
+
+    return () => clearTimeout(timer);
+  }, [slider, ranges]);
 
   /* =========================================================
      THƯƠNG HIỆU / DANH MỤC cho bộ lọc + form
@@ -458,22 +576,24 @@ const QuanLySanPham = () => {
     setPage(1);
   };
 
+  const handleClearAdvanced = () => {
+    if (ranges) {
+      setSlider({
+        mua: [ranges.mua.min, ranges.mua.max],
+        xem: [ranges.xem.min, ranges.xem.max],
+        gia: [ranges.gia.min, ranges.gia.max],
+        sao: [0, 5],
+      });
+    }
+    appliedRef.current = EMPTY_APPLIED;
+    setApplied(EMPTY_APPLIED);
+    setSort("moi");
+    setPage(1);
+  };
+
   const handleClearFilter = () => {
     setFilters({ th_ma: "", dmsp_ma: "", status: "" });
-    setAdvanced(EMPTY_ADVANCED);
-    setSort("moi");
-    setPage(1);
-  };
-
-  const handleAdvancedChange = (key, value) => {
-    setAdvanced((prev) => ({ ...prev, [key]: value }));
-    setPage(1);
-  };
-
-  const handleClearAdvanced = () => {
-    setAdvanced(EMPTY_ADVANCED);
-    setSort("moi");
-    setPage(1);
+    handleClearAdvanced();
   };
 
   const handleSortChange = (e) => {
@@ -484,6 +604,10 @@ const QuanLySanPham = () => {
   const handleLimitChange = (e) => {
     setLimit(Number(e.target.value));
     setPage(1);
+  };
+
+  const handleSliderChange = (key, value) => {
+    setSlider((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
 
   /* =========================================================
@@ -526,17 +650,13 @@ const QuanLySanPham = () => {
   const tuDong = total === 0 ? 0 : (page - 1) * limit + 1;
   const denDong = Math.min(page * limit, total);
 
-  const advancedCount = Object.values(advanced).filter(Boolean).length;
+  const advancedCount = Object.values(applied).filter(Boolean).length;
   const hasAnyFilter = Boolean(
     q ||
     filters.th_ma ||
     filters.dmsp_ma ||
     filters.status ||
-    advanced.sao ||
-    advanced.mua ||
-    advanced.xem ||
-    advanced.gia ||
-    advanced.duyet,
+    advancedCount > 0,
   );
 
   if (!shopId)
@@ -573,7 +693,7 @@ const QuanLySanPham = () => {
         }`}
       />
 
-      {/* ===== BỘ LỌC NÂNG CAO + SẮP XẾP ===== */}
+      {/* ===== BỘ LỌC NÂNG CAO (khoảng động) + SẮP XẾP ===== */}
       <div className="rounded-2xl border border-[#E2DED3] bg-white p-4 shadow-sm">
         <div className="flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-[#14201C] px-3.5 py-2 text-sm font-semibold text-[#14201C]">
@@ -616,17 +736,64 @@ const QuanLySanPham = () => {
           )}
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-3 border-t border-[#EFEBE2] pt-4 xl:grid-cols-2">
-          {ADVANCED_FILTERS.map((f) => (
-            <FilterRow
-              key={f.key}
-              icon={f.icon}
-              label={f.label}
-              options={f.options}
-              value={advanced[f.key]}
-              onChange={(v) => handleAdvancedChange(f.key, v)}
-            />
-          ))}
+        <div className="mt-4 grid grid-cols-1 gap-3 border-t border-[#EFEBE2] pt-4 lg:grid-cols-2">
+          <RangeFilterCard
+            icon="star"
+            label="Đánh giá"
+            hint="Thang điểm 0 – 5"
+            bounds={ranges?.sao}
+            value={slider?.sao}
+            step={0.5}
+            format={(v) => `${Number(v).toFixed(1)} ★`}
+            onChange={(v) => handleSliderChange("sao", v)}
+          />
+
+          <RangeFilterCard
+            icon="shopping_bag"
+            label="Lượt mua"
+            hint={
+              ranges
+                ? `Shop: ${fmtSo(ranges.mua.min)} – ${fmtSo(ranges.mua.max)}`
+                : "Đang tải..."
+            }
+            bounds={ranges?.mua}
+            value={slider?.mua}
+            step={stepTheoMax(ranges?.mua.max || 0)}
+            format={fmtSo}
+            onChange={(v) => handleSliderChange("mua", v)}
+          />
+
+          <RangeFilterCard
+            icon="visibility"
+            label="Lượt xem"
+            hint={
+              ranges
+                ? `Shop: ${fmtSo(ranges.xem.min)} – ${fmtSo(ranges.xem.max)}`
+                : "Đang tải..."
+            }
+            bounds={ranges?.xem}
+            value={slider?.xem}
+            step={stepTheoMax(ranges?.xem.max || 0)}
+            format={fmtSo}
+            onChange={(v) => handleSliderChange("xem", v)}
+          />
+
+          <RangeFilterCard
+            icon="payments"
+            label="Giá bán"
+            hint={
+              ranges
+                ? `Shop: ${fmtTien(ranges.gia.min)} – ${fmtTien(
+                    ranges.gia.max,
+                  )}`
+                : "Đang tải..."
+            }
+            bounds={ranges?.gia}
+            value={slider?.gia}
+            step={stepTheoGia(ranges?.gia.max || 0)}
+            format={fmtTien}
+            onChange={(v) => handleSliderChange("gia", v)}
+          />
         </div>
       </div>
 

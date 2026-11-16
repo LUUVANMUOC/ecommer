@@ -4,6 +4,7 @@ const SanPhamController = require('../../controllers/gianhang/sanPhamController'
 
 // Đặt trước để không bị nuốt bởi '/:gh_ma'
 router.get('/phan-trang/:gh_ma', SanPhamController.getPhanTrang);
+router.get('/khoang-loc/:gh_ma', SanPhamController.getKhoangLoc);
 
 router.get('/:gh_ma', SanPhamController.getByGianHang);
 router.post('/', SanPhamController.create);

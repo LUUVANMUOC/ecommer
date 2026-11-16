@@ -26,8 +26,7 @@ const normKeyword = `lower(translate($2::text, $6::text, $7::text))`;
    CTE dùng chung: lọc + ảnh bìa + khoảng giá + trạng thái + ngày duyệt
    Tham số: $1 gh_ma, $2 q, $3 th_ma, $4 dmsp_ma,
             $5 status, $6 TU, $7 DEN
-   (LIMIT/OFFSET là $8/$9, chỉ dùng ở câu chính)
-   Bộ lọc nâng cao KHÔNG thêm tham số — xem các bảng tra bên dưới.
+   ($8..$15 = lọc nâng cao, $16/$17 = LIMIT/OFFSET)
    ========================================================= */
 const CTE = `
 WITH sp_loc AS (
@@ -134,50 +133,18 @@ base AS (
 const LOC_STATUS = `($5::text IS NULL OR status = $5)`;
 
 /* =========================================================
-   Bộ lọc nâng cao: mã lọc (whitelist ở controller) → điều kiện SQL
-   Không dùng thêm tham số nên $8/$9 vẫn là LIMIT/OFFSET.
+   Lọc nâng cao: khoảng động do client gửi (null = không lọc)
+   Giá: sản phẩm khớp khi KHOẢNG giá của nó giao với khoảng chọn
    ========================================================= */
-const SAO_LOC = {
-    '5': `base.sao_tb >= 4.5`,
-    '4': `base.sao_tb >= 4 AND base.sao_tb < 4.5`,
-    '3': `base.sao_tb >= 3 AND base.sao_tb < 4`,
-    '2': `base.sao_tb >= 2 AND base.sao_tb < 3`,
-    '1': `base.sao_tb > 0 AND base.sao_tb < 2`,
-    '0': `base.sao_tb = 0`,
-};
-
-const MUA_LOC = {
-    '0': `COALESCE(base.sp_luotmua, 0) = 0`,
-    '1-10': `base.sp_luotmua BETWEEN 1 AND 10`,
-    '11-50': `base.sp_luotmua BETWEEN 11 AND 50`,
-    '51-200': `base.sp_luotmua BETWEEN 51 AND 200`,
-    '200+': `base.sp_luotmua > 200`,
-};
-
-const XEM_LOC = {
-    '0': `COALESCE(base.sp_luotxem, 0) = 0`,
-    '1-100': `base.sp_luotxem BETWEEN 1 AND 100`,
-    '101-1000': `base.sp_luotxem BETWEEN 101 AND 1000`,
-    '1001-10000': `base.sp_luotxem BETWEEN 1001 AND 10000`,
-    '10000+': `base.sp_luotxem > 10000`,
-};
-
-// Giá: sản phẩm khớp khi KHOẢNG giá của nó giao với khoảng đang chọn
-const GIA_LOC = {
-    'duoi-100k': `base.min_price IS NOT NULL AND base.min_price <= 100000`,
-    '100k-500k': `base.max_price >= 100000 AND base.min_price <= 500000`,
-    '500k-1tr': `base.max_price >= 500000 AND base.min_price <= 1000000`,
-    '1tr-5tr': `base.max_price >= 1000000 AND base.min_price <= 5000000`,
-    'tren-5tr': `base.max_price >= 5000000`,
-};
-
-const DUYET_LOC = {
-    homnay: `base.duyet_luc >= date_trunc('day', NOW())`,
-    '7n': `base.duyet_luc >= NOW() - INTERVAL '7 days'`,
-    '30n': `base.duyet_luc >= NOW() - INTERVAL '30 days'`,
-    '90n': `base.duyet_luc >= NOW() - INTERVAL '90 days'`,
-    chua: `base.duyet_luc IS NULL`,
-};
+const LOC_NANG_CAO = `
+      AND ($8::numeric IS NULL OR COALESCE(base.sp_luotmua, 0) >= $8::numeric)
+      AND ($9::numeric IS NULL OR COALESCE(base.sp_luotmua, 0) <= $9::numeric)
+      AND ($10::numeric IS NULL OR COALESCE(base.sp_luotxem, 0) >= $10::numeric)
+      AND ($11::numeric IS NULL OR COALESCE(base.sp_luotxem, 0) <= $11::numeric)
+      AND ($12::numeric IS NULL OR base.max_price >= $12::numeric)
+      AND ($13::numeric IS NULL OR base.min_price <= $13::numeric)
+      AND ($14::numeric IS NULL OR base.sao_tb >= $14::numeric)
+      AND ($15::numeric IS NULL OR base.sao_tb <= $15::numeric)`;
 
 const SORT_MAP = {
     moi: `base.sp_ma DESC`,
@@ -187,6 +154,7 @@ const SORT_MAP = {
     gia_tang: `base.min_price ASC NULLS LAST, base.sp_ma DESC`,
     gia_giam: `base.max_price DESC NULLS LAST, base.sp_ma DESC`,
     duyet: `base.duyet_luc DESC NULLS LAST, base.sp_ma DESC`,
+    duyet_cu: `base.duyet_luc ASC NULLS LAST, base.sp_ma DESC`,
 };
 
 const SanPhamModel = {
@@ -209,18 +177,21 @@ const SanPhamModel = {
         return result.rows;
     },
 
-    // 1b. Phân trang + tìm kiếm + lọc cơ bản + lọc nâng cao + sắp xếp
+    // 1b. Phân trang + tìm kiếm + lọc cơ bản + lọc nâng cao (khoảng động) + sắp xếp
     getPhanTrang: async ({
         gh_ma,
         q = null,
         th_ma = null,
         dmsp_ma = null,
         status = null,
-        sao = null,
-        mua = null,
-        xem = null,
-        gia = null,
-        duyet = null,
+        mua_tu = null,
+        mua_den = null,
+        xem_tu = null,
+        xem_den = null,
+        gia_tu = null,
+        gia_den = null,
+        sao_tu = null,
+        sao_den = null,
         sort = null,
         page = 1,
         limit = 12,
@@ -230,7 +201,7 @@ const SanPhamModel = {
         const offset = (pageNum - 1) * limitNum;
         const keyword = q && String(q).trim() ? String(q).trim() : null;
 
-        // $1..$7 cho CTE
+        // $1..$7 cho CTE, $8..$15 cho lọc nâng cao
         const baseParams = [
             gh_ma,
             keyword,
@@ -239,26 +210,25 @@ const SanPhamModel = {
             status || null,
             TU,
             DEN,
+            mua_tu,
+            mua_den,
+            xem_tu,
+            xem_den,
+            gia_tu,
+            gia_den,
+            sao_tu,
+            sao_den,
         ];
 
-        // Ghép điều kiện lọc (chỉ nhận mã có trong whitelist)
-        const conds = [LOC_STATUS];
-        if (sao && SAO_LOC[sao]) conds.push(SAO_LOC[sao]);
-        if (mua && MUA_LOC[mua]) conds.push(MUA_LOC[mua]);
-        if (xem && XEM_LOC[xem]) conds.push(XEM_LOC[xem]);
-        if (gia && GIA_LOC[gia]) conds.push(GIA_LOC[gia]);
-        if (duyet && DUYET_LOC[duyet]) conds.push(DUYET_LOC[duyet]);
-
-        const where = conds.join(' AND ');
         const orderBy = SORT_MAP[sort] || SORT_MAP.moi;
 
         const { rows } = await pool.query(
             `${CTE}
              SELECT base.*, COUNT(*) OVER() AS total
              FROM base
-             WHERE ${where}
+             WHERE ${LOC_STATUS} ${LOC_NANG_CAO}
              ORDER BY ${orderBy}
-             LIMIT $8 OFFSET $9`,
+             LIMIT $16 OFFSET $17`,
             [...baseParams, limitNum, offset]
         );
 
@@ -266,9 +236,9 @@ const SanPhamModel = {
         if (rows.length > 0) {
             total = Number(rows[0].total) || 0;
         } else {
-            // Chỉ truyền 7 tham số CTE → không còn tham số $8/$9 "mồ côi"
+            // Chỉ truyền 15 tham số → không còn $16/$17 "mồ côi"
             const countRes = await pool.query(
-                `${CTE} SELECT COUNT(*)::int AS total FROM base WHERE ${where}`,
+                `${CTE} SELECT COUNT(*)::int AS total FROM base WHERE ${LOC_STATUS} ${LOC_NANG_CAO}`,
                 baseParams
             );
             total = countRes.rows[0]?.total || 0;
@@ -280,6 +250,45 @@ const SanPhamModel = {
             page: pageNum,
             limit: limitNum,
             total_pages: Math.max(1, Math.ceil(total / limitNum)),
+        };
+    },
+
+    // 1c. Khoảng thực tế của shop → dùng làm mốc cho các thanh trượt
+    getKhoangLoc: async (gh_ma) => {
+        const query = `
+            WITH gia AS (
+                SELECT
+                    MIN(gb.gb_gia) AS min_price,
+                    MAX(gb.gb_gia) AS max_price
+                FROM chitietsanpham c
+                JOIN sanpham sp ON sp.sp_ma = c.sp_ma
+                JOIN LATERAL (
+                    SELECT g.gb_gia
+                    FROM giabangoc g
+                    WHERE g.ctsp_ma = c.ctsp_ma
+                    ORDER BY g.gb_thoidiem DESC, g.gb_ma DESC
+                    LIMIT 1
+                ) gb ON true
+                WHERE sp.gh_ma = $1
+                  AND gb.gb_gia > 0
+            )
+            SELECT
+                COALESCE(MIN(sp.sp_luotmua), 0) AS mua_min,
+                COALESCE(MAX(sp.sp_luotmua), 0) AS mua_max,
+                COALESCE(MIN(sp.sp_luotxem), 0) AS xem_min,
+                COALESCE(MAX(sp.sp_luotxem), 0) AS xem_max,
+                COALESCE((SELECT min_price FROM gia), 0) AS gia_min,
+                COALESCE((SELECT max_price FROM gia), 0) AS gia_max
+            FROM sanpham sp
+            WHERE sp.gh_ma = $1
+        `;
+        const { rows } = await pool.query(query, [gh_ma]);
+        const r = rows[0] || {};
+
+        return {
+            mua: { min: Number(r.mua_min) || 0, max: Number(r.mua_max) || 0 },
+            xem: { min: Number(r.xem_min) || 0, max: Number(r.xem_max) || 0 },
+            gia: { min: Number(r.gia_min) || 0, max: Number(r.gia_max) || 0 },
         };
     },
 

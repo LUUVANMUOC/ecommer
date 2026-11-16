@@ -9,6 +9,10 @@ const SanPhamService = {
         return await SanPhamModel.getPhanTrang(params);
     },
 
+    getKhoangLoc: async (gh_ma) => {
+        return await SanPhamModel.getKhoangLoc(gh_ma);
+    },
+
     create: async (data) => {
         let newMa = 'SP01';
         const latestMa = await SanPhamModel.getLatestMa();

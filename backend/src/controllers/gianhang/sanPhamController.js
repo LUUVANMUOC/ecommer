@@ -1,18 +1,22 @@
 const SanPhamService = require('../../services/gianhang/sanPhamService');
 
 const DS_TRANG_THAI = ['active', 'pending', 'suspended', 'draft'];
+const DS_SAP_XEP = ['moi', 'mua', 'xem', 'sao', 'gia_tang', 'gia_giam', 'duyet', 'duyet_cu'];
 
-// Whitelist cho bộ lọc nâng cao + sắp xếp
-const DS_SAO = ['0', '1', '2', '3', '4', '5'];
-const DS_LUOT_MUA = ['0', '1-10', '11-50', '51-200', '200+'];
-const DS_LUOT_XEM = ['0', '1-100', '101-1000', '1001-10000', '10000+'];
-const DS_GIA = ['duoi-100k', '100k-500k', '500k-1tr', '1tr-5tr', 'tren-5tr'];
-const DS_NGAY_DUYET = ['homnay', '7n', '30n', '90n', 'chua'];
-const DS_SAP_XEP = ['moi', 'mua', 'xem', 'sao', 'gia_tang', 'gia_giam', 'duyet'];
+// Chuỗi rỗng / không phải số / số âm → null (bỏ lọc)
+const num = (v) => {
+    if (v === undefined || v === null || v === '') return null;
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : null;
+};
 
-// Chỉ nhận giá trị nằm trong whitelist, còn lại trả null
-const pick = (value, whitelist) =>
-    whitelist.includes(value) ? value : null;
+// Đảm bảo Từ ≤ Đến (tự hoán đổi nếu client gửi ngược)
+const range = (a, b) => {
+    let tu = num(a);
+    let den = num(b);
+    if (tu !== null && den !== null && tu > den) [tu, den] = [den, tu];
+    return [tu, den];
+};
 
 const SanPhamController = {
     getByGianHang: async (req, res) => {
@@ -26,19 +30,22 @@ const SanPhamController = {
 
     // GET /api/nguoi-ban/san-pham/phan-trang/:gh_ma
     //   ?q=&th_ma=&dmsp_ma=&status=&page=&limit=
-    //   &sao=0..5&mua=0|1-10|11-50|51-200|200+
-    //   &xem=0|1-100|101-1000|1001-10000|10000+
-    //   &gia=duoi-100k|100k-500k|500k-1tr|1tr-5tr|tren-5tr
-    //   &duyet=homnay|7n|30n|90n|chua
-    //   &sort=moi|mua|xem|sao|gia_tang|gia_giam|duyet
+    //   &mua_tu=&mua_den=&xem_tu=&xem_den=&gia_tu=&gia_den=&sao_tu=&sao_den=
+    //   &sort=moi|mua|xem|sao|gia_tang|gia_giam|duyet|duyet_cu
     getPhanTrang: async (req, res) => {
         try {
             const { gh_ma } = req.params;
             const {
                 q, th_ma, dmsp_ma, status,
-                sao, mua, xem, gia, duyet, sort,
-                page, limit,
+                mua_tu, mua_den, xem_tu, xem_den,
+                gia_tu, gia_den, sao_tu, sao_den,
+                sort, page, limit,
             } = req.query;
+
+            const [muaTu, muaDen] = range(mua_tu, mua_den);
+            const [xemTu, xemDen] = range(xem_tu, xem_den);
+            const [giaTu, giaDen] = range(gia_tu, gia_den);
+            const [saoTu, saoDen] = range(sao_tu, sao_den);
 
             const data = await SanPhamService.getPhanTrang({
                 gh_ma,
@@ -46,12 +53,15 @@ const SanPhamController = {
                 th_ma: th_ma || null,
                 dmsp_ma: dmsp_ma || null,
                 status: DS_TRANG_THAI.includes(status) ? status : null,
-                sao: pick(sao, DS_SAO),
-                mua: pick(mua, DS_LUOT_MUA),
-                xem: pick(xem, DS_LUOT_XEM),
-                gia: pick(gia, DS_GIA),
-                duyet: pick(duyet, DS_NGAY_DUYET),
-                sort: pick(sort, DS_SAP_XEP),
+                mua_tu: muaTu,
+                mua_den: muaDen,
+                xem_tu: xemTu,
+                xem_den: xemDen,
+                gia_tu: giaTu,
+                gia_den: giaDen,
+                sao_tu: saoTu,
+                sao_den: saoDen,
+                sort: DS_SAP_XEP.includes(sort) ? sort : null,
                 page: Number(page) || 1,
                 limit: Number(limit) || 12,
             });
@@ -59,6 +69,17 @@ const SanPhamController = {
             res.status(200).json(data);
         } catch (error) {
             console.error('Lỗi phân trang sản phẩm:', error);
+            res.status(500).json({ message: error.message });
+        }
+    },
+
+    // GET /api/nguoi-ban/san-pham/khoang-loc/:gh_ma
+    getKhoangLoc: async (req, res) => {
+        try {
+            const data = await SanPhamService.getKhoangLoc(req.params.gh_ma);
+            res.status(200).json(data);
+        } catch (error) {
+            console.error('Lỗi lấy khoảng lọc sản phẩm:', error);
             res.status(500).json({ message: error.message });
         }
     },
