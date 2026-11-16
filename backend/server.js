@@ -104,13 +104,11 @@ const quanLyDongTienRoutes = require('./src/routes/san/quanLyDongTienRoutes');
 const suCoRoutes = require('./src/routes/suco/suCoRoutes');
 const adminSuCoRoutes = require('./src/routes/suco/adminSuCoRoutes');
 const SuCoSlaService = require('./src/services/suco/suCoSlaService');
+
 // ================= 2. KHỞI TẠO APP =================
 const app = express(); 
 
 // ================= 3. CẤU HÌNH WEBHOOK (BẮT BUỘC ĐẶT TRƯỚC express.json) =================
-// Lưu ý: express.raw() phải được dùng ở đây để lấy raw body cho việc xác thực HMAC
-
-// 🟢 Route Webhook Động dành cho từng Shop (Truyền :gh_ma trên URL)
 app.post(
   '/api/webhook/sepay/:gh_ma',
   express.raw({ type: 'application/json' }),
@@ -121,8 +119,6 @@ app.post(
   express.raw({ type: 'application/json' }),
   require('./src/controllers/quanlykho/webhookSepayController').handleDvvcWebhook
 );
-
-// 🟢 Route Webhook Cũ (Dành cho Sàn, giữ lại để không lỗi)
 app.post(
   '/api/webhook/sepay',
   express.raw({ type: 'application/json' }),
@@ -131,7 +127,31 @@ app.post(
 
 // ================= 4. MIDDLEWARE TOÀN CỤC =================
 app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
-app.use(cors()); 
+
+// 🟢 CẤU HÌNH CORS CHUẨN CHO PRODUCTION & LOCAL
+const whiteList = [
+  'http://localhost:5173', 
+  'http://localhost:3000',
+  'https://ecommer-muoc.vercel.app',          // Link Vercel chính thức của bạn
+  'https://ecommer-git-tam-muoc.vercel.app'   // Link nhánh tam của bạn
+];
+
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Cho phép request không có origin (như Postman, server-to-server)
+    if (!origin) return callback(null, true);
+    
+    if (whiteList.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  optionsSuccessStatus: 200
+};
+
+app.use(cors(corsOptions)); 
 app.use(express.json()); 
 
 // ================= 5. KHAI BÁO ROUTES =================
@@ -226,7 +246,6 @@ app.post('/api/khach-hang/tinh-phi-ship', phiVanChuyenController.calculateFee);
 app.use('/api/dong-tien', dongTienRoutes);
 app.use('/api/phi-van-chuyen', phiVanChuyenRoutes);
 app.use('/api/admin/thong-ke-nganh-hang', thongKeNganhHangRoutes);
-app.use('/api/admin/thong-ke-nganh-hang', thongKeNganhHangRoutes);
 app.use('/api/dvvc/thong-ke-dong-tien', dvvcDongTienThongKeRoutes);
 
 // 9. Trạng thái đơn hàng
@@ -317,13 +336,20 @@ cron.schedule('* * * * *', async () => {
 const PORT = process.env.PORT || 8080;
 
 const httpServer = http.createServer(app);
+
+// 🟢 CẤU HÌNH CORS CHO SOCKET.IO
 const io = new Server(httpServer, {
-  cors: { origin: true, credentials: true },
+  cors: {
+    origin: whiteList,
+    methods: ["GET", "POST"],
+    credentials: true
+  },
 });
 
 realtimeSocket.init(io);
 SuCoSlaService.start();
-httpServer.listen(PORT, () => {
+
+httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server Backend đang chạy ở cổng ${PORT}`);
   console.log(`🔗 API URL: http://localhost:${PORT}/api/auth`);
   console.log(`⏰ Cronjobs đã được bật (Voucher, Dọn dẹp phiếu).`);
