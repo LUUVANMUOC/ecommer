@@ -1,6 +1,28 @@
 // frontend/src/components/common/ImageUpload.jsx
 import { useState, useRef, useEffect } from "react";
 
+const BACKEND_URL = (
+  import.meta.env.VITE_BACKEND_URL || "http://localhost:8080"
+).replace(/\/+$/, "");
+
+const resolveImageUrl = (url) => {
+  if (!url) return null;
+  if (/^(data:image|blob:)/i.test(url)) return url;
+
+  // URL cũ bị lưu cứng localhost → đổi sang backend hiện tại
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(url)) {
+    return url.replace(
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i,
+      BACKEND_URL,
+    );
+  }
+
+  // URL tuyệt đối khác (Cloudinary, CDN...) → giữ nguyên
+  if (/^https?:/i.test(url)) return url;
+
+  return `${BACKEND_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+};
+
 const ImageUpload = ({
   onFileSelect,
   currentImage = null,
@@ -16,22 +38,7 @@ const ImageUpload = ({
 
   // Lắng nghe sự thay đổi của ảnh truyền từ bên ngoài vào (VD: Khi mở form Edit)
   useEffect(() => {
-    if (currentImage) {
-      if (
-        currentImage.startsWith("http") ||
-        currentImage.startsWith("blob:") ||
-        currentImage.startsWith("data:image")
-      ) {
-        setPreview(currentImage);
-      } else {
-        // Nếu là đường dẫn nội bộ từ backend (VD: /uploads/shops/logo.jpg)
-        setPreview(
-          `http://localhost:8080${currentImage.startsWith("/") ? "" : "/"}${currentImage}`,
-        );
-      }
-    } else {
-      setPreview(null);
-    }
+    setPreview(resolveImageUrl(currentImage));
   }, [currentImage]);
 
   // Dọn dẹp bộ nhớ (tránh rò rỉ memory) khi component unmount

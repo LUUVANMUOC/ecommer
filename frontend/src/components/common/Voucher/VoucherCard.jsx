@@ -1,6 +1,28 @@
 // frontend/src/components/common/Voucher/VoucherCard.jsx
 import { useState, useEffect } from "react";
 
+const BACKEND_URL = (
+  import.meta.env.VITE_BACKEND_URL || "http://localhost:8080"
+).replace(/\/+$/, "");
+
+const resolveImageUrl = (url) => {
+  if (!url) return null;
+  if (/^(data:image|blob:)/i.test(url)) return url;
+
+  // URL cũ bị lưu cứng localhost → đổi sang backend hiện tại
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(url)) {
+    return url.replace(
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i,
+      BACKEND_URL,
+    );
+  }
+
+  // URL tuyệt đối khác (Cloudinary, CDN...) → giữ nguyên
+  if (/^https?:/i.test(url)) return url;
+
+  return `${BACKEND_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+};
+
 const VoucherCard = ({ voucher, onEdit, onDelete, onView, onCopy }) => {
   const {
     MGG_San_Ma = "N/A",
@@ -39,17 +61,6 @@ const VoucherCard = ({ voucher, onEdit, onDelete, onView, onCopy }) => {
     else if (isOutOfStock) stampText = "Hết lượt";
     else stampText = "Tạm dừng";
   }
-
-  const getImageUrl = (url) => {
-    if (!url) return null;
-    if (
-      url.startsWith("http") ||
-      url.startsWith("data:image") ||
-      url.startsWith("blob:")
-    )
-      return url;
-    return `http://localhost:8080${url.startsWith("/") ? "" : "/"}${url}`;
-  };
 
   const formatDateWithTime = (dateStr) => {
     if (!dateStr) return "N/A";
@@ -131,7 +142,7 @@ const VoucherCard = ({ voucher, onEdit, onDelete, onView, onCopy }) => {
             {MGG_San_HinhAnh ? (
               <img
                 className="w-full h-full object-cover"
-                src={getImageUrl(MGG_San_HinhAnh)}
+                src={resolveImageUrl(MGG_San_HinhAnh)}
                 alt={MGG_San_Ten}
               />
             ) : (

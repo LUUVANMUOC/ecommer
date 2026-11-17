@@ -1,20 +1,30 @@
 // frontend/src/components/common/Voucher/VoucherDetailDrawer.jsx
 import React from "react";
 
+const BACKEND_URL = (
+  import.meta.env.VITE_BACKEND_URL || "http://localhost:8080"
+).replace(/\/+$/, "");
+
+const resolveImageUrl = (url) => {
+  if (!url) return null;
+  if (/^(data:image|blob:)/i.test(url)) return url;
+
+  // URL cũ bị lưu cứng localhost → đổi sang backend hiện tại
+  if (/^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i.test(url)) {
+    return url.replace(
+      /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?/i,
+      BACKEND_URL,
+    );
+  }
+
+  // URL tuyệt đối khác (Cloudinary, CDN...) → giữ nguyên
+  if (/^https?:/i.test(url)) return url;
+
+  return `${BACKEND_URL}${url.startsWith("/") ? "" : "/"}${url}`;
+};
+
 const VoucherDetailDrawer = ({ isOpen, onClose, voucher }) => {
   if (!voucher) return null;
-
-  const getImageUrl = (url) => {
-    if (!url) return null;
-    if (
-      url.startsWith("http") ||
-      url.startsWith("data:image") ||
-      url.startsWith("blob:")
-    ) {
-      return url;
-    }
-    return `http://localhost:8080${url.startsWith("/") ? "" : "/"}${url}`;
-  };
 
   const formatDate = (dateStr) => {
     if (!dateStr) return "N/A";
@@ -64,7 +74,7 @@ const VoucherDetailDrawer = ({ isOpen, onClose, voucher }) => {
           <div className="flex flex-col items-center justify-center p-6 bg-surface-container-low rounded-xl border border-outline-variant/50">
             {voucher.MGG_San_HinhAnh ? (
               <img
-                src={getImageUrl(voucher.MGG_San_HinhAnh)}
+                src={resolveImageUrl(voucher.MGG_San_HinhAnh)}
                 alt="Banner Voucher"
                 className="w-full h-32 object-cover rounded-lg mb-4 border border-outline-variant/30"
                 onError={(e) => {
