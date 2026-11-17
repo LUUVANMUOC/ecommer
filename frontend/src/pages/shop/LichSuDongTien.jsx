@@ -163,8 +163,6 @@ const LichSuDongTien = () => {
   const nam = Number(namChon) || namMacDinh;
 
   // ---- Danh sách năm cho dropdown ----
-  // Luôn có SO_NAM_GAN_NHAT năm gần nhất (năm hiện tại - 9 → năm hiện tại)
-  // + toàn bộ năm có phát sinh trong dữ liệu
   const dsNam = useMemo(() => {
     const now = new Date().getFullYear();
     const ys = donList.map((d) => d.ngay.getFullYear());
@@ -273,49 +271,265 @@ const LichSuDongTien = () => {
       return next;
     });
 
-  // ---- Xuất CSV ----
-  const exportCsv = () => {
+  // ==================================================================
+  // XUẤT EXCEL (định dạng báo cáo đầy đủ)
+  // ==================================================================
+  const exportExcel = async () => {
     if (!kyList.length) return showToast("Không có dữ liệu để xuất", "error");
 
-    const headers = [
+    const ExcelJSMod = await import("exceljs");
+    const ExcelJS = ExcelJSMod.default || ExcelJSMod;
+    const fileSaverMod = await import("file-saver");
+    const saveAs =
+      fileSaverMod.saveAs ||
+      fileSaverMod.default?.saveAs ||
+      fileSaverMod.default;
+
+    const wb = new ExcelJS.Workbook();
+    wb.creator = "Shop Analytics";
+    wb.created = new Date();
+
+    const ws = wb.addWorksheet("DongTien", {
+      views: [{ state: "frozen", ySplit: 1 }],
+    });
+
+    const shopLabel = user?.gh_ten ? `${user.gh_ten} (${gh_ma})` : gh_ma || "—";
+    const cheDoLabel = viewMode === "thang" ? "Theo tháng" : "Theo năm";
+    const periodLabel =
+      viewMode === "nam"
+        ? "Toàn bộ thời gian"
+        : thangSo
+          ? `Tháng ${thangSo}/${nam}`
+          : `Năm ${nam}`;
+
+    // Metadata cho từng dòng để style
+    const rows = [];
+    const meta = [];
+
+    // ----- HEADER BLOCK -----
+    rows.push(["BÁO CÁO THỐNG KÊ DÒNG TIỀN"]);
+    meta.push({ type: "title" });
+
+    rows.push(["Gian hàng", shopLabel]);
+    meta.push({ type: "meta" });
+    rows.push(["Chế độ xem", cheDoLabel]);
+    meta.push({ type: "meta" });
+    rows.push(["Phạm vi báo cáo", periodLabel]);
+    meta.push({ type: "meta" });
+    rows.push(["Ngày xuất", new Date().toLocaleString("vi-VN")]);
+    meta.push({ type: "meta" });
+    rows.push([]);
+    meta.push({ type: "blank" });
+
+    // ----- I. TỔNG QUAN -----
+    rows.push(["I. TỔNG QUAN"]);
+    meta.push({ type: "section" });
+    rows.push(["Chỉ tiêu", "Giá trị"]);
+    meta.push({ type: "header", moneyCols: [2] });
+
+    const kpiLines = [
+      ["Số đơn", kpi.so_don, false],
+      ["Tiền khách trả", kpi.tien_hang, true],
+      ["Phí sàn", kpi.phi_san, true],
+      ["Thực nhận", kpi.thuc_nhan, true],
+      ["Đã vào tài khoản", kpi.da_nhan, true],
+      ["Chờ kho chuyển", kpi.cho_chuyen, true],
+    ];
+    kpiLines.forEach(([label, value, isMoney]) => {
+      rows.push([label, value]);
+      meta.push({ type: "kpi-row", moneyCols: isMoney ? [2] : null });
+    });
+    rows.push([]);
+    meta.push({ type: "blank" });
+
+    // ----- II. CHI TIẾT THEO KỲ -----
+    rows.push([`II. CHI TIẾT THEO ${viewMode === "thang" ? "THÁNG" : "NĂM"}`]);
+    meta.push({ type: "section" });
+
+    const kyHeaders = [
       "Kỳ",
       "Số đơn",
       "Tiền khách trả",
       "Phí sàn",
       "Thực nhận",
-      "Đã vào tài khoản",
-      "Chờ kho chuyển",
+      "Đã vào TK",
+      "Chờ chuyển",
     ];
-    const rows = kyList.map((k) => [
-      k.label,
-      k.so_don,
-      k.tien_hang,
-      k.phi_san,
-      k.thuc_nhan,
-      k.da_nhan,
-      k.cho_chuyen,
+    rows.push(kyHeaders);
+    meta.push({ type: "header", moneyCols: [3, 4, 5, 6, 7] });
+
+    kyList.forEach((k) => {
+      rows.push([
+        k.label,
+        k.so_don,
+        k.tien_hang,
+        k.phi_san,
+        k.thuc_nhan,
+        k.da_nhan,
+        k.cho_chuyen,
+      ]);
+      meta.push({ type: "data-row", moneyCols: [3, 4, 5, 6, 7] });
+    });
+    rows.push([
+      "TỔNG CỘNG",
+      tongKy.so_don,
+      tongKy.tien_hang,
+      tongKy.phi_san,
+      tongKy.thuc_nhan,
+      tongKy.da_nhan,
+      tongKy.cho_chuyen,
     ]);
+    meta.push({ type: "total-row", moneyCols: [3, 4, 5, 6, 7] });
+    rows.push([]);
+    meta.push({ type: "blank" });
 
-    const csv = [headers, ...rows]
-      .map((r) =>
-        r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(","),
-      )
-      .join("\n");
+    // ----- III. CHI TIẾT ĐƠN HÀNG -----
+    rows.push(["III. CHI TIẾT ĐƠN HÀNG"]);
+    meta.push({ type: "section" });
 
-    const url = URL.createObjectURL(
-      new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }),
+    const ordHeaders = [
+      "Kỳ",
+      "Mã đơn",
+      "Ngày tất toán",
+      "Tiền khách trả",
+      "Phí sàn",
+      "Thực nhận",
+      "Trạng thái",
+    ];
+    rows.push(ordHeaders);
+    meta.push({ type: "header", moneyCols: [4, 5, 6] });
+
+    let ordCount = 0;
+    kyList.forEach((k) => {
+      k.rows.forEach((d) => {
+        rows.push([
+          k.label,
+          d.dts_ma,
+          d.ngay.toLocaleDateString("vi-VN"),
+          d.tien_hang,
+          d.phi_san,
+          d.thuc_nhan,
+          d.paid ? "Đã vào tài khoản" : "Chờ Kho chuyển",
+        ]);
+        meta.push({ type: "data-row", moneyCols: [4, 5, 6] });
+        ordCount += 1;
+      });
+    });
+
+    if (ordCount === 0) {
+      rows.push(["Không có đơn hàng trong phạm vi này."]);
+      meta.push({ type: "empty-row" });
+    }
+
+    rows.push([]);
+    meta.push({ type: "blank" });
+
+    rows.push([
+      "Ghi chú: mỗi đơn chỉ tính 1 lần (nếu đơn nằm trong nhiều phiếu tất toán thì lấy phiếu đã thanh toán).",
+    ]);
+    meta.push({ type: "footer" });
+    rows.push([
+      "Kỳ được xác định theo ngày tất toán của phiếu; nếu phiếu chưa có ngày tất toán thì dùng ngày đặt.",
+    ]);
+    meta.push({ type: "footer" });
+
+    // ----- WRITE ROWS -----
+    rows.forEach((r) => ws.addRow(Array.isArray(r) ? r : [r]));
+
+    const maxCol = Math.max(
+      ...rows.map((r) => (Array.isArray(r) ? r.length : 1)),
+      2,
     );
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `thong-ke-dong-tien-${viewMode}-${nam}${
-      thangSo ? `-T${thangSo}` : ""
-    }.csv`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    URL.revokeObjectURL(url);
 
-    showToast("Đã xuất file CSV");
+    // ----- STYLE -----
+    meta.forEach((m, i) => {
+      const excelRow = ws.getRow(i + 1);
+
+      if (m.type === "title") {
+        excelRow.font = { bold: true, size: 14, color: { argb: "FF0F172A" } };
+        excelRow.alignment = { vertical: "middle" };
+        excelRow.height = 22;
+        ws.mergeCells(i + 1, 1, i + 1, maxCol);
+      } else if (m.type === "section") {
+        excelRow.font = { bold: true, size: 12, color: { argb: "FF0F172A" } };
+        excelRow.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFE2E8F0" },
+        };
+        excelRow.height = 20;
+        ws.mergeCells(i + 1, 1, i + 1, maxCol);
+      } else if (m.type === "header") {
+        excelRow.font = { bold: true, color: { argb: "FF334155" } };
+        excelRow.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFF1F5F9" },
+        };
+        excelRow.alignment = { vertical: "middle" };
+        // border dưới
+        excelRow.eachCell((cell) => {
+          cell.border = {
+            bottom: { style: "thin", color: { argb: "FFCBD5E1" } },
+          };
+        });
+      } else if (m.type === "total-row") {
+        excelRow.font = { bold: true, color: { argb: "FF0F172A" } };
+        excelRow.fill = {
+          type: "pattern",
+          pattern: "solid",
+          fgColor: { argb: "FFF8FAFC" },
+        };
+        excelRow.eachCell((cell) => {
+          cell.border = {
+            top: { style: "medium", color: { argb: "FF94A3B8" } },
+          };
+        });
+      } else if (m.type === "footer") {
+        excelRow.font = {
+          italic: true,
+          size: 10,
+          color: { argb: "FF64748B" },
+        };
+      } else if (m.type === "empty-row") {
+        excelRow.font = {
+          italic: true,
+          color: { argb: "FF94A3B8" },
+        };
+      }
+
+      if (m.moneyCols) {
+        m.moneyCols.forEach((c) => {
+          const cell = excelRow.getCell(c);
+          cell.numFmt = "#,##0";
+          cell.alignment = { ...cell.alignment, horizontal: "right" };
+        });
+      }
+    });
+
+    // Auto column widths
+    for (let c = 1; c <= maxCol; c++) {
+      let w = 10;
+      rows.forEach((r) => {
+        if (!Array.isArray(r)) return;
+        const v = r[c - 1];
+        const s = v == null ? "" : String(v);
+        if (s.length > w) w = Math.min(s.length + 2, 40);
+      });
+      ws.getColumn(c).width = w;
+    }
+
+    const filename = `bao-cao-dong-tien-${viewMode}-${nam}${
+      thangSo ? `-T${thangSo}` : ""
+    }.xlsx`;
+
+    try {
+      const buf = await wb.xlsx.writeBuffer();
+      saveAs(new Blob([buf], { type: "application/octet-stream" }), filename);
+      showToast("Đã xuất báo cáo Excel");
+    } catch (e) {
+      showToast(e?.message || "Lỗi xuất báo cáo Excel", "error");
+    }
   };
 
   if (loading)
@@ -431,13 +645,13 @@ const LichSuDongTien = () => {
             </button>
             <button
               type="button"
-              onClick={exportCsv}
+              onClick={exportExcel}
               className="flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 hover:bg-slate-50"
             >
               <span className="material-symbols-outlined text-[18px]">
                 download
               </span>
-              CSV
+              Excel
             </button>
           </div>
         </div>
