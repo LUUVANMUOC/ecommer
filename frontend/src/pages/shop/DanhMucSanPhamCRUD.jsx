@@ -174,14 +174,14 @@ const DanhMucSanPhamCRUD = () => {
 
   return (
     <div className="w-full">
-      <CrudToolbar
+      {/* <CrudToolbar
         title="Quản lý Danh mục Sản phẩm"
         subtitle="Tạo và quản lý các danh mục để phân loại sản phẩm của gian hàng."
         totalItems={data.length}
         onAdd={openAddDrawer}
         addButtonText="+ Thêm Danh mục"
         searchPlaceholder="Tìm kiếm danh mục..."
-      />
+      /> */}
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div className="bg-surface-container-lowest border border-outline-variant/60 rounded-xl p-5 shadow-sm">
