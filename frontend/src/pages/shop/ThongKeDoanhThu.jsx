@@ -41,21 +41,10 @@ const TH =
   "whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500";
 const TD = "px-3 py-2.5 text-sm text-slate-700";
 
-// ---- CSV helpers ----
-const downloadCsv = (name, content) => {
-  const url = URL.createObjectURL(
-    new Blob(["\uFEFF" + content], { type: "text/csv;charset=utf-8;" }),
-  );
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${name}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
-};
+// ---- Excel helpers ----
 
-const buildReportCsv = ({
+// Trả về mảng các dòng (array of arrays) dùng chung cho export
+const buildReportRows = ({
   title,
   shopLabel,
   periodLabel,
@@ -65,22 +54,20 @@ const buildReportCsv = ({
   headers,
   dataRows,
   totalsRow,
+  note,
 }) => {
-  const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const L = (arr) => arr.map(esc).join(",");
-  const out = [];
-
-  // HEADER BLOCK
-  out.push(L([title]));
-  out.push(L(["Gian hàng", shopLabel]));
-  out.push(L(["Kỳ báo cáo", periodLabel]));
-  if (filterLabel) out.push(L(["Bộ lọc", filterLabel]));
-  out.push(L(["Ngày xuất", new Date().toLocaleString("vi-VN")]));
-  out.push("");
+  const rows = [];
+  rows.push([title]);
+  rows.push(["Gian hàng", shopLabel]);
+  rows.push(["Kỳ báo cáo", periodLabel]);
+  if (filterLabel) rows.push(["Bộ lọc", filterLabel]);
+  if (note) rows.push(["Ghi chú", note]);
+  rows.push(["Ngày xuất", new Date().toLocaleString("vi-VN")]);
+  rows.push([]);
 
   // I. TỔNG QUAN
-  out.push(L(["I. TỔNG QUAN"]));
-  out.push(L(["Chỉ tiêu", "Giá trị"]));
+  rows.push(["I. TỔNG QUAN"]);
+  rows.push(["Chỉ tiêu", "Giá trị"]);
   const num = (v) => Number(v || 0);
   [
     ["Doanh thu hàng hóa", num(kpi.doanh_thu)],
@@ -92,19 +79,89 @@ const buildReportCsv = ({
     ["Số lượng bán", num(kpi.so_luong)],
     ["Lượt xem", num(kpi.luot_xem)],
     ["Lượt thích", num(kpi.luot_thich)],
-  ].forEach((r) => out.push(L(r)));
-  out.push("");
+  ].forEach((r) => rows.push(r));
+  rows.push([]);
 
   // II. CHI TIẾT
-  out.push(L([`II. ${detailTitle}`]));
-  out.push(L(headers));
-  dataRows.forEach((r) => out.push(L(r)));
-  if (totalsRow) out.push(L(totalsRow));
-  out.push("");
+  rows.push([`II. ${detailTitle}`]);
+  rows.push(headers);
+  dataRows.forEach((r) => rows.push(r));
+  if (totalsRow) rows.push(totalsRow);
+  rows.push([]);
 
-  out.push(L(["— Hết báo cáo —"]));
-  return out.join("\n");
+  rows.push(["— Hết báo cáo —"]);
+  return rows;
 };
+
+const exportExcelReport = async ({ filename, rows }) => {
+  const ExcelJSMod = await import("exceljs");
+  const ExcelJS = ExcelJSMod.default || ExcelJSMod;
+  const fileSaverMod = await import("file-saver");
+  const saveAs =
+    fileSaverMod.saveAs || fileSaverMod.default?.saveAs || fileSaverMod.default;
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Shop Analytics";
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet("BaoCao");
+  rows.forEach((r) => ws.addRow(Array.isArray(r) ? r : [r]));
+
+  const maxCol = Math.max(
+    2,
+    ...rows.map((r) => (Array.isArray(r) ? r.length : 1)),
+  );
+
+  // Title
+  const titleCell = ws.getRow(1);
+  titleCell.font = { bold: true, size: 14, color: { argb: "FF0F172A" } };
+  ws.mergeCells(1, 1, 1, maxCol);
+
+  // Style section headers + header rows + totals row
+  let prevIsSection = false;
+  rows.forEach((r, i) => {
+    const first = String((Array.isArray(r) ? r[0] : r) ?? "").trim();
+    const isSection = first === "I. TỔNG QUAN" || first.startsWith("II. ");
+
+    if (isSection) {
+      const row = ws.getRow(i + 1);
+      row.font = { bold: true, size: 12, color: { argb: "FF0F172A" } };
+      row.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFE2E8F0" },
+      };
+    } else if (prevIsSection) {
+      ws.getRow(i + 1).font = { bold: true, color: { argb: "FF334155" } };
+    }
+
+    if (first === "TỔNG CỘNG") {
+      ws.getRow(i + 1).font = { bold: true };
+    }
+
+    prevIsSection = isSection;
+  });
+
+  // Auto column widths
+  for (let c = 1; c <= maxCol; c++) {
+    let max = 10;
+    rows.forEach((r) => {
+      if (!Array.isArray(r)) return;
+      const v = r[c - 1];
+      const s = v == null ? "" : String(v);
+      if (s.length > max) max = Math.min(s.length + 2, 40);
+    });
+    ws.getColumn(c).width = max;
+  }
+
+  const buf = await wb.xlsx.writeBuffer();
+  saveAs(
+    new Blob([buf], { type: "application/octet-stream" }),
+    `${filename}.xlsx`,
+  );
+};
+
+// ======================================================================
 
 const ThongKeDoanhThu = () => {
   const { user } = useContext(AuthContext);
@@ -114,7 +171,6 @@ const ThongKeDoanhThu = () => {
     nganh_hang: [],
     thuong_hieu: [],
     nam: [],
-    nam_mac_dinh: null,
   });
   const [filters, setFilters] = useState({
     nh_ma: "",
@@ -190,11 +246,9 @@ const ThongKeDoanhThu = () => {
           nganh_hang: data.nganh_hang || [],
           thuong_hieu: data.thuong_hieu || [],
           nam: data.nam || [],
-          nam_mac_dinh: data.nam_mac_dinh ?? null,
         });
 
         const namMacDinh = data.nam_mac_dinh ?? data.nam?.[0] ?? NAM_HIEN_TAI;
-
         setFilters((f) => ({ ...f, nam: f.nam || String(namMacDinh) }));
         setReady(true);
       })
@@ -230,6 +284,16 @@ const ThongKeDoanhThu = () => {
       thang: filters.thang || undefined,
     };
   }, [ready, filters]);
+
+  // ---- Cây danh mục phẳng dùng cho dropdown bộ lọc ----
+  // (khai báo SỚM để exportExcel phía dưới có thể tham chiếu an toàn)
+  const catRows = useMemo(() => {
+    const list = danhMuc.nganh_hang || [];
+    return flattenCategoryTree(
+      buildCategoryTree(list),
+      new Set(list.map((n) => n.nh_ma)),
+    );
+  }, [danhMuc.nganh_hang]);
 
   // ---- 6 KPI ----
   const loadTongQuan = useCallback(async () => {
@@ -472,16 +536,12 @@ const ThongKeDoanhThu = () => {
         ? "Danh mục cha đã cộng dồn toàn bộ danh mục con · lượt xem/thích tính trên toàn bộ sản phẩm của danh mục"
         : "Mỗi dòng là một thương hiệu · sản phẩm chưa gán thương hiệu gom vào dòng “Chưa xác định thương hiệu”";
 
-  // ---- CSV ----
-  const exportCsv = () => {
-  const ExcelJS = (await import("exceljs")).default;
-  const { saveAs } = await import("file-saver");
-
-  const workbook = new ExcelJS.Workbook();
-    // Kỳ + bộ lọc mô tả
+  // ---- Xuất Excel ----
+  const exportExcel = async () => {
     const periodLabel = `Năm ${filters.nam}${
       filters.thang ? ` - Tháng ${filters.thang}` : ""
     }`;
+
     const filterParts = [];
     if (filters.nh_ma) {
       const cat = catRows.find((c) => c.nh_ma === filters.nh_ma);
@@ -503,7 +563,8 @@ const ThongKeDoanhThu = () => {
     let detailTitle;
     let headers;
     let dataRows;
-    let totalsRow;
+    let totalsRow = null;
+    let note;
 
     if (viewMode === "danh-muc") {
       if (visibleRows.length === 0)
@@ -574,19 +635,11 @@ const ThongKeDoanhThu = () => {
         r.luot_thich,
         r.so_don > 0 ? Math.round(r.doanh_thu / r.so_don) : "",
       ]);
-      totalsRow = [
-        "TỔNG CỘNG",
-        "",
-        kpi.so_sp,
-        kpi.so_luong,
-        kpi.so_don,
-        kpi.doanh_thu,
-        kpi.phi_san,
-        kpi.shop_nhan,
-        kpi.luot_xem,
-        kpi.luot_thich,
-        kpi.so_don > 0 ? Math.round(kpi.doanh_thu / kpi.so_don) : "",
-      ];
+      // Dữ liệu phân trang → KHÔNG cộng dồn thành TỔNG CỘNG
+      totalsRow = null;
+      if (thList.total_pages > 1) {
+        note = `Dữ liệu trang ${thList.page}/${thList.total_pages} (${thList.rows.length}/${thList.total} thương hiệu) — tăng "Số dòng" để xuất đầy đủ hơn`;
+      }
     } else {
       if (spList.rows.length === 0)
         return showToast("Không có dữ liệu để xuất", "error");
@@ -618,10 +671,13 @@ const ThongKeDoanhThu = () => {
         r.luot_xem,
         r.luot_thich,
       ]);
-      totalsRow = null; // dữ liệu phân trang, không cộng dồn
+      totalsRow = null;
+      if (spList.limit > 0 && spList.total_pages > 1) {
+        note = `Dữ liệu trang ${spList.page}/${spList.total_pages} (${spList.rows.length}/${spList.total} sản phẩm) — chọn "Tất cả" để xuất đầy đủ`;
+      }
     }
 
-    const content = buildReportCsv({
+    const rows = buildReportRows({
       title: "BÁO CÁO THỐNG KÊ DOANH THU",
       shopLabel,
       periodLabel,
@@ -631,10 +687,15 @@ const ThongKeDoanhThu = () => {
       headers,
       dataRows,
       totalsRow,
+      note,
     });
 
-    downloadCsv(filename, content);
-    showToast("Đã xuất báo cáo CSV");
+    try {
+      await exportExcelReport({ filename, rows });
+      showToast("Đã xuất báo cáo Excel");
+    } catch (e) {
+      showToast(e?.message || "Lỗi xuất báo cáo Excel", "error");
+    }
   };
 
   const viewToggle = (
@@ -666,15 +727,6 @@ const ThongKeDoanhThu = () => {
         ? thLoading
         : spLoading;
 
-  // ---- Danh mục cho bộ lọc (cây phẳng) ----
-  const catRows = useMemo(() => {
-    const list = danhMuc.nganh_hang || [];
-    return flattenCategoryTree(
-      buildCategoryTree(list),
-      new Set(list.map((n) => n.nh_ma)),
-    );
-  }, [danhMuc.nganh_hang]);
-
   if (!gh_ma)
     return (
       <div className="p-10 text-center text-sm text-gray-500">
@@ -688,12 +740,6 @@ const ThongKeDoanhThu = () => {
         <h1 className="text-2xl font-bold text-[#0F172A]">
           Thống kê doanh thu
         </h1>
-        {/* <p className="mt-1 text-sm text-[#64748B]">
-          Doanh thu hàng hóa, phí sàn và tiền shop thực nhận. Chỉ tính đơn đã
-          hoàn thành (TTDH05), ghi nhận theo ngày hoàn thành. Lọc theo danh mục,
-          thương hiệu, tháng, năm rồi chuyển giữa 3 chế độ: theo sản phẩm, theo
-          danh mục, theo thương hiệu.
-        </p> */}
       </div>
 
       {/* ===== Bộ lọc ===== */}
@@ -772,13 +818,13 @@ const ThongKeDoanhThu = () => {
         <div className="ml-auto flex items-center gap-2">
           <button
             type="button"
-            onClick={exportCsv}
+            onClick={exportExcel}
             className="flex h-10 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-sm font-medium text-slate-600 hover:bg-slate-50"
           >
             <span className="material-symbols-outlined text-[18px]">
               download
             </span>
-            CSV
+            Excel
           </button>
           <button
             type="button"
