@@ -474,6 +474,10 @@ const ThongKeDoanhThu = () => {
 
   // ---- CSV ----
   const exportCsv = () => {
+  const ExcelJS = (await import("exceljs")).default;
+  const { saveAs } = await import("file-saver");
+
+  const workbook = new ExcelJS.Workbook();
     // Kỳ + bộ lọc mô tả
     const periodLabel = `Năm ${filters.nam}${
       filters.thang ? ` - Tháng ${filters.thang}` : ""
