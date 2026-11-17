@@ -8,27 +8,10 @@ const DatHangThanhCong = () => {
 
   const state = location.state || {};
   const shops = Array.isArray(state.shops) ? state.shops : [];
-  const reviewedShops = Array.isArray(state.reviewedShops)
-    ? state.reviewedShops
-    : [];
 
   const dmMa = state.dm_ma;
   const finalTotal = Number(state.finalTotal || 0);
   const paymentMethod = state.paymentMethod || "COD";
-
-  // Mở trang đánh giá của 1 shop, mang theo state để quay lại đây sau khi gửi
-  const handleReview = (shop) => {
-    navigate(`/khach-hang/danh-gia/${shop.dts_ma}`, {
-      state: {
-        fromOrder: true,
-        dm_ma: dmMa,
-        shops,
-        reviewedShops,
-        finalTotal: state.finalTotal,
-        paymentMethod,
-      },
-    });
-  };
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] py-10 px-4 font-sans">
@@ -77,72 +60,49 @@ const DatHangThanhCong = () => {
           </div>
         </div>
 
-        {/* DANH SÁCH SHOP ĐỂ ĐÁNH GIÁ */}
+        {/* THÔNG TIN ĐƠN THEO SHOP (chỉ để xem, không đánh giá) */}
         <div className="bg-white rounded-3xl shadow-sm border border-[#E2E8F0] mt-6 overflow-hidden">
           <div className="p-6 border-b border-[#F1F5F9]">
             <h2 className="text-lg font-bold text-[#0F172A]">
-              Đánh giá sản phẩm
+              Đơn hàng của bạn
             </h2>
             <p className="text-sm text-[#64748B] mt-1">
-              Bạn có thể đánh giá ngay từng shop. Đánh giá của bạn giúp shop cải
-              thiện chất lượng phục vụ.
+              Bạn có thể đánh giá sản phẩm sau khi đã nhận hàng, trong mục{" "}
+              <span className="font-semibold text-[#2563EB]">
+                Đơn hàng của tôi
+              </span>
+              .
             </p>
           </div>
 
           {shops.length === 0 ? (
             <div className="p-6 text-center text-[#64748B] text-sm">
-              Không có thông tin đơn hàng để đánh giá.
+              Không có thông tin đơn hàng.
             </div>
           ) : (
             <div className="divide-y divide-[#F1F5F9]">
-              {shops.map((shop) => {
-                const daDanhGia = reviewedShops.includes(shop.dts_ma);
-                return (
-                  <div
-                    key={shop.dts_ma}
-                    className="p-5 flex flex-col sm:flex-row sm:items-center gap-4"
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="w-11 h-11 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0">
-                        <span className="material-symbols-outlined">
-                          storefront
-                        </span>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="font-bold text-[#0F172A] truncate">
-                          {shop.gh_ten || shop.gh_ma}
-                        </p>
-                        <p className="text-xs text-[#64748B] mt-0.5">
-                          Mã đơn:{" "}
-                          <span className="font-mono">{shop.dts_ma}</span>
-                          {shop.tong_thanh_toan != null && (
-                            <> · {formatVND(Number(shop.tong_thanh_toan))}</>
-                          )}
-                        </p>
-                      </div>
-                    </div>
-
-                    {daDanhGia ? (
-                      <span className="inline-flex items-center gap-1 text-sm font-semibold text-emerald-600 bg-emerald-50 px-4 py-2 rounded-xl self-start sm:self-auto">
-                        <span className="material-symbols-outlined text-[18px]">
-                          check_circle
-                        </span>
-                        Đã đánh giá
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleReview(shop)}
-                        className="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-[#2563EB] hover:bg-blue-700 text-white rounded-xl font-bold text-sm transition-colors self-start sm:self-auto"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">
-                          star
-                        </span>
-                        Đánh giá ngay
-                      </button>
-                    )}
+              {shops.map((shop) => (
+                <div key={shop.dts_ma} className="p-5 flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-xl bg-blue-50 text-[#2563EB] flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined">
+                      storefront
+                    </span>
                   </div>
-                );
-              })}
+                  <div className="min-w-0 flex-1">
+                    <p className="font-bold text-[#0F172A] truncate">
+                      {shop.gh_ten || shop.gh_ma}
+                    </p>
+                    <p className="text-xs text-[#64748B] mt-0.5">
+                      Mã đơn: <span className="font-mono">{shop.dts_ma}</span>
+                    </p>
+                  </div>
+                  {shop.tong_thanh_toan != null && (
+                    <p className="font-bold text-[#DC2626] text-sm shrink-0">
+                      {formatVND(Number(shop.tong_thanh_toan))}
+                    </p>
+                  )}
+                </div>
+              ))}
             </div>
           )}
         </div>
