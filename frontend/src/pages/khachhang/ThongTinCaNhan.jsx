@@ -792,6 +792,60 @@ const ThongTinCaNhan = () => {
                         </div>
                       </div>
 
+                      {/* 🟢 SẢN PHẨM CỦA ĐƠN — LUÔN HIỂN THỊ, ĐỦ TẤT CẢ MÓN */}
+                      <div className="px-6 py-4 bg-white border-t border-[#E2E8F0] space-y-4">
+                        {order.shops.map((shop) => (
+                          <div key={shop.DTS_Ma}>
+                            {order.shops.length > 1 && (
+                              <div className="flex items-center gap-2 mb-3">
+                                <span className="material-symbols-outlined text-[18px] text-[#2563EB]">
+                                  storefront
+                                </span>
+                                <span className="font-bold text-sm text-[#0F172A]">
+                                  {shop.TenShop}
+                                </span>
+                                <span className="text-xs text-[#64748B]">
+                                  · {shop.items.length} sản phẩm
+                                </span>
+                              </div>
+                            )}
+                            <div className="space-y-3">
+                              {shop.items.map((item) => (
+                                <div
+                                  key={item.Ctsp_Ma}
+                                  className="flex gap-4 items-center text-sm"
+                                >
+                                  <img
+                                    src={
+                                      item.Image
+                                        ? `${BACKEND_URL}${item.Image}`
+                                        : "https://placehold.co/100x100"
+                                    }
+                                    className="w-14 h-14 rounded-lg object-cover border border-[#E2E8F0]"
+                                    alt=""
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="font-semibold text-[#0F172A] truncate">
+                                      {item.TenSanPham}
+                                    </p>
+                                    <p className="text-[#64748B] text-xs mt-0.5">
+                                      Phân loại: {item.TenPhanLoai}
+                                    </p>
+                                    <p className="text-[#64748B] text-xs">
+                                      SL: {item.SoLuong} ×{" "}
+                                      {formatVND(item.GiaBan)}
+                                    </p>
+                                  </div>
+                                  <p className="font-bold text-[#DC2626] shrink-0">
+                                    {formatVND(item.GiaBan * item.SoLuong)}
+                                  </p>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+
                       {expandedOrders[order.DM_Ma] && (
                         <>
                           <div className="px-6 py-3 bg-white border-b border-t border-[#E2E8F0] text-sm text-[#64748B] flex items-start gap-2">
@@ -867,39 +921,6 @@ const ThongTinCaNhan = () => {
                                       </button>
                                     )}
                                   </div>
-                                </div>
-
-                                <div className="space-y-4 mb-4">
-                                  {shop.items.map((item) => (
-                                    <div
-                                      key={item.Ctsp_Ma}
-                                      className="flex gap-4 items-center text-sm"
-                                    >
-                                      <img
-                                        src={
-                                          item.Image
-                                            ? `${BACKEND_URL}${item.Image}`
-                                            : "https://placehold.co/100x100"
-                                        }
-                                        className="w-16 h-16 rounded-lg object-cover border border-[#E2E8F0]"
-                                        alt=""
-                                      />
-                                      <div className="flex-1 min-w-0">
-                                        <p className="font-semibold text-[#0F172A] truncate">
-                                          {item.TenSanPham}
-                                        </p>
-                                        <p className="text-[#64748B] text-xs mt-0.5">
-                                          Phân loại: {item.TenPhanLoai}
-                                        </p>
-                                        <p className="text-[#64748B] text-xs">
-                                          Số lượng: {item.SoLuong}
-                                        </p>
-                                      </div>
-                                      <p className="font-bold text-[#DC2626]">
-                                        {formatVND(item.GiaBan * item.SoLuong)}
-                                      </p>
-                                    </div>
-                                  ))}
                                 </div>
 
                                 <div className="mt-4 pt-3 border-t border-[#E2E8F0] space-y-2 text-sm">

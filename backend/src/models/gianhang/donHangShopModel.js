@@ -4,8 +4,27 @@ const DonHangShopModel = {
   getOrdersByShop: async (gh_ma) => {
     const query = `
       SELECT dts.dts_ma AS "DTS_Ma", dts.dts_ngaylap AS "NgayLap", dts.dts_thoidiemdukiengiao AS "NgayGiaoDuKien", dts.dts_tongtienkhachhangthanhtoan AS "TongThanhToan", dts.dts_ghichu AS "GhiChu", kh.kh_ten AS "TenKhachHang", ttnh.ttnh_diachisnapshot AS "DiaChiGiao",
-        (SELECT ttdh_ma FROM chitiettrangthaidonhang WHERE dts_ma = dts.dts_ma ORDER BY ctttdh_thoidiem DESC LIMIT 1) AS "TrangThaiHienTai"
-      FROM donhangtheoshop dts JOIN donhangkhachmua dm ON dts.dm_ma = dm.dm_ma JOIN khachhang kh ON dm.kh_ma = kh.kh_ma JOIN thongtinnhanhang ttnh ON dm.ttnh_ma = ttnh.ttnh_ma
+        (SELECT ttdh_ma FROM chitiettrangthaidonhang WHERE dts_ma = dts.dts_ma ORDER BY ctttdh_thoidiem DESC LIMIT 1) AS "TrangThaiHienTai",
+        COALESCE(sp_items.items, '[]'::json) AS "items"
+      FROM donhangtheoshop dts
+      JOIN donhangkhachmua dm ON dts.dm_ma = dm.dm_ma
+      JOIN khachhang kh ON dm.kh_ma = kh.kh_ma
+      JOIN thongtinnhanhang ttnh ON dm.ttnh_ma = ttnh.ttnh_ma
+      LEFT JOIN LATERAL (
+        SELECT json_agg(json_build_object(
+          'Ctsp_Ma', ctdh.ctsp_ma,
+          'TenSanPham', sp.sp_ten,
+          'TenPhanLoai', ctsp.ctsp_ten,
+          'SoLuong', ctdh.ctdh_soluong,
+          'DonGia', ctdh.ctdh_dongia,
+          'ThanhTien', ctdh.ctdh_thanhtien,
+          'Image', (SELECT hasp_link FROM hinhanhsanpham WHERE ctsp_ma = ctsp.ctsp_ma ORDER BY hasp_laanhchinh DESC LIMIT 1)
+        ) ORDER BY ctdh.ctsp_ma) AS items
+        FROM chitietdonhang ctdh
+        JOIN chitietsanpham ctsp ON ctdh.ctsp_ma = ctsp.ctsp_ma
+        JOIN sanpham sp ON ctsp.sp_ma = sp.sp_ma
+        WHERE ctdh.dts_ma = dts.dts_ma
+      ) sp_items ON true
       WHERE dts.gh_ma = $1 ORDER BY dts.dts_ngaylap DESC
     `;
     const res = await pool.query(query, [gh_ma]);

@@ -1,5 +1,5 @@
 // src/pages/shop/QuanLyDonHang.jsx
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, Fragment } from "react";
 import { AuthContext } from "../../contexts/AuthContext";
 import donHangShopService from "../../services/gianhang/donHangShopService";
 import { formatVND } from "../../components/shop/SanPhamShared";
@@ -163,61 +163,122 @@ const QuanLyDonHang = () => {
                 <th className="p-4 font-semibold text-right">Thao Tác</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#E2E8F0]">
+            <tbody>
               {orders.map((order) => {
                 const statusConfig = STATUS_MAP[order.TrangThaiHienTai] || {
                   label: "Không xác định",
                   color: "text-gray-600 bg-gray-50",
                 };
+                const items = Array.isArray(order.items) ? order.items : [];
                 return (
-                  <tr
-                    key={order.DTS_Ma}
-                    className="hover:bg-gray-50 transition-colors"
-                  >
-                    <td className="p-4 font-bold text-[#2563EB]">
-                      {order.DTS_Ma}
-                    </td>
-                    <td className="p-4">
-                      <p className="font-semibold text-[#0F172A]">
-                        {order.TenKhachHang}
-                      </p>
-                      <p className="text-xs text-[#64748B] line-clamp-1 max-w-[200px]">
-                        {order.DiaChiGiao}
-                      </p>
-                    </td>
-                    <td className="p-4 text-sm text-[#64748B]">
-                      {new Date(order.NgayLap).toLocaleDateString("vi-VN")}
-                    </td>
-                    <td className="p-4 font-bold text-[#DC2626]">
-                      {formatVND(order.TongThanhToan)}
-                    </td>
-                    <td className="p-4">
-                      <span
-                        className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold border ${statusConfig.color}`}
-                      >
-                        {statusConfig.label}
-                      </span>
-                    </td>
-                    <td className="p-4 text-right flex justify-end gap-2">
-                      <button
-                        onClick={() => handleViewDetail(order.DTS_Ma)}
-                        className="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm font-bold rounded-lg hover:bg-gray-200 transition-colors"
-                      >
-                        Xem chi tiết
-                      </button>
-                      {order.TrangThaiHienTai === "TTDH01" && (
-                        <button
-                          onClick={() => handleConfirmOrder(order.DTS_Ma)}
-                          disabled={confirmingId === order.DTS_Ma}
-                          className="px-3 py-1.5 bg-[#2563EB] text-white text-sm font-bold rounded-lg hover:bg-[#1D4ED8] transition-colors disabled:opacity-50"
+                  <Fragment key={order.DTS_Ma}>
+                    <tr className="hover:bg-gray-50 transition-colors">
+                      <td className="p-4 font-bold text-[#2563EB]">
+                        {order.DTS_Ma}
+                      </td>
+                      <td className="p-4">
+                        <p className="font-semibold text-[#0F172A]">
+                          {order.TenKhachHang}
+                        </p>
+                        <p className="text-xs text-[#64748B] line-clamp-1 max-w-[200px]">
+                          {order.DiaChiGiao}
+                        </p>
+                      </td>
+                      <td className="p-4 text-sm text-[#64748B]">
+                        {new Date(order.NgayLap).toLocaleDateString("vi-VN")}
+                      </td>
+                      <td className="p-4 font-bold text-[#DC2626]">
+                        {formatVND(order.TongThanhToan)}
+                      </td>
+                      <td className="p-4">
+                        <span
+                          className={`inline-flex items-center px-2.5 py-1 rounded-md text-xs font-bold border ${statusConfig.color}`}
                         >
-                          {confirmingId === order.DTS_Ma
-                            ? "Đang xử lý..."
-                            : "Xác Nhận"}
+                          {statusConfig.label}
+                        </span>
+                      </td>
+                      <td className="p-4 text-right flex justify-end gap-2">
+                        <button
+                          onClick={() => handleViewDetail(order.DTS_Ma)}
+                          className="px-3 py-1.5 bg-gray-100 text-gray-700 text-sm font-bold rounded-lg hover:bg-gray-200 transition-colors"
+                        >
+                          Xem chi tiết
                         </button>
-                      )}
-                    </td>
-                  </tr>
+                        {order.TrangThaiHienTai === "TTDH01" && (
+                          <button
+                            onClick={() => handleConfirmOrder(order.DTS_Ma)}
+                            disabled={confirmingId === order.DTS_Ma}
+                            className="px-3 py-1.5 bg-[#2563EB] text-white text-sm font-bold rounded-lg hover:bg-[#1D4ED8] transition-colors disabled:opacity-50"
+                          >
+                            {confirmingId === order.DTS_Ma
+                              ? "Đang xử lý..."
+                              : "Xác Nhận"}
+                          </button>
+                        )}
+                      </td>
+                    </tr>
+
+                    {/* 🟢 SẢN PHẨM CỦA ĐƠN — LUÔN HIỂN THỊ, ĐỦ TẤT CẢ MÓN */}
+                    <tr className="bg-white">
+                      <td
+                        colSpan={6}
+                        className="px-4 pb-4 pt-0 border-b border-[#E2E8F0]"
+                      >
+                        <div className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3">
+                          <div className="flex items-center gap-1.5 mb-2">
+                            <span className="material-symbols-outlined text-[16px] text-[#2563EB]">
+                              inventory_2
+                            </span>
+                            <span className="text-[11px] font-bold uppercase tracking-wide text-[#64748B]">
+                              Sản phẩm ({items.length})
+                            </span>
+                          </div>
+
+                          {items.length === 0 ? (
+                            <p className="text-xs text-[#94A3B8] italic">
+                              Không có sản phẩm.
+                            </p>
+                          ) : (
+                            <div className="space-y-2">
+                              {items.map((item) => (
+                                <div
+                                  key={item.Ctsp_Ma}
+                                  className="flex items-center gap-3"
+                                >
+                                  <img
+                                    src={
+                                      item.Image
+                                        ? `${BACKEND_URL}${item.Image}`
+                                        : "https://placehold.co/100x100"
+                                    }
+                                    alt=""
+                                    className="w-11 h-11 rounded-lg object-cover border border-[#E2E8F0] bg-white shrink-0"
+                                  />
+                                  <div className="flex-1 min-w-0">
+                                    <p className="text-sm font-semibold text-[#0F172A] truncate">
+                                      {item.TenSanPham}
+                                    </p>
+                                    <p className="text-xs text-[#64748B] truncate">
+                                      Phân loại: {item.TenPhanLoai || "—"}
+                                    </p>
+                                  </div>
+                                  <div className="text-right shrink-0">
+                                    <p className="text-xs text-[#64748B]">
+                                      SL: {item.SoLuong} ×{" "}
+                                      {formatVND(item.DonGia)}
+                                    </p>
+                                    <p className="text-sm font-bold text-[#DC2626]">
+                                      {formatVND(item.ThanhTien)}
+                                    </p>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  </Fragment>
                 );
               })}
             </tbody>
