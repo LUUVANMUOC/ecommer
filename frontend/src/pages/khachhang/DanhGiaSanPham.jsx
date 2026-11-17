@@ -1,5 +1,6 @@
+// src/pages/khachhang/DanhGiaSanPham.jsx
 import { useState, useEffect, useContext } from "react";
-import { useParams, useNavigate } from "react-router-dom";
+import { useParams, useNavigate, useLocation } from "react-router-dom";
 import { AuthContext } from "../../contexts/AuthContext";
 import donHangService from "../../services/khachhang/donHangService";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
@@ -10,6 +11,7 @@ const DanhGiaSanPham = () => {
   const { dts_ma } = useParams(); // Lấy mã đơn hàng từ URL
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
+  const location = useLocation(); // ✅ MỚI: nhận state từ trang Đặt hàng thành công
 
   const [shopData, setShopData] = useState(null);
   const [reviewData, setReviewData] = useState({});
@@ -40,7 +42,11 @@ const DanhGiaSanPham = () => {
   // Lấy thông tin đơn hàng
   useEffect(() => {
     const fetchData = async () => {
-      if (!user?.kh_ma) return;
+      // ✅ Nếu chưa có user thì tắt loading, không treo màn hình "Đang tải..."
+      if (!user?.kh_ma) {
+        setLoading(false);
+        return;
+      }
       try {
         const res = await donHangService.getMyOrders(user.kh_ma);
         // Tìm đơn shop tương ứng với dts_ma
@@ -108,7 +114,27 @@ const DanhGiaSanPham = () => {
       }
       showToast("Gửi đánh giá thành công!");
       setTimeout(() => {
-        navigate("/khach-hang/thong-tin-ca-nhan"); // Quay lại trang cá nhân
+        // ✅ Nếu vào từ luồng đặt hàng → quay lại trang Đặt hàng thành công
+        //    để khách đánh giá tiếp shop khác (nếu có)
+        if (location.state?.fromOrder) {
+          const prevReviewed = Array.isArray(location.state.reviewedShops)
+            ? location.state.reviewedShops
+            : [];
+          navigate("/khach-hang/dat-hang-thanh-cong", {
+            replace: true,
+            state: {
+              dm_ma: location.state.dm_ma,
+              shops: location.state.shops || [],
+              reviewedShops: prevReviewed.includes(shopData.DTS_Ma)
+                ? prevReviewed
+                : [...prevReviewed, shopData.DTS_Ma],
+              finalTotal: location.state.finalTotal,
+              paymentMethod: location.state.paymentMethod,
+            },
+          });
+        } else {
+          navigate("/khach-hang/thong-tin-ca-nhan"); // Quay lại trang cá nhân
+        }
       }, 1500);
     } catch (error) {
       showToast("Lỗi gửi đánh giá", "error");
@@ -121,6 +147,26 @@ const DanhGiaSanPham = () => {
     return (
       <div className="min-h-screen flex items-center justify-center font-medium">
         Đang tải...
+      </div>
+    );
+  }
+
+  // ✅ Chưa đăng nhập / thiếu kh_ma → báo rõ ràng thay vì trắng trang
+  if (!user?.kh_ma) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-[#F8FAFC] px-4 text-center">
+        <span className="material-symbols-outlined text-5xl text-[#2563EB]">
+          lock
+        </span>
+        <p className="text-lg font-semibold text-[#0F172A]">
+          Bạn cần đăng nhập để đánh giá sản phẩm.
+        </p>
+        <button
+          onClick={() => navigate("/khach-hang/login")}
+          className="px-6 py-2.5 bg-[#2563EB] text-white rounded-xl font-bold hover:bg-blue-700 transition-colors"
+        >
+          Đăng nhập
+        </button>
       </div>
     );
   }

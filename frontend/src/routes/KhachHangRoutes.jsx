@@ -5,6 +5,7 @@ import GioHang from "../pages/khachhang/GioHang";
 import ThongTinCaNhan from "../pages/khachhang/ThongTinCaNhan"; // ✅ Thêm import này
 import ThanhToan from "../pages/khachhang/ThanhToan";
 import DanhGiaSanPham from "../pages/khachhang/DanhGiaSanPham";
+import DatHangThanhCong from "../pages/khachhang/DatHangThanhCong"; // ✅ MỚI
 import HopThuKhachHang from "../pages/khachhang/HopThuKhachHang";
 import SuCoPage from "../pages/suco/SuCoPage";
 import ChiTietSuCoPage from "../pages/suco/ChiTietSuCoPage";
@@ -18,6 +19,8 @@ const KhachHangRoutes = () => {
         <Route path="thong-tin-ca-nhan" element={<ThongTinCaNhan />} />
         <Route path="thanh-toan" element={<ThanhToan />} />
         <Route path="danh-gia/:dts_ma" element={<DanhGiaSanPham />} />
+        {/* ✅ MỚI: trang xác nhận sau khi đặt hàng */}
+        <Route path="dat-hang-thanh-cong" element={<DatHangThanhCong />} />
         <Route path="thong-bao" element={<HopThuKhachHang />} />
         <Route
           path="su-co"

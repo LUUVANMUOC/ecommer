@@ -22,7 +22,11 @@ axiosClient.interceptors.request.use(
 axiosClient.interceptors.response.use(
     (response) => response,
     (error) => {
-        if (error.response && error.response.status === 401) {
+        // ✅ CHỈ đăng xuất khi request THỰC SỰ có gửi token.
+        // Request công khai (không token) trả 401 không được phép xoá phiên đăng nhập.
+        const hadAuth = Boolean(error.config?.headers?.Authorization);
+
+        if (error.response && error.response.status === 401 && hadAuth) {
             const currentPath = window.location.pathname;
             
             // 1. Kiểm tra xem có đang ở trang đăng nhập/đăng ký không

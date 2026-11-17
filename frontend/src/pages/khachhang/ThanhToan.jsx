@@ -364,10 +364,20 @@ const ThanhToan = () => {
     try {
       setLoadingFee(true);
       const res = await axiosClient.post("/khach-hang/dat-hang", orderPayload);
+      const data = res.data || {};
       showToast("Đặt hàng thành công!", "success");
-      setTimeout(() => {
-        navigate("/");
-      }, 1500);
+
+      // ✅ Chuyển sang trang xác nhận (giữ nguyên phiên đăng nhập),
+      //    mang theo danh sách shop + dts_ma để đánh giá ngay
+      navigate("/khach-hang/dat-hang-thanh-cong", {
+        replace: true,
+        state: {
+          dm_ma: data.dm_ma,
+          shops: data.shops || [],
+          finalTotal: finalTotal,
+          paymentMethod: paymentMethod,
+        },
+      });
     } catch (error) {
       console.error(error);
       showToast(error.response?.data?.message || "Lỗi khi đặt hàng", "error");
