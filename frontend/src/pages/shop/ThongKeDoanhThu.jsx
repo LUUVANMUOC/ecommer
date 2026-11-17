@@ -41,14 +41,10 @@ const TH =
   "whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500";
 const TD = "px-3 py-2.5 text-sm text-slate-700";
 
-const downloadCsv = (name, headers, rows) => {
-  const csv = [headers, ...rows]
-    .map((r) =>
-      r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(","),
-    )
-    .join("\n");
+// ---- CSV helpers ----
+const downloadCsv = (name, content) => {
   const url = URL.createObjectURL(
-    new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }),
+    new Blob(["\uFEFF" + content], { type: "text/csv;charset=utf-8;" }),
   );
   const a = document.createElement("a");
   a.href = url;
@@ -57,6 +53,57 @@ const downloadCsv = (name, headers, rows) => {
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+};
+
+const buildReportCsv = ({
+  title,
+  shopLabel,
+  periodLabel,
+  filterLabel,
+  kpi = {},
+  detailTitle,
+  headers,
+  dataRows,
+  totalsRow,
+}) => {
+  const esc = (v) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const L = (arr) => arr.map(esc).join(",");
+  const out = [];
+
+  // HEADER BLOCK
+  out.push(L([title]));
+  out.push(L(["Gian hàng", shopLabel]));
+  out.push(L(["Kỳ báo cáo", periodLabel]));
+  if (filterLabel) out.push(L(["Bộ lọc", filterLabel]));
+  out.push(L(["Ngày xuất", new Date().toLocaleString("vi-VN")]));
+  out.push("");
+
+  // I. TỔNG QUAN
+  out.push(L(["I. TỔNG QUAN"]));
+  out.push(L(["Chỉ tiêu", "Giá trị"]));
+  const num = (v) => Number(v || 0);
+  [
+    ["Doanh thu hàng hóa", num(kpi.doanh_thu)],
+    ["Phí sàn", num(kpi.phi_san)],
+    ["Giảm giá shop", num(kpi.giam_gia_shop)],
+    ["Shop thực nhận", num(kpi.shop_nhan)],
+    ["Đơn hoàn thành", num(kpi.so_don)],
+    ["Số sản phẩm bán", num(kpi.so_sp)],
+    ["Số lượng bán", num(kpi.so_luong)],
+    ["Lượt xem", num(kpi.luot_xem)],
+    ["Lượt thích", num(kpi.luot_thich)],
+  ].forEach((r) => out.push(L(r)));
+  out.push("");
+
+  // II. CHI TIẾT
+  out.push(L([`II. ${detailTitle}`]));
+  out.push(L(headers));
+  dataRows.forEach((r) => out.push(L(r)));
+  if (totalsRow) out.push(L(totalsRow));
+  out.push("");
+
+  out.push(L(["— Hết báo cáo —"]));
+  return out.join("\n");
 };
 
 const ThongKeDoanhThu = () => {
@@ -427,105 +474,163 @@ const ThongKeDoanhThu = () => {
 
   // ---- CSV ----
   const exportCsv = () => {
-    const suffix = `${filters.nam}${
-      filters.thang ? `-T${filters.thang}` : ""
-    }${filters.nh_ma ? `-${filters.nh_ma}` : ""}${
-      filters.th_ma ? `-${filters.th_ma}` : ""
+    // Kỳ + bộ lọc mô tả
+    const periodLabel = `Năm ${filters.nam}${
+      filters.thang ? ` - Tháng ${filters.thang}` : ""
     }`;
+    const filterParts = [];
+    if (filters.nh_ma) {
+      const cat = catRows.find((c) => c.nh_ma === filters.nh_ma);
+      filterParts.push(`Danh mục: ${cat?.nh_ten || filters.nh_ma}`);
+    }
+    if (filters.th_ma) {
+      const th = (danhMuc.thuong_hieu || []).find(
+        (t) => t.th_ma === filters.th_ma,
+      );
+      filterParts.push(`Thương hiệu: ${th?.th_ten || filters.th_ma}`);
+    }
+    const filterLabel = filterParts.length ? filterParts.join(" · ") : "Không";
+    const shopLabel = user?.gh_ten ? `${user.gh_ten} (${gh_ma})` : gh_ma || "—";
+    const suffix = `${filters.nam}${filters.thang ? `-T${filters.thang}` : ""}${
+      filters.nh_ma ? `-${filters.nh_ma}` : ""
+    }${filters.th_ma ? `-${filters.th_ma}` : ""}`;
+
+    let filename;
+    let detailTitle;
+    let headers;
+    let dataRows;
+    let totalsRow;
 
     if (viewMode === "danh-muc") {
       if (visibleRows.length === 0)
         return showToast("Không có dữ liệu để xuất", "error");
-      downloadCsv(
-        `thong-ke-danh-muc-${suffix}`,
-        [
-          "Danh mục",
-          "SP bán",
-          "SL bán",
-          "Đơn",
-          "Doanh thu",
-          "Phí sàn",
-          "Shop nhận",
-          "Lượt xem",
-          "Lượt thích",
-        ],
-        visibleRows.map((r) => [
-          `${"  ".repeat(r.level)}${r.nh_ten}`,
-          r.so_sp,
-          r.so_luong,
-          r.so_don,
-          r.doanh_thu,
-          r.phi_san,
-          r.shop_nhan,
-          r.luot_xem,
-          r.luot_thich,
-        ]),
-      );
+      filename = `bao-cao-danh-muc-${suffix}`;
+      detailTitle = "CHI TIẾT DOANH THU THEO DANH MỤC";
+      headers = [
+        "Danh mục",
+        "SP bán",
+        "SL bán",
+        "Đơn",
+        "Doanh thu",
+        "Phí sàn",
+        "Shop nhận",
+        "Lượt xem",
+        "Lượt thích",
+      ];
+      dataRows = visibleRows.map((r) => [
+        `${"   ".repeat(r.level)}${r.nh_ten}`,
+        r.so_sp,
+        r.so_luong,
+        r.so_don,
+        r.doanh_thu,
+        r.phi_san,
+        r.shop_nhan,
+        r.luot_xem,
+        r.luot_thich,
+      ]);
+      totalsRow = [
+        "TỔNG CỘNG",
+        kpi.so_sp,
+        kpi.so_luong,
+        kpi.so_don,
+        kpi.doanh_thu,
+        kpi.phi_san,
+        kpi.shop_nhan,
+        kpi.luot_xem,
+        kpi.luot_thich,
+      ];
     } else if (viewMode === "thuong-hieu") {
       if (thList.rows.length === 0)
         return showToast("Không có dữ liệu để xuất", "error");
-      downloadCsv(
-        `thong-ke-thuong-hieu-${suffix}`,
-        [
-          "Mã thương hiệu",
-          "Thương hiệu",
-          "SP bán",
-          "SL bán",
-          "Đơn",
-          "Doanh thu",
-          "Phí sàn",
-          "Shop nhận",
-          "Lượt xem",
-          "Lượt thích",
-        ],
-        thList.rows.map((r) => [
-          r.th_ma,
-          r.th_ten,
-          r.so_sp,
-          r.so_luong,
-          r.so_don,
-          r.doanh_thu,
-          r.phi_san,
-          r.shop_nhan,
-          r.luot_xem,
-          r.luot_thich,
-        ]),
-      );
+      filename = `bao-cao-thuong-hieu-${suffix}`;
+      detailTitle = "CHI TIẾT DOANH THU THEO THƯƠNG HIỆU";
+      headers = [
+        "Mã thương hiệu",
+        "Thương hiệu",
+        "SP bán",
+        "SL bán",
+        "Đơn",
+        "Doanh thu",
+        "Phí sàn",
+        "Shop nhận",
+        "Lượt xem",
+        "Lượt thích",
+        "TB/đơn",
+      ];
+      dataRows = thList.rows.map((r) => [
+        r.th_ma,
+        r.th_ten,
+        r.so_sp,
+        r.so_luong,
+        r.so_don,
+        r.doanh_thu,
+        r.phi_san,
+        r.shop_nhan,
+        r.luot_xem,
+        r.luot_thich,
+        r.so_don > 0 ? Math.round(r.doanh_thu / r.so_don) : "",
+      ]);
+      totalsRow = [
+        "TỔNG CỘNG",
+        "",
+        kpi.so_sp,
+        kpi.so_luong,
+        kpi.so_don,
+        kpi.doanh_thu,
+        kpi.phi_san,
+        kpi.shop_nhan,
+        kpi.luot_xem,
+        kpi.luot_thich,
+        kpi.so_don > 0 ? Math.round(kpi.doanh_thu / kpi.so_don) : "",
+      ];
     } else {
       if (spList.rows.length === 0)
         return showToast("Không có dữ liệu để xuất", "error");
-      downloadCsv(
-        `thong-ke-san-pham-${suffix}`,
-        [
-          "Mã phân loại",
-          "Tên sản phẩm",
-          "Phân loại",
-          "Danh mục",
-          "SL bán",
-          "Đơn",
-          "Doanh thu",
-          "Phí sàn",
-          "Shop nhận",
-          "Lượt xem",
-          "Lượt thích",
-        ],
-        spList.rows.map((r) => [
-          r.ctsp_ma,
-          r.sp_ten,
-          r.ctsp_ten,
-          r.nh_ten,
-          r.so_luong,
-          r.so_don,
-          r.doanh_thu,
-          r.phi_san,
-          r.shop_nhan,
-          r.luot_xem,
-          r.luot_thich,
-        ]),
-      );
+      filename = `bao-cao-san-pham-${suffix}`;
+      detailTitle = "CHI TIẾT DOANH THU THEO SẢN PHẨM";
+      headers = [
+        "Mã phân loại",
+        "Tên sản phẩm",
+        "Phân loại",
+        "Danh mục",
+        "SL bán",
+        "Đơn",
+        "Doanh thu",
+        "Phí sàn",
+        "Shop nhận",
+        "Lượt xem",
+        "Lượt thích",
+      ];
+      dataRows = spList.rows.map((r) => [
+        r.ctsp_ma,
+        r.sp_ten,
+        r.ctsp_ten,
+        r.nh_ten,
+        r.so_luong,
+        r.so_don,
+        r.doanh_thu,
+        r.phi_san,
+        r.shop_nhan,
+        r.luot_xem,
+        r.luot_thich,
+      ]);
+      totalsRow = null; // dữ liệu phân trang, không cộng dồn
     }
 
-    showToast("Đã xuất file CSV");
+    const content = buildReportCsv({
+      title: "BÁO CÁO THỐNG KÊ DOANH THU",
+      shopLabel,
+      periodLabel,
+      filterLabel,
+      kpi,
+      detailTitle,
+      headers,
+      dataRows,
+      totalsRow,
+    });
+
+    downloadCsv(filename, content);
+    showToast("Đã xuất báo cáo CSV");
   };
 
   const viewToggle = (
