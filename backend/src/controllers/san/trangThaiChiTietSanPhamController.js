@@ -1,5 +1,6 @@
 const TrangThaiChiTietSanPhamModel = require('../../models/san/trangThaiChiTietSanPhamModel');
 const ChiTietSanPhamModel = require('../../models/gianhang/chiTietSanPhamModel');
+const ThongBaoSanPham = require('../../services/thongbao/thongBaoSanPham');
 
 const TrangThaiChiTietSanPhamController = {
     // ==========================================================
@@ -67,6 +68,17 @@ const TrangThaiChiTietSanPhamController = {
                 ctttsp_yeucau: (yeucau || '').trim() || 'Yêu cầu duyệt sản phẩm'
             });
 
+            // ⭐ Báo sàn có phân loại mới chờ duyệt (lỗi thông báo không làm hỏng việc gửi duyệt)
+            try {
+                await ThongBaoSanPham.guiSanChoDuyet({
+                    ctsp_ma,
+                    yeucau,
+                    stmdt_ma,
+                });
+            } catch (thongBaoError) {
+                console.error('❌ Lỗi gửi thông báo chờ duyệt cho sàn:', thongBaoError.message);
+            }
+
             res.status(201).json({
                 message: 'Đã gửi duyệt thành công! Vui lòng chờ sàn phê duyệt.',
                 data: result
@@ -107,6 +119,18 @@ const TrangThaiChiTietSanPhamController = {
                 ctttsp_phanhoi: (phanhoi || '').trim() || 'Đã duyệt'
             });
 
+            // ⭐ Báo shop biết phân loại đã được duyệt
+            try {
+                await ThongBaoSanPham.guiShopKetQuaDuyet({
+                    ctsp_ma,
+                    stmdt_ma,
+                    daDuyet: true,
+                    phanhoi,
+                });
+            } catch (thongBaoError) {
+                console.error('❌ Lỗi gửi thông báo duyệt cho shop:', thongBaoError.message);
+            }
+
             res.status(201).json({
                 message: 'Đã duyệt phân loại! Sản phẩm có thể được bán.',
                 data: result
@@ -146,6 +170,18 @@ const TrangThaiChiTietSanPhamController = {
                 ctsp_ma,
                 ctttsp_phanhoi: (phanhoi || '').trim() || 'Bị đình chỉ'
             });
+
+            // ⭐ Báo shop biết phân loại bị đình chỉ + lý do
+            try {
+                await ThongBaoSanPham.guiShopKetQuaDuyet({
+                    ctsp_ma,
+                    stmdt_ma,
+                    daDuyet: false,
+                    phanhoi,
+                });
+            } catch (thongBaoError) {
+                console.error('❌ Lỗi gửi thông báo đình chỉ cho shop:', thongBaoError.message);
+            }
 
             res.status(201).json({
                 message: 'Đã đình chỉ phân loại! Sản phẩm không thể bán.',
@@ -219,6 +255,18 @@ const TrangThaiChiTietSanPhamController = {
                     message: 'Tất cả phân loại đã được gửi duyệt hoặc đang chờ duyệt. Không có phân loại nào cần gửi.',
                     count: 0
                 });
+            }
+
+            // ⭐ Báo sàn 1 thông báo tổng hợp cho cả đợt gửi duyệt
+            try {
+                const stmdt_ma = await TrangThaiChiTietSanPhamModel.getDefaultStmdt();
+                await ThongBaoSanPham.guiSanChoDuyetHangLoat({
+                    sp_ma,
+                    count: result.count,
+                    stmdt_ma,
+                });
+            } catch (thongBaoError) {
+                console.error('❌ Lỗi gửi thông báo gửi duyệt hàng loạt:', thongBaoError.message);
             }
 
             res.status(200).json({
