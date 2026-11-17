@@ -118,7 +118,7 @@ const DatHangThanhCong = () => {
             Xem đơn hàng của tôi
           </button>
           <button
-            onClick={() => navigate("/")}
+            onClick={() => navigate("/san-pham")}
             className="flex-1 py-3.5 rounded-xl font-bold bg-[#DC2626] hover:bg-[#B91C1C] text-white transition-colors"
           >
             Về trang chủ
