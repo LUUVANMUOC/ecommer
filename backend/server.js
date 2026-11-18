@@ -8,6 +8,9 @@ const cron = require('node-cron');
 const pool = require('./src/config/db');
 const axios = require('axios'); 
 
+// ⚠️ Phải nạp TRƯỚC các route bên dưới: route gọi multer.diskStorage() ngay khi require
+require('./src/config/uploadShim');
+
 // ================= 1. IMPORT ROUTES =================
 const thanhToanVanChuyenRoutes = require('./src/routes/san/thanhToanVanChuyenRoutes');
 const phiVanChuyenRoutes = require('./src/routes/san/phiVanChuyenRoutes');
@@ -126,7 +129,8 @@ app.post(
 );
 
 // ================= 4. MIDDLEWARE TOÀN CỤC =================
-app.use('/uploads', express.static(path.join(__dirname, 'public/uploads')));
+// Ảnh: ưu tiên đĩa local, thiếu thì chuyển sang Supabase Storage (xem src/middlewares/phucVuAnh.js)
+app.use('/uploads', require('./src/middlewares/phucVuAnh'));
 
 // 🟢 CẤU HÌNH CORS CHUẨN CHO PRODUCTION & LOCAL
 const whiteList = [
