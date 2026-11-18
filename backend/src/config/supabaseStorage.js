@@ -29,18 +29,34 @@ const MIME = {
 let client = null;
 let daThuKhoiTao = false;
 let loiKhoiTao = null;
+let daCanhBaoNgoac = false;
 
 const cho = (ms) => new Promise((r) => setTimeout(r, ms));
 
+// Cắt khoảng trắng + dấu ngoặc kép dán kèm khi copy env từ dashboard
+const sachGiaTri = (v) => {
+  let s = String(v ?? '').trim();
+  const dau = s[0];
+  const cuoi = s[s.length - 1];
+  if (s.length >= 2 && ((dau === '"' && cuoi === '"') || (dau === "'" && cuoi === "'"))) {
+    s = s.slice(1, -1).trim();
+    if (!daCanhBaoNgoac) {
+      daCanhBaoNgoac = true;
+      console.warn('⚠️  [STORAGE] Biến môi trường có dấu ngoặc kép ở đầu/cuối -> đã tự cắt bỏ.');
+    }
+  }
+  return s;
+};
+
 const cauHinh = () => {
-  const driver = String(process.env.STORAGE_DRIVER || 'auto').trim().toLowerCase();
+  const driver = sachGiaTri(process.env.STORAGE_DRIVER || 'auto').toLowerCase();
   return {
     driver: ['local', 'supabase', 'auto'].includes(driver) ? driver : 'auto',
-    url: String(process.env.SUPABASE_URL || '').trim().replace(/\/+$/, ''),
-    khoa: String(process.env.SUPABASE_SERVICE_ROLE_KEY || '').trim(),
-    bucket: String(process.env.SUPABASE_BUCKET || 'uploads').trim(),
-    maxMb: Number(process.env.SUPABASE_MAX_MB || 0),
-    failFast: String(process.env.STORAGE_FAIL_FAST ?? 'true').trim().toLowerCase() !== 'false',
+    url: sachGiaTri(process.env.SUPABASE_URL || '').replace(/\/+$/, ''),
+    khoa: sachGiaTri(process.env.SUPABASE_SERVICE_ROLE_KEY || ''),
+    bucket: sachGiaTri(process.env.SUPABASE_BUCKET || 'uploads') || 'uploads',
+    maxMb: Number(sachGiaTri(process.env.SUPABASE_MAX_MB || 0)) || 0,
+    failFast: sachGiaTri(process.env.STORAGE_FAIL_FAST ?? 'true').toLowerCase() !== 'false',
   };
 };
 
@@ -96,6 +112,14 @@ const bat = () => {
 };
 
 const daBat = () => Boolean(client) || bat();
+
+// Cho phép thử lại từ đầu (dùng cho endpoint chẩn đoán khi env vừa được sửa)
+const khoiTaoLai = () => {
+  client = null;
+  daThuKhoiTao = false;
+  loiKhoiTao = null;
+  daCanhBaoNgoac = false;
+};
 
 const urlCongKhai = (key) => {
   const sach = chuanHoaKey(key);
@@ -159,6 +183,35 @@ const xoa = async (key) => {
   return true;
 };
 
+// Ghi thử 1 file nhỏ rồi xoá ngay: dùng để biết bucket có THẬT SỰ ghi được không
+const thuGhi = async () => {
+  khoiTaoLai();
+  if (!daBat()) {
+    return { ok: false, loi: loiKhoiTao || 'Storage chưa bật (thiếu env hoặc STORAGE_DRIVER=local)' };
+  }
+  const c = cauHinh();
+  const key = `_health/thu-ghi-${Date.now()}.txt`;
+  try {
+    const noiDung = Buffer.from(`self-test ${new Date().toISOString()}`, 'utf8');
+    const { error } = await client.storage.from(c.bucket).upload(key, noiDung, {
+      contentType: 'text/plain',
+      upsert: true,
+    });
+    if (error) return { ok: false, key, loi: error.message };
+
+    const { error: loiXoa } = await client.storage.from(c.bucket).remove([key]);
+    return {
+      ok: true,
+      key,
+      url: urlCongKhai(key),
+      daXoa: !loiXoa,
+      loiXoa: loiXoa ? loiXoa.message : null,
+    };
+  } catch (e) {
+    return { ok: false, key, loi: e.message };
+  }
+};
+
 // "/uploads/san_pham/a.jpg" -> "san_pham/a.jpg"
 const keyTuLink = (link) => {
   if (!link || typeof link !== 'string' || !link.startsWith('/uploads/')) return null;
@@ -207,6 +260,12 @@ const thongTin = () => {
     loiKhoiTao,
     coUrl: Boolean(c.url),
     coKhoa: Boolean(c.khoa),
+    url: c.url || null,
+    khoaDau: c.khoa ? `${c.khoa.slice(0, 6)}…` : null,
+    khoaDai: c.khoa.length,
+    node: process.version,
+    pid: process.pid,
+    uptimeGiay: Math.round(process.uptime()),
   };
 };
 
@@ -214,8 +273,10 @@ module.exports = {
   cauHinh,
   bat,
   daBat,
+  khoiTaoLai,
   taiLen,
   xoa,
+  thuGhi,
   urlCongKhai,
   keyTuLink,
   chuanHoaKey,

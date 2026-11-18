@@ -10,6 +10,7 @@ const axios = require('axios');
 
 // ⚠️ Phải nạp TRƯỚC các route bên dưới: route gọi multer.diskStorage() ngay khi require
 require('./src/config/uploadShim');
+const storageAnh = require('./src/config/supabaseStorage');
 
 // ================= 1. IMPORT ROUTES =================
 const thanhToanVanChuyenRoutes = require('./src/routes/san/thanhToanVanChuyenRoutes');
@@ -194,6 +195,24 @@ app.get('/api/_debug/db', async (req, res) => {
         : undefined,
       stack: e.stack,
     });
+  }
+});
+// ===== KIỂM TRA KHO ẢNH: ghi thử 1 file nhỏ vào bucket rồi xoá ngay =====
+app.get('/api/health/storage', async (req, res) => {
+  const batDau = Date.now();
+  try {
+    const truoc = storageAnh.thongTin();
+    const thu = await storageAnh.thuGhi();
+    const sau = storageAnh.thongTin();
+    res.status(thu.ok ? 200 : 500).json({
+      ok: thu.ok,
+      ms: Date.now() - batDau,
+      thongTin: sau,
+      loiKhoiTaoTruoc: truoc.loiKhoiTao,
+      thuGhi: thu,
+    });
+  } catch (e) {
+    res.status(500).json({ ok: false, ms: Date.now() - batDau, message: e.message, stack: e.stack });
   }
 });
 // ================= 5. KHAI BÁO ROUTES =================
@@ -396,4 +415,27 @@ httpServer.listen(PORT, '0.0.0.0', () => {
   console.log(`🔗 API URL: http://localhost:${PORT}/api/auth`);
   console.log(`⏰ Cronjobs đã được bật (Voucher, Dọn dẹp phiếu).`);
   console.log(`🔔 Thông báo real-time đã bật (Socket.IO).`);
+
+  // ===== TỰ KIỂM TRA KHO ẢNH NGAY KHI KHỞI ĐỘNG =====
+  // Ghi thử 1 file vài chục byte vào bucket rồi xoá -> log nói rõ có lưu ảnh bền được hay không.
+  if (String(process.env.STORAGE_SELF_TEST ?? 'true').toLowerCase() !== 'false') {
+    setTimeout(async () => {
+      try {
+        const info = storageAnh.thongTin();
+        console.log(
+          `🗄️  [STORAGE] driver=${info.driver} bat=${info.bat} bucket=${info.bucket} ` +
+            `coUrl=${info.coUrl} coKhoa=${info.coKhoa} failFast=${info.failFast}` +
+            (info.loiKhoiTao ? ` loiKhoiTao=${info.loiKhoiTao}` : '')
+        );
+        const thu = await storageAnh.thuGhi();
+        if (thu.ok) {
+          console.log(`✅ [STORAGE] Ghi thử Supabase THÀNH CÔNG -> ảnh sẽ không mất khi deploy.`);
+        } else {
+          console.error(`❌ [STORAGE] Ghi thử Supabase THẤT BẠI: ${thu.loi}`);
+        }
+      } catch (e) {
+        console.error('❌ [STORAGE] Lỗi tự kiểm tra kho ảnh:', e.message);
+      }
+    }, 3000);
+  }
 });
