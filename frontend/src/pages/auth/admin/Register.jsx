@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 // Lưu ý: Đảm bảo đường dẫn import này đúng với cấu trúc thư mục của bạn
 import { authService } from "../../../services/san/authService";
+import PasswordInput from "../../../components/common/PasswordInput";
 
 const AdminRegister = () => {
   const [formData, setFormData] = useState({
@@ -141,8 +142,7 @@ const AdminRegister = () => {
                 <label className="text-label-md font-label-md text-on-surface block mb-1.5">
                   Mật khẩu <span className="text-error">*</span>
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   name="password"
                   value={formData.password}
                   onChange={handleChange}
@@ -155,8 +155,7 @@ const AdminRegister = () => {
                 <label className="text-label-md font-label-md text-on-surface block mb-1.5">
                   Xác nhận mật khẩu <span className="text-error">*</span>
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   name="confirmPassword"
                   value={formData.confirmPassword}
                   onChange={handleChange}

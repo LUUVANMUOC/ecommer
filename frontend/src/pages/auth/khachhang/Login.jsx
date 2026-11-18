@@ -2,6 +2,7 @@
 import { useState, useContext } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "../../../contexts/AuthContext";
+import PasswordInput from "../../../components/common/PasswordInput";
 
 const KhachHangLogin = () => {
   const { loginKhachHang } = useContext(AuthContext);
@@ -82,12 +83,11 @@ const KhachHangLogin = () => {
                 <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-lg">
                   lock
                 </span>
-                <input
-                  type="password"
+                <PasswordInput
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-lg focus:border-[#F2A93B] focus:ring-1 focus:ring-[#F2A93B] outline-none"
+                  className="w-full pl-10 pr-11 py-2.5 border border-gray-300 rounded-lg focus:border-[#F2A93B] focus:ring-1 focus:ring-[#F2A93B] outline-none"
                   placeholder="••••••••"
                 />
               </div>

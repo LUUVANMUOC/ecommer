@@ -1,5 +1,6 @@
 import { useState } from "react";
 import ImageUpload from "../common/ImageUpload";
+import PasswordInput from "../common/PasswordInput";
 import { FormField, fieldBase, btnPrimary } from "./AccountLayout";
 
 const EMPTY_PASSWORD = {
@@ -60,9 +61,8 @@ export const ChangePasswordForm = ({ onSubmit, onNotify, minLength = 6 }) => {
       </h3>
       <form onSubmit={handleSubmit} className="space-y-3">
         {PASSWORD_FIELDS.map((field) => (
-          <input
+          <PasswordInput
             key={field.name}
-            type="password"
             name={field.name}
             placeholder={field.placeholder}
             aria-label={field.placeholder}

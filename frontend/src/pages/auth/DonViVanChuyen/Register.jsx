@@ -2,6 +2,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { authDVVCService } from "../../../services/dvvc/authService"; // <-- Gọi service riêng
+import PasswordInput from "../../../components/common/PasswordInput";
 
 const DVVCRegister = () => {
   const navigate = useNavigate();
@@ -138,8 +139,7 @@ const DVVCRegister = () => {
                   <label className="text-label-md font-label-md text-on-surface block mb-1.5">
                     Mật khẩu <span className="text-error">*</span>
                   </label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     name="password"
                     required
                     onChange={handleChange}
@@ -151,8 +151,7 @@ const DVVCRegister = () => {
                   <label className="text-label-md font-label-md text-on-surface block mb-1.5">
                     Xác nhận mật khẩu <span className="text-error">*</span>
                   </label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     name="confirmPassword"
                     required
                     onChange={handleChange}

@@ -3,6 +3,7 @@ import { useState, useContext } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "../../../contexts/AuthContext";
 import khachHangService from "../../../services/khachhang/authService";
+import PasswordInput from "../../../components/common/PasswordInput";
 const KhachHangRegister = () => {
   // Bỏ registerKhachHang từ context vì context đang dùng JSON, ta cần gửi FormData
   const navigate = useNavigate();
@@ -206,8 +207,7 @@ const KhachHangRegister = () => {
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Mật khẩu <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   required
                   value={formData.password}
                   onChange={(e) =>
@@ -221,8 +221,7 @@ const KhachHangRegister = () => {
                 <label className="block text-sm font-semibold text-gray-700 mb-1">
                   Xác nhận MK <span className="text-red-500">*</span>
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   required
                   value={formData.confirmPassword}
                   onChange={(e) =>

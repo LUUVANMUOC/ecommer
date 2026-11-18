@@ -3,6 +3,7 @@ import { useState, useEffect, useContext } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "../../../contexts/AuthContext";
 import addressService from "../../../services/san/addressService";
+import PasswordInput from "../../../components/common/PasswordInput";
 
 const ShopRegister = () => {
   const { registerShop } = useContext(AuthContext);
@@ -242,8 +243,7 @@ const ShopRegister = () => {
                   <label className="text-label-md font-label-md text-on-surface block mb-1.5">
                     Mật khẩu <span className="text-error">*</span>
                   </label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     name="password"
                     required
                     onChange={handleChange}
@@ -255,8 +255,7 @@ const ShopRegister = () => {
                   <label className="text-label-md font-label-md text-on-surface block mb-1.5">
                     Xác nhận mật khẩu <span className="text-error">*</span>
                   </label>
-                  <input
-                    type="password"
+                  <PasswordInput
                     name="confirmPassword"
                     required
                     onChange={handleChange}
