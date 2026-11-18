@@ -41,31 +41,115 @@ const TH =
   "whitespace-nowrap px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500";
 const TD = "px-3 py-2.5 text-sm text-slate-700";
 
-const downloadCsv = (name, headers, rows) => {
-  const csv = [headers, ...rows]
-    .map((r) =>
-      r.map((c) => `"${String(c ?? "").replace(/"/g, '""')}"`).join(","),
-    )
-    .join("\n");
-  const url = URL.createObjectURL(
-    new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" }),
+// ==================================================================
+// EXCEL HELPERS
+// ==================================================================
+const exportExcelReport = async ({ filename, rows, sheetName = "BaoCao" }) => {
+  const ExcelJSMod = await import("exceljs");
+  const ExcelJS = ExcelJSMod.default || ExcelJSMod;
+  const fileSaverMod = await import("file-saver");
+  const saveAs =
+    fileSaverMod.saveAs || fileSaverMod.default?.saveAs || fileSaverMod.default;
+
+  const wb = new ExcelJS.Workbook();
+  wb.creator = "Shop Analytics";
+  wb.created = new Date();
+
+  const ws = wb.addWorksheet(sheetName, {
+    views: [{ state: "frozen", ySplit: 1 }],
+  });
+
+  rows.forEach((r) => ws.addRow(Array.isArray(r.cells) ? r.cells : [r.cells]));
+
+  const maxCol = Math.max(
+    ...rows.map((r) => (Array.isArray(r.cells) ? r.cells.length : 1)),
+    2,
   );
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = `${name}.csv`;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+
+  rows.forEach((r, i) => {
+    const excelRow = ws.getRow(i + 1);
+
+    if (r.type === "title") {
+      excelRow.font = { bold: true, size: 14, color: { argb: "FF0F172A" } };
+      excelRow.height = 22;
+      ws.mergeCells(i + 1, 1, i + 1, maxCol);
+    } else if (r.type === "section") {
+      excelRow.font = { bold: true, size: 12, color: { argb: "FF0F172A" } };
+      excelRow.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFE2E8F0" },
+      };
+      excelRow.height = 20;
+      ws.mergeCells(i + 1, 1, i + 1, maxCol);
+    } else if (r.type === "header") {
+      excelRow.font = { bold: true, color: { argb: "FF334155" } };
+      excelRow.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFF1F5F9" },
+      };
+      excelRow.eachCell((cell) => {
+        cell.border = {
+          bottom: { style: "thin", color: { argb: "FFCBD5E1" } },
+        };
+      });
+    } else if (r.type === "total") {
+      excelRow.font = { bold: true, color: { argb: "FF0F172A" } };
+      excelRow.fill = {
+        type: "pattern",
+        pattern: "solid",
+        fgColor: { argb: "FFF8FAFC" },
+      };
+      excelRow.eachCell((cell) => {
+        cell.border = {
+          top: { style: "medium", color: { argb: "FF94A3B8" } },
+        };
+      });
+    } else if (r.type === "note") {
+      excelRow.font = {
+        italic: true,
+        size: 10,
+        color: { argb: "FF64748B" },
+      };
+    }
+
+    if (r.moneyCols) {
+      r.moneyCols.forEach((c) => {
+        const cell = excelRow.getCell(c);
+        cell.numFmt = "#,##0";
+        cell.alignment = { ...cell.alignment, horizontal: "right" };
+      });
+    }
+  });
+
+  for (let c = 1; c <= maxCol; c++) {
+    let w = 10;
+    rows.forEach((r) => {
+      if (!Array.isArray(r.cells)) return;
+      const v = r.cells[c - 1];
+      const s = v == null ? "" : String(v);
+      if (s.length > w) w = Math.min(s.length + 2, 40);
+    });
+    ws.getColumn(c).width = w;
+  }
+
+  const buf = await wb.xlsx.writeBuffer();
+  saveAs(
+    new Blob([buf], { type: "application/octet-stream" }),
+    `${filename}.xlsx`,
+  );
 };
 
+// ==================================================================
+// COMPONENT
+// ==================================================================
 const ThongKeNganhHang = () => {
   const [danhMuc, setDanhMuc] = useState({
     nganh_hang: [],
     shop: [],
     thuong_hieu: [],
     nam: [],
-    nam_mac_dinh: null,
   });
   const [filters, setFilters] = useState({
     nh_ma: "",
@@ -152,7 +236,6 @@ const ThongKeNganhHang = () => {
           shop: data.shop || [],
           thuong_hieu: data.thuong_hieu || [],
           nam: dsNam,
-          nam_mac_dinh: data.nam_mac_dinh ?? null,
         });
 
         const namMacDinh = data.nam_mac_dinh ?? dsNam[0] ?? NAM_HIEN_TAI;
@@ -185,6 +268,15 @@ const ThongKeNganhHang = () => {
       thang: filters.thang || undefined,
     };
   }, [ready, filters]);
+
+  // ---- Cây danh mục phẳng (dùng cho lookup tên trong export) ----
+  const catRows = useMemo(() => {
+    const list = danhMuc.nganh_hang || [];
+    return flattenCategoryTree(
+      buildCategoryTree(list),
+      new Set(list.map((n) => n.nh_ma)),
+    );
+  }, [danhMuc.nganh_hang]);
 
   // ---- 6 ô KPI (luôn chạy theo bộ lọc) ----
   const loadTongQuan = useCallback(async () => {
@@ -455,133 +547,244 @@ const ThongKeNganhHang = () => {
           ? "Lượt xem/thích là số lũy kế trên toàn bộ sản phẩm của shop"
           : `Xếp theo ${sortLabel} · mỗi dòng là một phân loại sản phẩm`;
 
-  // ---- Xuất CSV theo đúng bảng đang xem ----
-  const exportCsv = () => {
+  // ==================================================================
+  // XUẤT EXCEL
+  // ==================================================================
+  const exportExcel = async () => {
     const suffix = `${filters.nam}${
       filters.thang ? `-T${filters.thang}` : ""
-    }${filters.th_ma ? `-${filters.th_ma}` : ""}`;
+    }${filters.nh_ma ? `-${filters.nh_ma}` : ""}${
+      filters.th_ma ? `-${filters.th_ma}` : ""
+    }${filters.gh_ma ? `-${filters.gh_ma}` : ""}`;
+
+    // Filter label
+    const filterParts = [];
+    if (filters.nh_ma) {
+      const cat = catRows.find((c) => c.nh_ma === filters.nh_ma);
+      filterParts.push(`Ngành hàng: ${cat?.nh_ten || filters.nh_ma}`);
+    }
+    if (filters.th_ma) {
+      const th = (danhMuc.thuong_hieu || []).find(
+        (t) => t.th_ma === filters.th_ma,
+      );
+      filterParts.push(`Thương hiệu: ${th?.th_ten || filters.th_ma}`);
+    }
+    if (filters.gh_ma) {
+      const sh = (danhMuc.shop || []).find((s) => s.gh_ma === filters.gh_ma);
+      filterParts.push(`Shop: ${sh?.gh_ten || filters.gh_ma}`);
+    }
+    const filterLabel = filterParts.length ? filterParts.join(" · ") : "Không";
+    const periodLabel = `Năm ${filters.nam}${
+      filters.thang ? ` - Tháng ${filters.thang}` : ""
+    }`;
+
+    let filename;
+    let detailTitle;
+    let headers;
+    let dataRows;
+    let totalsRow = null;
+    let note;
+    let moneyCols;
 
     if (viewMode === "nganh-hang") {
       if (visibleRows.length === 0)
         return showToast("Không có dữ liệu để xuất", "error");
-      downloadCsv(
-        `thong-ke-nganh-hang-${suffix}`,
-        [
-          "Ngành hàng",
-          "SP bán",
-          "SL bán",
-          "Đơn",
-          "Doanh thu",
-          "Phí sàn",
-          "Shop nhận",
-          "Lượt xem",
-          "Lượt thích",
-        ],
-        visibleRows.map((r) => [
-          `${"  ".repeat(r.level)}${r.nh_ten}`,
-          r.so_sp,
-          r.so_luong,
-          r.so_don,
-          r.doanh_thu,
-          r.phi_san,
-          r.shop_nhan,
-          r.luot_xem,
-          r.luot_thich,
-        ]),
-      );
+      filename = `thong-ke-nganh-hang-${suffix}`;
+      detailTitle = "CHI TIẾT DOANH THU THEO NGÀNH HÀNG";
+      headers = [
+        "Ngành hàng",
+        "SP bán",
+        "SL bán",
+        "Đơn",
+        "Doanh thu",
+        "Phí sàn",
+        "Shop nhận",
+        "Lượt xem",
+        "Lượt thích",
+      ];
+      dataRows = visibleRows.map((r) => [
+        `${"   ".repeat(r.level)}${r.nh_ten}`,
+        r.so_sp,
+        r.so_luong,
+        r.so_don,
+        r.doanh_thu,
+        r.phi_san,
+        r.shop_nhan,
+        r.luot_xem,
+        r.luot_thich,
+      ]);
+      totalsRow = [
+        "TỔNG CỘNG",
+        kpi.so_sp,
+        kpi.so_luong,
+        kpi.so_don,
+        kpi.doanh_thu,
+        kpi.phi_san,
+        kpi.shop_nhan,
+        kpi.luot_xem,
+        kpi.luot_thich,
+      ];
+      moneyCols = [5, 6, 7];
     } else if (viewMode === "thuong-hieu") {
       if (thList.rows.length === 0)
         return showToast("Không có dữ liệu để xuất", "error");
-      downloadCsv(
-        `thong-ke-thuong-hieu-${suffix}`,
-        [
-          "Mã thương hiệu",
-          "Thương hiệu",
-          "SP bán",
-          "SL bán",
-          "Đơn",
-          "Doanh thu",
-          "Phí sàn",
-          "Shop nhận",
-          "Lượt xem",
-          "Lượt thích",
-        ],
-        thList.rows.map((r) => [
-          r.th_ma,
-          r.th_ten,
-          r.so_sp,
-          r.so_luong,
-          r.so_don,
-          r.doanh_thu,
-          r.phi_san,
-          r.shop_nhan,
-          r.luot_xem,
-          r.luot_thich,
-        ]),
-      );
+      filename = `thong-ke-thuong-hieu-${suffix}`;
+      detailTitle = "CHI TIẾT DOANH THU THEO THƯƠNG HIỆU";
+      headers = [
+        "Mã thương hiệu",
+        "Thương hiệu",
+        "SP bán",
+        "SL bán",
+        "Đơn",
+        "Doanh thu",
+        "Phí sàn",
+        "Shop nhận",
+        "Lượt xem",
+        "Lượt thích",
+        "TB/đơn",
+      ];
+      dataRows = thList.rows.map((r) => [
+        r.th_ma,
+        r.th_ten,
+        r.so_sp,
+        r.so_luong,
+        r.so_don,
+        r.doanh_thu,
+        r.phi_san,
+        r.shop_nhan,
+        r.luot_xem,
+        r.luot_thich,
+        r.so_don > 0 ? Math.round(r.doanh_thu / r.so_don) : "",
+      ]);
+      moneyCols = [6, 7, 8, 11];
+      if (thList.total_pages > 1) {
+        note = `Dữ liệu trang ${thList.page}/${thList.total_pages} (${thList.rows.length}/${thList.total} thương hiệu) — tăng "Số dòng" để xuất đầy đủ hơn`;
+      }
     } else if (viewMode === "shop") {
       if (shopList.rows.length === 0)
         return showToast("Không có dữ liệu để xuất", "error");
-      downloadCsv(
-        `thong-ke-shop-${suffix}`,
-        [
-          "Shop",
-          "Đơn",
-          "SL bán",
-          "Doanh thu",
-          "Phí sàn",
-          "Shop nhận",
-          "Lượt xem",
-          "Lượt thích",
-        ],
-        shopList.rows.map((r) => [
-          r.gh_ten,
-          r.so_don,
-          r.so_luong,
-          r.doanh_thu,
-          r.phi_san,
-          r.shop_nhan,
-          r.luot_xem,
-          r.luot_thich,
-        ]),
-      );
+      filename = `thong-ke-shop-${suffix}`;
+      detailTitle = "CHI TIẾT DOANH THU THEO SHOP";
+      headers = [
+        "Shop",
+        "Đơn",
+        "SL bán",
+        "Doanh thu",
+        "Phí sàn",
+        "Shop nhận",
+        "Lượt xem",
+        "Lượt thích",
+        "TB/đơn",
+      ];
+      dataRows = shopList.rows.map((r) => [
+        r.gh_ten,
+        r.so_don,
+        r.so_luong,
+        r.doanh_thu,
+        r.phi_san,
+        r.shop_nhan,
+        r.luot_xem,
+        r.luot_thich,
+        r.so_don > 0 ? Math.round(r.doanh_thu / r.so_don) : "",
+      ]);
+      moneyCols = [4, 5, 6, 9];
+      if (shopList.total_pages > 1) {
+        note = `Dữ liệu trang ${shopList.page}/${shopList.total_pages} (${shopList.rows.length}/${shopList.total} shop) — tăng "Số dòng" để xuất đầy đủ hơn`;
+      }
     } else {
       if (spList.rows.length === 0)
         return showToast("Không có dữ liệu để xuất", "error");
-      downloadCsv(
-        `thong-ke-san-pham-${suffix}`,
-        [
-          "Mã phân loại",
-          "Tên sản phẩm",
-          "Phân loại",
-          "Ngành hàng",
-          "Shop",
-          "SL bán",
-          "Đơn",
-          "Doanh thu",
-          "Phí sàn",
-          "Shop nhận",
-          "Lượt xem",
-          "Lượt thích",
-        ],
-        spList.rows.map((r) => [
-          r.ctsp_ma,
-          r.sp_ten,
-          r.ctsp_ten,
-          r.nh_ten,
-          r.gh_ten,
-          r.so_luong,
-          r.so_don,
-          r.doanh_thu,
-          r.phi_san,
-          r.shop_nhan,
-          r.luot_xem,
-          r.luot_thich,
-        ]),
-      );
+      filename = `thong-ke-san-pham-${suffix}`;
+      detailTitle = "CHI TIẾT DOANH THU THEO SẢN PHẨM";
+      headers = [
+        "Mã phân loại",
+        "Tên sản phẩm",
+        "Phân loại",
+        "Ngành hàng",
+        "Shop",
+        "SL bán",
+        "Đơn",
+        "Doanh thu",
+        "Phí sàn",
+        "Shop nhận",
+        "Lượt xem",
+        "Lượt thích",
+      ];
+      dataRows = spList.rows.map((r) => [
+        r.ctsp_ma,
+        r.sp_ten,
+        r.ctsp_ten,
+        r.nh_ten,
+        r.gh_ten,
+        r.so_luong,
+        r.so_don,
+        r.doanh_thu,
+        r.phi_san,
+        r.shop_nhan,
+        r.luot_xem,
+        r.luot_thich,
+      ]);
+      moneyCols = [8, 9, 10];
+      if (spList.limit > 0 && spList.total_pages > 1) {
+        note = `Dữ liệu trang ${spList.page}/${spList.total_pages} (${spList.rows.length}/${spList.total} sản phẩm) — chọn "Tất cả" để xuất đầy đủ`;
+      }
     }
 
-    showToast("Đã xuất file CSV");
+    // ----- Build rows + meta -----
+    const rows = [];
+    const num = (v) => Number(v || 0);
+
+    rows.push({ cells: ["BÁO CÁO THỐNG KÊ HÀNG"], type: "title" });
+    rows.push({ cells: ["Đơn vị", "Toàn hệ thống"], type: "meta" });
+    rows.push({ cells: ["Kỳ báo cáo", periodLabel], type: "meta" });
+    rows.push({ cells: ["Bộ lọc", filterLabel], type: "meta" });
+    if (note) rows.push({ cells: ["Ghi chú", note], type: "meta" });
+    rows.push({
+      cells: ["Ngày xuất", new Date().toLocaleString("vi-VN")],
+      type: "meta",
+    });
+    rows.push({ cells: [], type: "blank" });
+
+    // I. TỔNG QUAN
+    rows.push({ cells: ["I. TỔNG QUAN"], type: "section" });
+    rows.push({ cells: ["Chỉ tiêu", "Giá trị"], type: "header" });
+    [
+      ["Doanh thu hàng hóa", num(kpi.doanh_thu), true],
+      ["Phí sàn", num(kpi.phi_san), true],
+      ["Giảm giá shop", num(kpi.giam_gia_shop), true],
+      ["Shop thực nhận", num(kpi.shop_nhan), true],
+      ["Đơn hoàn thành", num(kpi.so_don), false],
+      ["Số sản phẩm bán", num(kpi.so_sp), false],
+      ["Số lượng bán", num(kpi.so_luong), false],
+      ["Lượt xem", num(kpi.luot_xem), false],
+      ["Lượt thích", num(kpi.luot_thich), false],
+    ].forEach(([label, value, isMoney]) => {
+      rows.push({
+        cells: [label, value],
+        type: "data",
+        moneyCols: isMoney ? [2] : null,
+      });
+    });
+    rows.push({ cells: [], type: "blank" });
+
+    // II. CHI TIẾT
+    rows.push({ cells: [`II. ${detailTitle}`], type: "section" });
+    rows.push({ cells: headers, type: "header" });
+    dataRows.forEach((r) => {
+      rows.push({ cells: r, type: "data", moneyCols });
+    });
+    if (totalsRow) {
+      rows.push({ cells: totalsRow, type: "total", moneyCols });
+    }
+    rows.push({ cells: [], type: "blank" });
+    rows.push({ cells: ["— Hết báo cáo —"], type: "note" });
+
+    try {
+      await exportExcelReport({ filename, rows });
+      showToast("Đã xuất báo cáo Excel");
+    } catch (e) {
+      showToast(e?.message || "Lỗi xuất báo cáo Excel", "error");
+    }
   };
 
   // Nút chuyển 4 chế độ xem (không phải bộ lọc)
@@ -628,7 +831,7 @@ const ThongKeNganhHang = () => {
         onChange={setFilters}
         onReload={reloadAll}
         loading={loading || !ready || currentLoading}
-        onExport={exportCsv}
+        onExport={exportExcel}
       />
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
