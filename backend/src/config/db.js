@@ -7,7 +7,7 @@ require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
 //    Dùng Connection Pooler:
 //      Session pooler     : aws-0-<region>.pooler.supabase.com:5432  (khuyến nghị)
 //      Transaction pooler : aws-0-<region>.pooler.supabase.com:6543  (+ ?pgbouncer=true)
-//    User: postgres.<project_ref>
+
 const coDatabaseUrl = Boolean(process.env.DATABASE_URL);
 
 const poolConfig = coDatabaseUrl
