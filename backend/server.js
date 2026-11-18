@@ -153,7 +153,45 @@ const corsOptions = {
 
 app.use(cors(corsOptions)); 
 app.use(express.json()); 
-
+// ===== DEBUG TẠM: xoá sau khi fix xong =====
+app.get('/api/_debug/db', async (req, res) => {
+  const batDau = Date.now();
+  try {
+    const r = await pool.query('SELECT NOW() AS now, current_database() AS db, version() AS v');
+    res.json({
+      ok: true,
+      ms: Date.now() - batDau,
+      db: r.rows[0].db,
+      now: r.rows[0].now,
+      version: r.rows[0].v,
+      host: process.env.DATABASE_URL
+        ? String(process.env.DATABASE_URL).replace(/^.*@/, '').replace(/\/.*$/, '')
+        : `${process.env.DB_HOST || '(trống)'}:${process.env.DB_PORT || '5432'}`,
+      node: process.version,
+    });
+  } catch (e) {
+    res.status(500).json({
+      ok: false,
+      ms: Date.now() - batDau,
+      host: process.env.DATABASE_URL
+        ? String(process.env.DATABASE_URL).replace(/^.*@/, '').replace(/\/.*$/, '')
+        : `${process.env.DB_HOST || '(trống)'}:${process.env.DB_PORT || '5432'}`,
+      node: process.version,
+      code: e.code,
+      message: e.message,
+      errors: Array.isArray(e.errors)
+        ? e.errors.map((x) => ({
+            code: x.code,
+            message: x.message,
+            syscall: x.syscall,
+            address: x.address,
+            port: x.port,
+          }))
+        : undefined,
+      stack: e.stack,
+    });
+  }
+});
 // ================= 5. KHAI BÁO ROUTES =================
 
 // 1. Auth & Người dùng
