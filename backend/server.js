@@ -64,6 +64,7 @@ const trangThaiChiTietSanPhamRoutes = require('./src/routes/san/trangThaiChiTiet
 const publicSanPhamRoutes = require('./src/routes/san/publicSanPhamRoutes');
 const vanChuyenShopRoutes = require('./src/routes/gianhang/vanChuyenShopRoutes');
 const donHangShopRoutes = require('./src/routes/gianhang/donHangShopRoutes');
+const phiChiecKhauShopRoutes = require('./src/routes/gianhang/phiChiecKhauShopRoutes');
 
 // Đơn vị vận chuyển (DVVC)
 const bangGiaVanChuyenRoutes = require('./src/routes/dvvc/bangGiaVanChuyenRoutes');
@@ -253,6 +254,7 @@ app.use('/api/nguoi-ban/chi-tiet-san-pham', chiTietSanPhamRoutes);
 app.use('/api/trang-thai-chi-tiet', trangThaiChiTietSanPhamRoutes);
 app.use('/api/nguoi-ban/van-chuyen', vanChuyenShopRoutes);
 app.use('/api/nguoi-ban/don-hang', donHangShopRoutes);
+app.use('/api/nguoi-ban/phi-chiet-khau', phiChiecKhauShopRoutes);
 app.use('/api/nguoi-ban/thong-ke-doanh-thu', thongKeShopRoutes);
 app.use('/api/nguoi-ban/danh-gia', danhGiaShopRoutes);
 app.use('/api/san-pham', publicSanPhamRoutes);

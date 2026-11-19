@@ -13,12 +13,42 @@ const COT_NGUON = `
   COALESCE(d.dvvc_hinhanh, g.gh_hinhanh, '')              AS nguon_hinhanh
 `;
 
+// Với thông báo PHI_CHIET_KHAU: lấy thêm mức phí cũ / phí mới.
+// Ghép theo ngành hàng + sàn và chọn lần đổi gần thời điểm gửi thông báo nhất.
+const PHI_JOIN = `
+  LEFT JOIN LATERAL (
+    SELECT
+      p.psck_phantram AS phi_moi,
+      (
+        SELECT p2.psck_phantram
+        FROM phisanchieckhau p2
+        WHERE p2.nh_ma = p.nh_ma
+          AND p2.stmdt_ma = p.stmdt_ma
+          AND p2.psck_thoidiem < p.psck_thoidiem
+        ORDER BY p2.psck_thoidiem DESC
+        LIMIT 1
+      ) AS phi_cu
+    FROM phisanchieckhau p
+    WHERE t.tb_loai = 'PHI_CHIET_KHAU'
+      AND p.nh_ma = t.tb_doituong_ma
+      AND p.stmdt_ma = t.tb_nguon_ma
+    ORDER BY ABS(EXTRACT(EPOCH FROM (p.psck_thoidiem - t.tb_thoidiemtao)))
+    LIMIT 1
+  ) phi ON true
+`;
+
+const COT_PHI = `
+  phi.phi_cu  AS tb_phi_cu,
+  phi.phi_moi AS tb_phi_moi
+`;
+
 const COT_CHUNG = `
   t.tb_ma::text AS tb_ma,
   t.tb_tieude, t.tb_noidung, t.tb_loai, t.tb_nguon, t.tb_nguon_ma,
   t.tb_doituong_loai, t.tb_doituong_ma, t.tb_link, t.tb_tepdinhlieu,
   t.tb_nhom, t.tb_thoidiemtao,
-  nn.nn_dadoc, nn.nn_thoidiemdoc
+  nn.nn_dadoc, nn.nn_thoidiemdoc,
+  ${COT_PHI}
 `;
 
 // ================== GHI ==================
@@ -94,9 +124,11 @@ const getThongBao = async (tb_ma) => {
     `SELECT t.tb_ma::text AS tb_ma, t.tb_tieude, t.tb_noidung, t.tb_loai,
             t.tb_nguon, t.tb_nguon_ma, t.tb_doituong_loai, t.tb_doituong_ma,
             t.tb_link, t.tb_tepdinhlieu, t.tb_nhom, t.tb_thoidiemtao,
-            ${COT_NGUON}
+            ${COT_NGUON},
+            ${COT_PHI}
      FROM thongbao t
      ${NGUON_JOIN}
+     ${PHI_JOIN}
      WHERE t.tb_ma = $1::bigint`,
     [tb_ma],
   );
@@ -151,6 +183,7 @@ const getHopThu = async ({
        FROM thongbao t
        JOIN thongbao_nguoinhan nn ON nn.tb_ma = t.tb_ma
        ${NGUON_JOIN}
+       ${PHI_JOIN}
        WHERE ${where}
        ORDER BY t.tb_thoidiemtao DESC, t.tb_ma DESC
        LIMIT $${thamSo.length + 1} OFFSET $${thamSo.length + 2}`,
@@ -176,6 +209,7 @@ const getChiTiet = async (tb_ma, nn_loai, nn_ma) => {
      FROM thongbao t
      JOIN thongbao_nguoinhan nn ON nn.tb_ma = t.tb_ma
      ${NGUON_JOIN}
+     ${PHI_JOIN}
      WHERE t.tb_ma = $1::bigint AND nn.nn_loai = $2 AND nn.nn_ma = $3`,
     [tb_ma, nn_loai, nn_ma],
   );

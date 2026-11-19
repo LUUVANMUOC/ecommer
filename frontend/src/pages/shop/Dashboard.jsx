@@ -79,6 +79,10 @@ const ShopDashboard = () => {
           title: "Vận chuyển",
           path: "/nguoi-ban/van-chuyen",
         },
+        {
+          title: "Phí chiết khấu",
+          path: "/nguoi-ban/phi-chiet-khau",
+        },
       ],
     },
   ];

@@ -228,7 +228,7 @@ const thongBaoDoiPhi = async ({
     nguon_ma: stmdt_ma,
     doituong_loai: 'NGANH_HANG',
     doituong_ma: nh_ma,
-    link: '/nguoi-ban/quan-ly-san-pham',
+    link: `/nguoi-ban/phi-chiet-khau?nganh=${encodeURIComponent(nh_ma)}&tab=lich-su`,
     ds_nguoinhan: ds,
   });
 };

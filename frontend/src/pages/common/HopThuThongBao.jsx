@@ -73,6 +73,18 @@ const fmtThoiGian = (value) => {
   return d.toLocaleString("vi-VN", { hour12: false });
 };
 
+const so = (value) => {
+  if (value === null || value === undefined || value === "") return null;
+  const n = Number(value);
+  return Number.isNaN(n) ? null : n;
+};
+
+const fmtPhanTram = (value) => {
+  const n = so(value);
+  if (n === null) return "—";
+  return `${n.toLocaleString("vi-VN", { maximumFractionDigits: 2 })}%`;
+};
+
 const HopThuThongBao = () => {
   const navigate = useNavigate();
   const { nguoiNhan, unreadCount, phienBan, danhDauDaDoc, danhDauTatCa } =
@@ -388,6 +400,50 @@ const HopThuThongBao = () => {
                 <X className="h-4 w-4" />
               </button>
             </div>
+
+            {dangXem.tb_loai === "PHI_CHIET_KHAU" &&
+              so(dangXem.tb_phi_moi) !== null && (
+                <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50/70 p-4">
+                  <div className="flex items-center justify-center gap-4">
+                    <div className="text-center">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                        Phí cũ
+                      </p>
+                      <p className="mt-1 text-xl font-bold text-slate-500">
+                        {fmtPhanTram(dangXem.tb_phi_cu)}
+                      </p>
+                    </div>
+
+                    <ChevronRight className="h-5 w-5 text-amber-500" />
+
+                    <div className="text-center">
+                      <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                        Phí mới
+                      </p>
+                      <p className="mt-1 text-2xl font-bold text-amber-600">
+                        {fmtPhanTram(dangXem.tb_phi_moi)}
+                      </p>
+                    </div>
+                  </div>
+
+                  {so(dangXem.tb_phi_cu) !== null &&
+                    Number(dangXem.tb_phi_moi) !==
+                      Number(dangXem.tb_phi_cu) && (
+                      <p className="mt-2 text-center text-xs font-semibold text-amber-700">
+                        {Number(dangXem.tb_phi_moi) >
+                        Number(dangXem.tb_phi_cu)
+                          ? "Tăng"
+                          : "Giảm"}{" "}
+                        {fmtPhanTram(
+                          Math.abs(
+                            Number(dangXem.tb_phi_moi) -
+                              Number(dangXem.tb_phi_cu),
+                          ),
+                        )}
+                      </p>
+                    )}
+                </div>
+              )}
 
             <div className="mt-4 whitespace-pre-line text-sm leading-relaxed text-slate-700">
               {dangXem.tb_noidung}

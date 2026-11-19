@@ -137,11 +137,16 @@ const PhiChiecKhauCRUD = () => {
     }
 
     try {
-      await phiChiecKhauService.updateFee({
+      const res = await phiChiecKhauService.updateFee({
         nh_ma: rowId,
         stmdt_ma: currentMerchantId,
         psck_phantram: soPhi,
       });
+
+      if (res.data?.khong_doi) {
+        showToast("Mức phí không thay đổi.");
+        return;
+      }
 
       setData((prev) =>
         prev.map((item) =>

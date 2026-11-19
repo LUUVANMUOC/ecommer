@@ -18,6 +18,7 @@ import GuiThongBaoKhachHang from "../pages/shop/GuiThongBaoKhachHang";
 import SuCoPage from "../pages/suco/SuCoPage";
 import ChiTietSuCoPage from "../pages/suco/ChiTietSuCoPage";
 import DanhGiaShop from "../pages/shop/DanhGiaShop";
+import PhiChiecKhauShop from "../pages/shop/PhiChiecKhauShop";
 
 const ShopRoutes = () => {
   return (
@@ -66,6 +67,7 @@ const ShopRoutes = () => {
             path="quan-ly-san-pham/:sp_ma/phan-loai/:ctsp_ma/sua"
             element={<CapNhatChiTietSanPham />}
           />
+          <Route path="phi-chiet-khau" element={<PhiChiecKhauShop />} />
           <Route path="thong-bao" element={<HopThuThongBao />} />
           <Route path="gui-thong-bao" element={<GuiThongBaoKhachHang />} />
           {/* Báo cáo & thống kê */}

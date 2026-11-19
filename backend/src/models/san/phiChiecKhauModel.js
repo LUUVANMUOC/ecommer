@@ -48,17 +48,25 @@ const PhiChiecKhauModel = {
       // 0. Lấy phí cũ + tên ngành hàng để soạn thông báo
       const [truocRes, nganhRes] = await Promise.all([
         client.query(
-          `SELECT psck_phantram
+          // So sánh ngay trong DB để khớp đúng kiểu numeric(5,2) khi làm tròn.
+          `SELECT psck_phantram,
+                  (psck_phantram = $3::numeric(5,2)) AS khong_doi
            FROM phisanchieckhau
            WHERE nh_ma = $1 AND stmdt_ma = $2
            ORDER BY psck_thoidiem DESC
            LIMIT 1`,
-          [nh_ma, stmdt_ma],
+          [nh_ma, stmdt_ma, psck_phantram],
         ),
         client.query(`SELECT nh_ten FROM nganhhang WHERE nh_ma = $1`, [nh_ma]),
       ]);
       phanTramCu = truocRes.rows[0]?.psck_phantram ?? null;
       tenNganh = nganhRes.rows[0]?.nh_ten || null;
+
+      // Không ghi lịch sử và không gửi thông báo khi mức phí không thay đổi.
+      if (truocRes.rows[0]?.khong_doi) {
+        await client.query('ROLLBACK');
+        return { khong_doi: true, psck_phantram: phanTramCu };
+      }
 
       // 1. Lưu lịch sử phí mới
       const queryInsert = `
