@@ -25,6 +25,7 @@ const TatToan = () => {
 
   const [selectedDtsMa, setSelectedDtsMa] = useState([]);
   const [selectedCuocTon, setSelectedCuocTon] = useState([]);
+  const [cuocTonError, setCuocTonError] = useState(false);
 
   const pollingRef = useRef(null);
 
@@ -47,22 +48,34 @@ const TatToan = () => {
   };
 
   const fetchData = async () => {
-    try {
-      const [tatToanRes, cuocTonRes] = await Promise.all([
-        qlkTaiChinhService.getDuLieuTatToan(kho_ma),
-        qlkTaiChinhService.getCuocTon(kho_ma),
-      ]);
+    // Tách riêng 2 nguồn: cước tồn lỗi không được làm trắng cả trang tất toán chính
+    const [tatToanRes, cuocTonRes] = await Promise.allSettled([
+      qlkTaiChinhService.getDuLieuTatToan(kho_ma),
+      qlkTaiChinhService.getCuocTon(kho_ma),
+    ]);
 
-      const tatToanData = tatToanRes.data || DU_LIEU_TAT_TOAN_RONG;
+    if (tatToanRes.status === "fulfilled") {
+      const tatToanData = tatToanRes.value.data || DU_LIEU_TAT_TOAN_RONG;
       setData(tatToanData);
-      setCuocTon(cuocTonRes.data || DU_LIEU_CUOC_TON_RONG);
       setSelectedDtsMa((tatToanData.orders || []).map((o) => o.DTS_Ma));
-      setSelectedCuocTon([]);
-    } catch (err) {
-      showToast(err.response?.data?.message || "Lỗi tải dữ liệu", "error");
-    } finally {
-      setLoading(false);
+    } else {
+      showToast(
+        tatToanRes.reason?.response?.data?.message ||
+          "Lỗi tải danh sách tất toán",
+        "error",
+      );
     }
+
+    if (cuocTonRes.status === "fulfilled") {
+      setCuocTon(cuocTonRes.value.data || DU_LIEU_CUOC_TON_RONG);
+      setCuocTonError(false);
+    } else {
+      setCuocTonError(true);
+      console.error("Lỗi tải cước tồn:", cuocTonRes.reason);
+    }
+
+    setSelectedCuocTon([]);
+    setLoading(false);
   };
 
   useEffect(() => {
@@ -462,6 +475,22 @@ const TatToan = () => {
             </p>
           </div>
         </div>
+
+        {cuocTonError && (
+          <div className="mb-4 flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+            <span className="material-symbols-outlined text-red-500">
+              error
+            </span>
+            <p>
+              Không tải được dữ liệu cước tồn. Có thể database chưa chạy
+              migration{" "}
+              <span className="font-mono font-semibold">
+                2026-11-19_them_tat_toan_dvvc.sql
+              </span>
+              .
+            </p>
+          </div>
+        )}
 
         {!cuocTon.thongTinDVVC && coDuLieuCuocTon && (
           <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">

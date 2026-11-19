@@ -2,14 +2,27 @@
 -- Chạy 1 lần trên Supabase (SQL Editor) hoặc bằng psql:
 --   psql "$DATABASE_URL" -f backend/scripts/sql/2026-11-19_them_tat_toan_dvvc.sql
 --
--- Các cột tiền của ĐVVC đã có sẵn trong DB:
---   phieu_tat_toan.ptt_tong_tien_dvvc
---   chitiet_tat_toan.ctt_tien_dvvc
---   qr_thanh_toan.qr_loai = 'DVVC' + qr_thanh_toan.dvvc_ma
--- Migration này chỉ bổ sung cột phân loại phiếu và bật lại constraint (nếu thiếu).
+-- Vì sao cần migration này:
+--   DB cũ (production/Supabase) mới chỉ có phần tất toán Shop + Sàn.
+--   Tính năng "kho tất toán cước cho ĐVVC" cần thêm các cột/constraint sau.
+--   DB localhost của máy dev có thể đã có sẵn một phần -> IF NOT EXISTS bỏ qua.
 --
--- An toàn để chạy nhiều lần (IF NOT EXISTS) và không ảnh hưởng dữ liệu cũ.
+-- An toàn để chạy nhiều lần (IF NOT EXISTS) và không ảnh hưởng dữ liệu cũ:
+--   các cột tiền mặc định 0 nên phiếu cũ vẫn đọc bình thường.
 
+-- 1. Tổng cước ĐVVC của phiếu tất toán
+ALTER TABLE phieu_tat_toan
+    ADD COLUMN IF NOT EXISTS ptt_tong_tien_dvvc numeric NOT NULL DEFAULT 0;
+
+-- 2. Cước ĐVVC của từng đơn trong phiếu
+ALTER TABLE chitiet_tat_toan
+    ADD COLUMN IF NOT EXISTS ctt_tien_dvvc numeric NOT NULL DEFAULT 0;
+
+-- 3. Mã ĐVVC nhận tiền của QR tất toán cước
+ALTER TABLE qr_thanh_toan
+    ADD COLUMN IF NOT EXISTS dvvc_ma varchar(10);
+
+-- 4. Phân loại phiếu: DAY_DU (tất toán Shop/Sàn/ĐVVC) | CUOC_TON (chỉ cước tồn)
 ALTER TABLE phieu_tat_toan
     ADD COLUMN IF NOT EXISTS ptt_loai varchar(20) NOT NULL DEFAULT 'DAY_DU';
 
@@ -24,7 +37,8 @@ BEGIN
     END IF;
 END $$;
 
--- Đảm bảo CHECK của qr_loai cho phép 'DVVC' (bỏ qua nếu constraint đã đúng).
+-- 5. Cho phép qr_loai = 'DVVC'
+--    Constraint cũ chỉ cho SAN/SHOP -> phải drop rồi tạo lại.
 DO $$
 BEGIN
     IF EXISTS (
