@@ -7,7 +7,10 @@ const pool = require('../../config/db');
 router.get('/trang-thai/:ptt_ma', async (req, res) => {
   try {
     const phieuRes = await pool.query(
-      `SELECT ptt_trang_thai_thanh_toan AS trang_thai FROM phieu_tat_toan WHERE ptt_ma = $1`,
+      `SELECT ptt_trang_thai_thanh_toan AS trang_thai,
+              ptt_loai,
+              ptt_tong_tien_dvvc
+       FROM phieu_tat_toan WHERE ptt_ma = $1`,
       [req.params.ptt_ma]
     );
     
@@ -22,6 +25,8 @@ router.get('/trang-thai/:ptt_ma', async (req, res) => {
 
     res.json({
       trang_thai: phieuRes.rows[0].trang_thai,
+      ptt_loai: phieuRes.rows[0].ptt_loai,
+      tong_tien_dvvc: Number(phieuRes.rows[0].ptt_tong_tien_dvvc || 0),
       ds_qr: qrRes.rows
     });
   } catch (error) {
@@ -57,6 +62,11 @@ router.delete('/huy/:ptt_ma', async (req, res) => {
 
 // 3. Các route chính
 router.post('/tao-qr', TatToanController.taoPhieuVaQr);
+
+// 4. Tất toán cước vận chuyển còn tồn (đặt trước '/:kho_ma' để không bị bắt nhầm)
+router.get('/cuoc-ton/:kho_ma', TatToanController.getDuLieuCuocTon);
+router.post('/cuoc-ton/tao-qr', TatToanController.taoPhieuCuocTon);
+
 router.get('/:kho_ma', TatToanController.getDuLieuTatToan);
 router.post('/', TatToanController.xacNhanTatToan);
 

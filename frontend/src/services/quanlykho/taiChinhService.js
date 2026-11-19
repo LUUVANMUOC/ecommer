@@ -10,6 +10,10 @@ const qlkTaiChinhService = {
   taoPhieuVaQr: (data) => axiosClient.post('/quan-ly-kho/tat-toan/tao-qr', data),
   getTrangThaiTatToan: (ptt_ma) => axiosClient.get(`/quan-ly-kho/tat-toan/trang-thai/${ptt_ma}`),
   huyPhieuTatToan: (ptt_ma) => axiosClient.delete(`/quan-ly-kho/tat-toan/huy/${ptt_ma}`), // 🟢 Đã thêm API Hủy
+
+  // Tất toán cước vận chuyển còn tồn cho ĐVVC
+  getCuocTon: (kho_ma) => axiosClient.get(`/quan-ly-kho/tat-toan/cuoc-ton/${kho_ma}`),
+  taoPhieuCuocTon: (data) => axiosClient.post('/quan-ly-kho/tat-toan/cuoc-ton/tao-qr', data),
 };
 
 export default qlkTaiChinhService;

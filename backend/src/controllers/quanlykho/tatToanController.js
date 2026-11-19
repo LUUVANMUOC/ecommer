@@ -28,6 +28,24 @@ const TatToanController = {
       res.status(400).json({ message: error.message });
     }
   },
+
+  getDuLieuCuocTon: async (req, res) => {
+    try {
+      const data = await TatToanService.getDuLieuCuocTon(req.params.kho_ma);
+      res.status(200).json(data);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  },
+
+  taoPhieuCuocTon: async (req, res) => {
+    try {
+      const result = await TatToanService.taoPhieuCuocTon(req.body.kho_ma, req.body);
+      res.status(200).json(result);
+    } catch (error) {
+      res.status(400).json({ message: error.message });
+    }
+  },
   chiTienHangLoat: async (req, res) => {
   try {
     const ketQua = await SepayPayoutService.payoutChoShop();
