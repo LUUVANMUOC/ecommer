@@ -16,6 +16,7 @@ const ORDER_FIELDS = `
         dts.dts_tongtienkhachhangthanhtoan AS "TongTien",
         dts.dts_trangthaithanhtoan AS "TrangThaiThanhToan",
 
+        gh.gh_ma AS "GH_Ma",
         gh.gh_ten AS "TenShop",
         gh.gh_hinhanh AS "HinhShop",
         gh.gh_sdt AS "SdtShop",

@@ -1,4 +1,4 @@
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useMemo } from "react";
 import { AuthContext } from "../../contexts/AuthContext";
 import shipperDonHangService from "../../services/shipper/donHangService";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
@@ -416,6 +416,14 @@ const DonChoLay = () => {
   const [modalNote, setModalNote] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // ── Lấy hàng hàng loạt theo shop ─────────────────────────────
+  const [selected, setSelected] = useState([]);
+  const [bulkShop, setBulkShop] = useState(null); // nhóm shop đang mở modal
+  const [bulkPhoto, setBulkPhoto] = useState(null);
+  const [bulkPreview, setBulkPreview] = useState(null);
+  const [bulkNote, setBulkNote] = useState("");
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+
   const [toast, setToast] = useState({
     show: false,
     message: "",
@@ -426,6 +434,25 @@ const DonChoLay = () => {
     setTimeout(() => setToast((p) => ({ ...p, show: false })), 3000);
   };
 
+  // Gom đơn chờ lấy theo shop, giữ thứ tự đơn như API trả về
+  const shopGroups = useMemo(() => {
+    const map = new Map();
+    orders.forEach((o) => {
+      const key = o.GH_Ma || "__khac__";
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          ten: o.TenShop || "Shop chưa xác định",
+          sdt: o.SdtShop,
+          diachi: o.GH_Ma ? fullPickupAddress(o) : null,
+          orders: [],
+        });
+      }
+      map.get(key).orders.push(o);
+    });
+    return Array.from(map.values());
+  }, [orders]);
+
   const fetchData = async () => {
     if (!shipper_ma) return;
     setLoading(true);
@@ -433,6 +460,8 @@ const DonChoLay = () => {
       if (activeTab === "processing") {
         const res = await shipperDonHangService.getChoLay(shipper_ma);
         setOrders(res.data);
+        // Mặc định tick hết, shipper tự bỏ tick đơn chưa đóng gói xong
+        setSelected(res.data.map((o) => o.DTS_Ma));
       } else {
         const res = await shipperDonHangService.getLichSu(shipper_ma);
         setHistory(res.data);
@@ -484,6 +513,86 @@ const DonChoLay = () => {
       showToast(err.response?.data?.message || "Lỗi lấy hàng", "error");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // ── Chọn đơn để lấy hàng loạt ────────────────────────────────
+  const toggleOne = (dts_ma) => {
+    setSelected((prev) =>
+      prev.includes(dts_ma)
+        ? prev.filter((ma) => ma !== dts_ma)
+        : [...prev, dts_ma]
+    );
+  };
+
+  const toggleShop = (group) => {
+    const maShop = group.orders.map((o) => o.DTS_Ma);
+    const daChonHet = maShop.every((ma) => selected.includes(ma));
+    setSelected((prev) =>
+      daChonHet
+        ? prev.filter((ma) => !maShop.includes(ma))
+        : Array.from(new Set([...prev, ...maShop]))
+    );
+  };
+
+  const handleOpenBulk = (group) => {
+    const ds = group.orders.filter((o) => selected.includes(o.DTS_Ma));
+    if (ds.length === 0)
+      return showToast("Vui lòng chọn ít nhất 1 đơn hàng!", "error");
+
+    setBulkShop({ ...group, orders: ds });
+    setBulkPhoto(null);
+    setBulkPreview(null);
+    setBulkNote("");
+  };
+
+  const handleCloseBulk = () => {
+    if (bulkSubmitting) return;
+    setBulkShop(null);
+    setBulkPhoto(null);
+    setBulkPreview(null);
+    setBulkNote("");
+  };
+
+  const handleBulkPhoto = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBulkPhoto(file);
+    setBulkPreview(URL.createObjectURL(file));
+  };
+
+  const handleBulkSubmit = async (e) => {
+    e.preventDefault();
+    if (!bulkShop) return;
+    if (!bulkPhoto) return showToast("Vui lòng chọn ảnh minh chứng!", "error");
+
+    setBulkSubmitting(true);
+    try {
+      const fd = new FormData();
+      fd.append("hinhanh", bulkPhoto);
+      fd.append(
+        "danh_sach",
+        JSON.stringify(bulkShop.orders.map((o) => o.DTS_Ma))
+      );
+      if (bulkNote) fd.append("ghichu", bulkNote);
+
+      await shipperDonHangService.layHangHangLoat(shipper_ma, fd);
+
+      showToast(
+        `Đã lấy hàng ${bulkShop.orders.length} đơn của ${bulkShop.ten}!`
+      );
+      setBulkShop(null);
+      setBulkPhoto(null);
+      setBulkPreview(null);
+      setBulkNote("");
+      fetchData();
+    } catch (err) {
+      showToast(
+        err.response?.data?.message || "Lỗi lấy hàng hàng loạt",
+        "error"
+      );
+    } finally {
+      setBulkSubmitting(false);
     }
   };
 
@@ -542,99 +651,222 @@ const DonChoLay = () => {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3">
-            {orders.map((o) => {
-              const items = o.items || [];
-              const totalQty = items.reduce(
-                (sum, item) => sum + Number(item.SoLuong || 0),
-                0,
+          <div className="space-y-4">
+            {shopGroups.map((group) => {
+              const maShop = group.orders.map((o) => o.DTS_Ma);
+              const soChon = maShop.filter((ma) =>
+                selected.includes(ma)
+              ).length;
+              const chonHet = soChon === maShop.length;
+              const tongCOD = group.orders.reduce(
+                (sum, o) => sum + Number(o.TongTien || 0),
+                0
               );
 
               return (
-                <div
-                  key={o.DTS_Ma}
-                  className="flex flex-col rounded-2xl border border-[#E2E8F0] bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
+                <section
+                  key={group.key}
+                  className="overflow-hidden rounded-2xl border border-[#E2E8F0] bg-white shadow-sm"
                 >
-                  <div className="mb-3 flex items-center justify-between border-b pb-2">
-                    <span className="font-bold text-[#16a34a]">{o.DTS_Ma}</span>
-                    <span className="rounded bg-yellow-50 px-2 py-1 text-xs font-bold text-yellow-600">
-                      Chờ lấy
-                    </span>
-                  </div>
-
-                  <div className="flex-1 space-y-2 text-sm">
-                    <p>
-                      <b className="text-[#334155]">Shop:</b> {o.TenShop}
-                    </p>
-                    <p className="text-[#64748B]">
-                      <b>SĐT shop:</b>{" "}
-                      {o.SdtShop ? (
-                        <a
-                          href={telHref(o.SdtShop)}
-                          className="font-semibold text-[#2563EB] hover:underline"
-                        >
-                          {o.SdtShop}
-                        </a>
-                      ) : (
-                        <span className="italic text-[#94A3B8]">
-                          Chưa cập nhật
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-[#64748B]">
-                      <b>Lấy tại:</b> {fullPickupAddress(o)}
-                    </p>
-                    <p className="text-[#64748B]">
-                      <b>Giao đến:</b> {o.DiaChiGiao}
-                    </p>
-                    <p className="text-[#64748B]">
-                      <b>Người nhận:</b> {o.TenNguoiNhan}
-                      {o.SdtNguoiNhan ? ` • ${o.SdtNguoiNhan}` : ""}
-                    </p>
-                    <p className="text-[#64748B]">
-                      <b>Tổng tiền:</b>{" "}
-                      <span className="font-bold text-[#DC2626]">
-                        {formatVND(o.TongTien)}
-                      </span>
-                    </p>
-
-                    {items.length > 0 && (
-                      <div className="mt-3 border-t border-[#F1F5F9] pt-3">
-                        <p className="mb-1.5 text-xs font-semibold text-gray-500">
-                          Sản phẩm ({items.length} loại • {totalQty} món):
-                        </p>
-                        {items.slice(0, 3).map((item, idx) => (
-                          <p
-                            key={`${item.Ctsp_Ma}-${idx}`}
-                            className="truncate text-xs leading-5 text-gray-600"
-                          >
-                            • {item.TenSanPham}
-                            {item.TenPhanLoai
-                              ? ` (${item.TenPhanLoai})`
-                              : ""} × {item.SoLuong}
+                  <details open className="group">
+                    <summary className="cursor-pointer list-none border-b border-[#E2E8F0] bg-[#F8FAFC] p-4 [&::-webkit-details-marker]:hidden">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="flex items-center gap-2 font-bold text-[#0F172A]">
+                            <span className="material-symbols-outlined text-[20px] text-[#16a34a]">
+                              storefront
+                            </span>
+                            {group.ten}
                           </p>
-                        ))}
-                        {items.length > 3 && (
-                          <p className="mt-1 text-xs italic text-gray-400">
-                            ... và {items.length - 3} sản phẩm khác
+                          <div className="mt-1 space-y-0.5 text-xs text-[#64748B]">
+                            {group.sdt && (
+                              <p className="flex items-center gap-1">
+                                <span className="material-symbols-outlined text-[14px]">
+                                  call
+                                </span>
+                                <a
+                                  href={telHref(group.sdt)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="font-semibold text-[#2563EB] hover:underline"
+                                >
+                                  {group.sdt}
+                                </a>
+                              </p>
+                            )}
+                            {group.diachi && (
+                              <p className="flex items-start gap-1">
+                                <span className="material-symbols-outlined text-[14px]">
+                                  location_on
+                                </span>
+                                <span>{group.diachi}</span>
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="shrink-0 text-right">
+                          <p className="text-xs font-bold text-[#334155]">
+                            {group.orders.length} đơn
                           </p>
-                        )}
+                          <p className="text-xs text-[#64748B]">
+                            COD {formatVND(tongCOD)}
+                          </p>
+                        </div>
                       </div>
-                    )}
-                  </div>
+                    </summary>
 
-                  <div className="mt-4 border-t border-[#F1F5F9] pt-4">
-                    <button
-                      onClick={() => handleOpenDetail(o)}
-                      className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#16a34a] py-2.5 font-bold text-white transition-colors hover:bg-[#15803d]"
-                    >
-                      <span className="material-symbols-outlined text-[20px]">
-                        visibility
+                    {/* Thanh chọn + lấy hàng loạt của shop */}
+                    <div className="flex flex-wrap items-center gap-3 border-b border-[#F1F5F9] px-4 py-3">
+                      <label className="flex cursor-pointer select-none items-center gap-2 text-xs font-semibold text-[#334155]">
+                        <input
+                          type="checkbox"
+                          className="h-4 w-4 cursor-pointer"
+                          checked={chonHet}
+                          onChange={() => toggleShop(group)}
+                          disabled={bulkSubmitting}
+                        />
+                        Chọn cả shop
+                      </label>
+
+                      <span className="text-xs text-[#64748B]">
+                        Đã chọn{" "}
+                        <b className="text-[#16a34a]">{soChon}</b>/
+                        {group.orders.length}
                       </span>
-                      Xem chi tiết & lấy hàng
-                    </button>
-                  </div>
-                </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleOpenBulk(group)}
+                        disabled={bulkSubmitting || soChon === 0}
+                        className="ml-auto flex items-center gap-1 rounded-xl bg-[#16a34a] px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-[#15803d] disabled:cursor-not-allowed disabled:bg-gray-400"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">
+                          done_all
+                        </span>
+                        Lấy {soChon} đơn
+                      </button>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-5 p-4 md:grid-cols-2 xl:grid-cols-3">
+                      {group.orders.map((o) => {
+                        const items = o.items || [];
+                        const totalQty = items.reduce(
+                          (sum, item) => sum + Number(item.SoLuong || 0),
+                          0
+                        );
+                        const isChecked = selected.includes(o.DTS_Ma);
+
+                        return (
+                          <div
+                            key={o.DTS_Ma}
+                            className={`flex flex-col rounded-2xl border bg-white p-5 shadow-sm transition-shadow hover:shadow-md ${
+                              isChecked
+                                ? "border-[#BBF7D0] ring-1 ring-[#16a34a]/30"
+                                : "border-[#E2E8F0]"
+                            }`}
+                          >
+                            <div className="mb-3 flex items-center justify-between border-b pb-2">
+                              <label className="flex cursor-pointer items-center gap-2">
+                                <input
+                                  type="checkbox"
+                                  className="h-4 w-4 cursor-pointer"
+                                  checked={isChecked}
+                                  onChange={() => toggleOne(o.DTS_Ma)}
+                                  disabled={bulkSubmitting}
+                                />
+                                <span className="font-bold text-[#16a34a]">
+                                  {o.DTS_Ma}
+                                </span>
+                              </label>
+                              <span className="rounded bg-yellow-50 px-2 py-1 text-xs font-bold text-yellow-600">
+                                Chờ lấy
+                              </span>
+                            </div>
+
+                            <div className="flex-1 space-y-2 text-sm">
+                              <p>
+                                <b className="text-[#334155]">Shop:</b>{" "}
+                                {o.TenShop}
+                              </p>
+                              <p className="text-[#64748B]">
+                                <b>SĐT shop:</b>{" "}
+                                {o.SdtShop ? (
+                                  <a
+                                    href={telHref(o.SdtShop)}
+                                    className="font-semibold text-[#2563EB] hover:underline"
+                                  >
+                                    {o.SdtShop}
+                                  </a>
+                                ) : (
+                                  <span className="italic text-[#94A3B8]">
+                                    Chưa cập nhật
+                                  </span>
+                                )}
+                              </p>
+                              <p className="text-[#64748B]">
+                                <b>Lấy tại:</b> {fullPickupAddress(o)}
+                              </p>
+                              <p className="text-[#64748B]">
+                                <b>Giao đến:</b> {o.DiaChiGiao}
+                              </p>
+                              <p className="text-[#64748B]">
+                                <b>Người nhận:</b> {o.TenNguoiNhan}
+                                {o.SdtNguoiNhan
+                                  ? ` • ${o.SdtNguoiNhan}`
+                                  : ""}
+                              </p>
+                              <p className="text-[#64748B]">
+                                <b>Tổng tiền:</b>{" "}
+                                <span className="font-bold text-[#DC2626]">
+                                  {formatVND(o.TongTien)}
+                                </span>
+                              </p>
+
+                              {items.length > 0 && (
+                                <div className="mt-3 border-t border-[#F1F5F9] pt-3">
+                                  <p className="mb-1.5 text-xs font-semibold text-gray-500">
+                                    Sản phẩm ({items.length} loại •{" "}
+                                    {totalQty} món):
+                                  </p>
+                                  {items.slice(0, 3).map((item, idx) => (
+                                    <p
+                                      key={`${item.Ctsp_Ma}-${idx}`}
+                                      className="truncate text-xs leading-5 text-gray-600"
+                                    >
+                                      • {item.TenSanPham}
+                                      {item.TenPhanLoai
+                                        ? ` (${item.TenPhanLoai})`
+                                        : ""}{" "}
+                                      × {item.SoLuong}
+                                    </p>
+                                  ))}
+                                  {items.length > 3 && (
+                                    <p className="mt-1 text-xs italic text-gray-400">
+                                      ... và {items.length - 3} sản phẩm khác
+                                    </p>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+
+                            <div className="mt-4 border-t border-[#F1F5F9] pt-4">
+                              <button
+                                onClick={() => handleOpenDetail(o)}
+                                disabled={bulkSubmitting}
+                                className="flex w-full items-center justify-center gap-2 rounded-xl bg-[#16a34a] py-2.5 font-bold text-white transition-colors hover:bg-[#15803d] disabled:cursor-not-allowed disabled:bg-gray-400"
+                              >
+                                <span className="material-symbols-outlined text-[20px]">
+                                  visibility
+                                </span>
+                                Xem chi tiết & lấy hàng
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </details>
+                </section>
               );
             })}
           </div>
@@ -694,6 +926,138 @@ const DonChoLay = () => {
           note={modalNote}
           onNoteChange={setModalNote}
         />
+      )}
+
+      {/* MODAL LẤY HÀNG HÀNG LOẠT */}
+      {bulkShop && (
+        <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/50 sm:items-center sm:p-4">
+          <div className="flex max-h-[92vh] w-full max-w-2xl flex-col overflow-hidden rounded-t-3xl bg-white shadow-xl sm:rounded-3xl">
+            <div className="flex items-start justify-between gap-3 border-b border-[#E2E8F0] px-5 py-4">
+              <div className="min-w-0">
+                <h3 className="text-lg font-bold text-[#0F172A]">
+                  Lấy Hàng Hàng Loạt
+                </h3>
+                <p className="mt-0.5 truncate text-xs text-[#64748B]">
+                  {bulkShop.ten} • {bulkShop.orders.length} đơn
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={handleCloseBulk}
+                disabled={bulkSubmitting}
+                className="shrink-0 text-gray-400 hover:text-red-500 disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <form
+              onSubmit={handleBulkSubmit}
+              className="flex flex-1 flex-col overflow-hidden"
+            >
+              <div className="flex-1 space-y-3 overflow-y-auto p-5">
+                <div className="flex gap-2 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs text-amber-800">
+                  <span className="material-symbols-outlined shrink-0 text-[18px]">
+                    warning
+                  </span>
+                  <p>
+                    Lấy <b>{bulkShop.orders.length} đơn</b> trong một lần. Nếu
+                    một đơn không lấy được thì <b>toàn bộ lô sẽ bị huỷ</b>,
+                    không đơn nào được ghi nhận.
+                  </p>
+                </div>
+
+                <div>
+                  <p className="mb-1 text-xs font-semibold text-[#334155]">
+                    Danh sách đơn ({bulkShop.orders.length})
+                  </p>
+                  <div className="max-h-44 space-y-1 overflow-y-auto rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-2">
+                    {bulkShop.orders.map((o) => (
+                      <div
+                        key={o.DTS_Ma}
+                        className="flex items-center gap-2 rounded-lg border border-[#F1F5F9] bg-white px-2 py-1.5"
+                      >
+                        <span className="shrink-0 font-mono text-xs font-bold text-[#334155]">
+                          {o.DTS_Ma}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate text-xs text-[#64748B]">
+                          {o.TenNguoiNhan}
+                        </span>
+                        <span className="shrink-0 text-xs font-bold text-[#DC2626]">
+                          {formatVND(o.TongTien)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-1 text-right text-xs text-[#64748B]">
+                    Tổng COD:{" "}
+                    <b className="text-[#DC2626]">
+                      {formatVND(
+                        bulkShop.orders.reduce(
+                          (sum, o) => sum + Number(o.TongTien || 0),
+                          0
+                        )
+                      )}
+                    </b>
+                  </p>
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-[#334155]">
+                    Ảnh minh chứng chung <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    required
+                    onChange={handleBulkPhoto}
+                    className="w-full text-xs text-[#64748B] file:mr-3 file:rounded-lg file:border-0 file:bg-green-50 file:px-3 file:py-2 file:font-semibold file:text-[#16a34a]"
+                  />
+                  {bulkPreview && (
+                    <img
+                      src={bulkPreview}
+                      alt="Minh chứng"
+                      className="mt-3 max-h-56 w-full rounded-xl border border-[#E2E8F0] object-contain"
+                    />
+                  )}
+                </div>
+
+                <div>
+                  <label className="mb-1 block text-xs font-semibold text-[#334155]">
+                    Ghi chú chung (không bắt buộc)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={bulkNote}
+                    onChange={(e) => setBulkNote(e.target.value)}
+                    placeholder="VD: Shop giao đủ kiện, hàng nguyên vẹn..."
+                    className="w-full resize-none rounded-xl border border-[#E2E8F0] px-3 py-2 text-sm outline-none focus:border-[#16a34a]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 border-t border-[#E2E8F0] bg-white px-5 py-4">
+                <button
+                  type="button"
+                  onClick={handleCloseBulk}
+                  disabled={bulkSubmitting}
+                  className="rounded-xl px-5 py-2.5 font-semibold text-[#64748B] hover:bg-gray-100 disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={bulkSubmitting}
+                  className="rounded-xl bg-[#16a34a] px-6 py-2.5 font-bold text-white hover:bg-[#15803d] disabled:bg-gray-400"
+                >
+                  {bulkSubmitting
+                    ? "Đang xử lý..."
+                    : `Xác nhận lấy ${bulkShop.orders.length} đơn`}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
 
       <ToastNotification toast={toast} />

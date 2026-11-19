@@ -20,6 +20,13 @@ const upload = multer({ storage });
 router.get('/cho-lay/:shipper_ma', ShipperDonHangController.getChoLay);
 router.get('/lich-su/:shipper_ma', ShipperDonHangController.getLichSu);
 
+// Lấy hàng loạt theo shop (khai báo trước route 1 đơn cho rõ ràng)
+router.put(
+  '/lay-hang-hang-loat/:shipper_ma',
+  upload.single('hinhanh'),
+  ShipperDonHangController.layHangHangLoat
+);
+
 router.put(
   '/:dts_ma/lay-hang/:shipper_ma',
   upload.single('hinhanh'),
