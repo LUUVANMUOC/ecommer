@@ -44,6 +44,8 @@ const ThongTinDVVC = () => {
   const [bankForm, setBankForm] = useState(EMPTY_BANK_FORM);
   const [savingBank, setSavingBank] = useState(false);
   const [qrBank, setQrBank] = useState(null);
+  // Secret không bao giờ được tải về máy khách: chỉ biết đã cấu hình hay chưa + 4 ký tự cuối
+  const [secretInfo, setSecretInfo] = useState({ has: false, hint: "" });
 
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
@@ -73,6 +75,11 @@ const ThongTinDVVC = () => {
         DVVC_HinhAnh: data.DVVC_HinhAnh || "",
       });
 
+      setSecretInfo({
+        has: !!data.sepay_webhook_secret_set,
+        hint: data.sepay_webhook_secret_hint || "",
+      });
+
       if (data.NganHang_Ma) {
         setLinkedBank({
           NganHang_Ma: data.NganHang_Ma,
@@ -85,7 +92,7 @@ const ThongTinDVVC = () => {
           NganHang_Ma: data.NganHang_Ma,
           TTNT_DVVC_SoTaiKhoan: data.TTNT_DVVC_SoTaiKhoan || "",
           TTNT_DVVC_TenTaiKhoan: data.TTNT_DVVC_TenTaiKhoan || "",
-          sepay_webhook_secret: data.sepay_webhook_secret || "",
+          sepay_webhook_secret: "",
         });
       }
     } catch (err) {
@@ -408,7 +415,8 @@ const ThongTinDVVC = () => {
                       2. Mã bảo mật (Webhook Secret)
                     </label>
                     <input
-                      type="text"
+                      type="password"
+                      autoComplete="new-password"
                       value={bankForm.sepay_webhook_secret || ""}
                       onChange={(e) =>
                         setBankForm({
@@ -416,11 +424,25 @@ const ThongTinDVVC = () => {
                           sepay_webhook_secret: e.target.value,
                         })
                       }
-                      placeholder="Dán mã Secret lấy từ SePay vào đây..."
+                      placeholder={
+                        secretInfo.has
+                          ? `Đã cấu hình ${secretInfo.hint} — để trống nếu không đổi`
+                          : "Dán mã Secret lấy từ SePay vào đây..."
+                      }
                       className="w-full px-4 py-3 rounded-xl border border-blue-300 outline-none focus:border-blue-500"
                     />
+                    {secretInfo.has && (
+                      <p className="text-xs text-green-700 mt-2 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[16px]">
+                          verified_user
+                        </span>
+                        Đã lưu secret {secretInfo.hint}. Chỉ nhập khi bạn muốn đổi
+                        secret mới.
+                      </p>
+                    )}
                     <p className="text-xs text-blue-600 mt-2">
-                      * Mã này giúp chống kẻ gian spam tín hiệu thanh toán ảo.
+                      * Mã này giúp chống kẻ gian spam tín hiệu thanh toán ảo. Hệ
+                      thống không hiển thị lại mã đầy đủ để bảo mật.
                     </p>
                   </div>
 

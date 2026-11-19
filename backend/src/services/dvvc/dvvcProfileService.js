@@ -2,12 +2,24 @@ const DvvcProfileModel = require('../../models/dvvc/dvvcProfileModel');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
+const { encrypt, decrypt, mask } = require('../../config/secretCrypto');
 
 const UPLOAD_DIR = path.join(__dirname, '../../../public/uploads/dvvc');
 
 const DvvcProfileService = {
+    // Trả profile cho trình duyệt: KHÔNG bao giờ trả secret nguyên văn
     getProfile: async (dvvc_ma) => {
-        return await DvvcProfileModel.getProfile(dvvc_ma);
+        const data = await DvvcProfileModel.getProfile(dvvc_ma);
+        if (!data) return data;
+
+        const secret = decrypt(data.sepay_webhook_secret);
+        const ketQua = { ...data };
+        delete ketQua.sepay_webhook_secret;
+
+        ketQua.sepay_webhook_secret_set = !!secret;
+        ketQua.sepay_webhook_secret_hint = mask(secret);
+
+        return ketQua;
     },
 
     updateProfile: async (dvvc_ma, data, file) => {
@@ -38,15 +50,28 @@ const DvvcProfileService = {
             throw new Error('Vui lòng nhập đầy đủ thông tin ngân hàng!');
         }
         
-        // 🟢 Chuẩn bị dữ liệu để gửi xuống Model (bao gồm cả sepay_webhook_secret)
+        // 🟢 Chuẩn bị dữ liệu để gửi xuống Model
+        // - Có nhập secret mới -> mã hoá rồi lưu
+        // - Để trống -> null, model giữ nguyên secret cũ
+        const secretMoi =
+            data.sepay_webhook_secret !== null &&
+            data.sepay_webhook_secret !== undefined &&
+            String(data.sepay_webhook_secret).trim() !== ''
+                ? encrypt(String(data.sepay_webhook_secret).trim())
+                : null;
+
         const bankData = {
             NganHang_Ma: data.NganHang_Ma,
             TTNT_DVVC_SoTaiKhoan: data.TTNT_DVVC_SoTaiKhoan,
             TTNT_DVVC_TenTaiKhoan: data.TTNT_DVVC_TenTaiKhoan,
-            sepay_webhook_secret: data.sepay_webhook_secret || null
+            sepay_webhook_secret: secretMoi
         };
 
-        return await DvvcProfileModel.saveBankAccount(dvvc_ma, bankData);
+        const daLuu = await DvvcProfileModel.saveBankAccount(dvvc_ma, bankData);
+
+        // Không trả secret (kể cả bản đã mã hoá) về trình duyệt
+        if (daLuu) delete daLuu.sepay_webhook_secret;
+        return daLuu;
     },
 
     deleteBankAccount: async (dvvc_ma) => {

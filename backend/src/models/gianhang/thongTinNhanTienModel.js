@@ -32,6 +32,23 @@ const ThongTinNhanTienModel = {
         try {
             await client.query('BEGIN');
 
+            // Giữ lại secret cũ nếu lần này không nhập secret mới
+            const cuRes = await client.query(
+                `SELECT sepay_webhook_secret FROM thongtinnhantien_gianhang
+                  WHERE gh_ma = $1 AND sepay_webhook_secret IS NOT NULL
+                  LIMIT 1`,
+                [data.gh_ma]
+            );
+
+            const secretMoi =
+                data.sepay_webhook_secret !== null &&
+                data.sepay_webhook_secret !== undefined &&
+                String(data.sepay_webhook_secret).trim() !== ''
+                    ? String(data.sepay_webhook_secret).trim()
+                    : null;
+
+            const secretLuu = secretMoi || cuRes.rows[0]?.sepay_webhook_secret || null;
+
             // Xóa tài khoản cũ (nếu có)
             await client.query('DELETE FROM thongtinnhantien_gianhang WHERE gh_ma = $1', [data.gh_ma]);
 
@@ -52,7 +69,7 @@ const ThongTinNhanTienModel = {
                 data.nh_ma, 
                 data.ttnt_gianhang_tentaikhoan,
                 data.ttnt_gianhang_sotaikhoan,
-                data.sepay_webhook_secret // 🟢 Truyền dữ liệu vào
+                secretLuu // 🟢 Đã mã hoá (hoặc giữ nguyên bản cũ)
             ]);
 
             await client.query('COMMIT');

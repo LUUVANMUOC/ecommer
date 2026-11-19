@@ -14,7 +14,12 @@ const DvvcProfileModel = {
                 tt.nganhang_ma AS "NganHang_Ma", 
                 tt.ttnt_dvvc_sotaikhoan AS "TTNT_DVVC_SoTaiKhoan", 
                 tt.ttnt_dvvc_tentaikhoan AS "TTNT_DVVC_TenTaiKhoan",
-                tt.sepay_webhook_secret AS "sepay_webhook_secret", -- 🟢 Đã thêm cột này
+                -- Lấy secret của BẤT KỲ dòng ngân hàng nào của ĐVVC (không phụ thuộc dòng đang join)
+                (SELECT s.sepay_webhook_secret
+                   FROM thongtinnhantien_dvvc s
+                  WHERE s.dvvc_ma = d.dvvc_ma
+                    AND s.sepay_webhook_secret IS NOT NULL
+                  LIMIT 1) AS "sepay_webhook_secret",
                 nh.nhg_ten AS "NHG_Ten", 
                 nh.nhg_logo AS "NHG_Logo"
             FROM donvivanchuyen d
@@ -53,7 +58,15 @@ const DvvcProfileModel = {
             DO UPDATE SET 
                 ttnt_dvvc_sotaikhoan = EXCLUDED.ttnt_dvvc_sotaikhoan,
                 ttnt_dvvc_tentaikhoan = EXCLUDED.ttnt_dvvc_tentaikhoan,
-                sepay_webhook_secret = EXCLUDED.sepay_webhook_secret -- 🟢 Cập nhật thêm Secret
+                -- Không gửi secret mới = giữ nguyên secret đã lưu (không bao giờ xoá oan)
+                sepay_webhook_secret = COALESCE(
+                    EXCLUDED.sepay_webhook_secret,
+                    thongtinnhantien_dvvc.sepay_webhook_secret,
+                    (SELECT s2.sepay_webhook_secret
+                       FROM thongtinnhantien_dvvc s2
+                      WHERE s2.dvvc_ma = $1 AND s2.sepay_webhook_secret IS NOT NULL
+                      LIMIT 1)
+                )
             RETURNING *
         `;
         const values = [

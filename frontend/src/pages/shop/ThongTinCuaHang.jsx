@@ -68,6 +68,8 @@ const useBankAccount = (ownerId, notify) => {
   const [linkedBank, setLinkedBank] = useState(null);
   const [bankForm, setBankForm] = useState(EMPTY_BANK_FORM);
   const [savingBank, setSavingBank] = useState(false);
+  // Secret không bao giờ được tải về máy khách: chỉ biết đã cấu hình hay chưa + 4 ký tự cuối
+  const [secretInfo, setSecretInfo] = useState({ has: false, hint: "" });
 
   const updateBankForm = useCallback(
     (patch) => setBankForm((prev) => ({ ...prev, ...patch })),
@@ -84,12 +86,16 @@ const useBankAccount = (ownerId, notify) => {
 
     if (resLinked.data) {
       setLinkedBank(resLinked.data);
+      setSecretInfo({
+        has: !!resLinked.data.sepay_webhook_secret_set,
+        hint: resLinked.data.sepay_webhook_secret_hint || "",
+      });
       setBankForm({
         nh_ma: resLinked.data.nh_ma || resLinked.data.nganhang_ma,
         ttnt_gianhang_tentaikhoan:
           resLinked.data.ttnt_gianhang_tentaikhoan || "",
         ttnt_gianhang_sotaikhoan: resLinked.data.ttnt_gianhang_sotaikhoan,
-        sepay_webhook_secret: resLinked.data.sepay_webhook_secret || "",
+        sepay_webhook_secret: "",
       });
     }
   }, [ownerId]);
@@ -119,6 +125,12 @@ const useBankAccount = (ownerId, notify) => {
 
       const res = await axiosClient.get(`/thong-tin-nhan-tien/${ownerId}`);
       setLinkedBank(res.data);
+      setSecretInfo({
+        has: !!res.data?.sepay_webhook_secret_set,
+        hint: res.data?.sepay_webhook_secret_hint || "",
+      });
+      // Xoá secret khỏi form sau khi lưu (không giữ nguyên văn trong state)
+      setBankForm((prev) => ({ ...prev, sepay_webhook_secret: "" }));
     } catch (err) {
       notify(err.response?.data?.message || "Lỗi khi lưu tài khoản", "error");
     } finally {
@@ -149,6 +161,7 @@ const useBankAccount = (ownerId, notify) => {
     loadBankAccount,
     saveBank,
     deleteBank,
+    secretInfo,
   };
 };
 
@@ -166,6 +179,7 @@ const ThongTinCuaHang = () => {
     loadBankAccount,
     saveBank,
     deleteBank,
+    secretInfo,
   } = useBankAccount(ownerId, showToast);
 
   const [loading, setLoading] = useState(true);
@@ -414,16 +428,31 @@ const ThongTinCuaHang = () => {
               2. Mã bảo mật (Webhook Secret)
             </label>
             <input
-              type="text"
+              type="password"
+              autoComplete="new-password"
               value={bankForm.sepay_webhook_secret || ""}
               onChange={(e) =>
                 updateBankForm({ sepay_webhook_secret: e.target.value })
               }
-              placeholder="Dán mã Secret lấy từ SePay vào đây..."
+              placeholder={
+                secretInfo.has
+                  ? `Đã cấu hình ${secretInfo.hint} — để trống nếu không đổi`
+                  : "Dán mã Secret lấy từ SePay vào đây..."
+              }
               className="w-full px-4 py-3 rounded-xl border border-blue-300 outline-none focus:border-blue-500"
             />
+            {secretInfo.has && (
+              <p className="text-xs text-green-700 mt-2 flex items-center gap-1">
+                <span className="material-symbols-outlined text-[16px]">
+                  verified_user
+                </span>
+                Đã lưu secret {secretInfo.hint}. Chỉ nhập khi bạn muốn đổi secret
+                mới.
+              </p>
+            )}
             <p className="text-xs text-blue-600 mt-2">
-              * Mã này giúp chống kẻ gian spam tín hiệu thanh toán ảo.
+              * Mã này giúp chống kẻ gian spam tín hiệu thanh toán ảo. Hệ thống
+              không hiển thị lại mã đầy đủ để bảo mật.
             </p>
           </div>
 
