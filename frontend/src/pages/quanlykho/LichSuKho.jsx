@@ -4,6 +4,7 @@ import { AuthContext } from "../../contexts/AuthContext";
 import axiosClient from "../../config/axiosClient";
 import DateGroupedList from "../../components/common/DateGroupedList";
 import { formatVND } from "../../components/shop/SanPhamShared";
+import { tenDiem } from "../../components/common/LoTrinhVanChuyen";
 
 // Cấu hình icon/màu theo loại sự kiện
 const LOAI_SU_KIEN = {
@@ -229,6 +230,12 @@ const LichSuKho = () => {
                       ? ` • ${formatVND(item.TongTien)}`
                       : ""}
                   </p>
+                  {(item.Diem_Di || item.Diem_Den) && (
+                    <p className="text-xs font-semibold text-indigo-700 truncate">
+                      {item.TenChang ? `${item.TenChang}: ` : ""}
+                      {tenDiem(item.Diem_Di)} → {tenDiem(item.Diem_Den)}
+                    </p>
+                  )}
                 </div>
               </div>
 

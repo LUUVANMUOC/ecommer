@@ -5,6 +5,9 @@ import ToastNotification from "../../components/common/Crud/ToastNotification";
 import DateGroupedList from "../../components/common/DateGroupedList";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import { toAssetUrl } from "../../utils/accountUtils";
+import LoTrinhVanChuyen, {
+  diemKhoTuDuLieu,
+} from "../../components/common/LoTrinhVanChuyen";
 
 const formatThoiGian = (value) => {
   if (!value) return "—";
@@ -354,26 +357,14 @@ const TrungChuyen = () => {
                     </div>
 
                     <div className="space-y-2 text-sm flex-1">
-                      <div className="rounded-xl bg-orange-50 p-2.5 text-xs text-orange-800">
-                        <p className="flex items-center gap-1">
-                          <span className="material-symbols-outlined text-[16px]">
-                            route
-                          </span>
-                          <b>Từ:</b> {o.Kho_Di_Ten || "—"}
-                        </p>
-                        <p className="flex items-center gap-1 mt-1">
-                          <span className="material-symbols-outlined text-[16px]">
-                            move_down
-                          </span>
-                          <b>Đến:</b>
-                          <span className="font-bold">
-                            {o.Kho_Den_Ten || "—"}
-                          </span>
-                        </p>
-                        <p className="mt-1 text-orange-600">
-                          Gửi lúc: {formatThoiGian(o.ThoiDiemGui)}
-                        </p>
-                      </div>
+                      <LoTrinhVanChuyen
+                        nhan="Chặng trung chuyển (LSP02)"
+                        tu={diemKhoTuDuLieu(o, "Kho_Di_")}
+                        den={diemKhoTuDuLieu(o, "Kho_Den_")}
+                      />
+                      <p className="text-xs text-orange-700">
+                        Gửi lúc: {formatThoiGian(o.ThoiDiemGui)}
+                      </p>
 
                       <p>
                         <b className="text-[#334155]">Shop:</b> {o.TenShop}
@@ -382,7 +373,7 @@ const TrungChuyen = () => {
                         <b>Khách:</b> {o.TenKhach} - {o.SdtKhach}
                       </p>
                       <p className="text-[#64748B]">
-                        <b>Giao đến:</b> {o.DiaChiGiao}
+                        <b>Địa chỉ giao cuối:</b> {o.DiaChiGiao}
                       </p>
                       <p className="text-[#64748B]">
                         <b>Tổng tiền:</b>{" "}
@@ -437,9 +428,12 @@ const TrungChuyen = () => {
                   <p className="text-sm text-gray-500 truncate">
                     Shop: {item.TenShop}
                   </p>
-                  <p className="text-xs text-orange-700 font-semibold mt-0.5">
-                    {item.Kho_Di_Ten || "—"} → {item.Kho_Den_Ten || "—"}
-                  </p>
+                  <LoTrinhVanChuyen
+                    className="mt-1.5 max-w-md"
+                    compact
+                    tu={diemKhoTuDuLieu(item, "Kho_Di_")}
+                    den={diemKhoTuDuLieu(item, "Kho_Den_")}
+                  />
                   {item.GhiChu && (
                     <p className="text-xs text-gray-400 italic truncate">
                       {item.GhiChu}

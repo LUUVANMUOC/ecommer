@@ -4,8 +4,13 @@ const PhieuKhoModel = require('./phieuKhoModel');
 const PhanCongGiaoHangModel = {
   getDonChoPhanCong: async (kho_ma) => {
     const res = await pool.query(`
-      SELECT dts.dts_ma AS "DTS_Ma", dts.dts_tongtienkhachhangthanhtoan AS "TongTien", gh.gh_ten AS "TenShop", ttnh.ttnh_diachisnapshot AS "DiaChiGiao", ttnh.ttnh_sdt AS "SdtKhach", ttnh.ttnh_ten AS "TenKhach"
+      SELECT dts.dts_ma AS "DTS_Ma", dts.dts_tongtienkhachhangthanhtoan AS "TongTien", gh.gh_ten AS "TenShop", ttnh.ttnh_diachisnapshot AS "DiaChiGiao", ttnh.ttnh_sdt AS "SdtKhach", ttnh.ttnh_ten AS "TenKhach",
+        k.kho_ma AS "Kho_Ma", k.kho_ten AS "Kho_Ten", dc_kho.dc_mota AS "Kho_DiaChi", x_kho.xa_ten AS "Kho_Xa", t_kho.tinh_ten AS "Kho_Tinh"
       FROM donhangtheoshop dts JOIN thongtintrungchuyen ttc ON dts.dts_ma = ttc.dts_ma JOIN gianhang gh ON dts.gh_ma = gh.gh_ma JOIN donhangkhachmua dm ON dts.dm_ma = dm.dm_ma JOIN thongtinnhanhang ttnh ON dm.ttnh_ma = ttnh.ttnh_ma
+      JOIN kho k ON ttc.kho_den_ma = k.kho_ma
+      LEFT JOIN diachi dc_kho ON k.dc_ma = dc_kho.dc_ma
+      LEFT JOIN xaphuong x_kho ON dc_kho.xa_ma = x_kho.xa_ma
+      LEFT JOIN tinhtp t_kho ON x_kho.tinh_ma = t_kho.tinh_ma
       WHERE ttc.kho_den_ma = $1 AND ttc.ttc_thoidiemden IS NOT NULL AND (SELECT ttdh_ma FROM chitiettrangthaidonhang WHERE dts_ma = dts.dts_ma ORDER BY ctttdh_thoidiem DESC LIMIT 1) = 'TTDH03' AND NOT EXISTS (SELECT 1 FROM thongtingiaohang WHERE dts_ma = dts.dts_ma) ORDER BY dts.dts_ma ASC
     `, [kho_ma]);
     return res.rows;

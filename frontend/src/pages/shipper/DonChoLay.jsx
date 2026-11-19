@@ -5,6 +5,9 @@ import ToastNotification from "../../components/common/Crud/ToastNotification";
 import DateGroupedList from "../../components/common/DateGroupedList";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import { toAssetUrl } from "../../utils/accountUtils";
+import LoTrinhVanChuyen, {
+  diemKhoTuDuLieu,
+} from "../../components/common/LoTrinhVanChuyen";
 
 const formatDate = (value) => {
   if (!value) return "—";
@@ -121,6 +124,19 @@ const OrderDetailModal = ({
 
         {/* BODY */}
         <div className="flex-1 space-y-3 overflow-y-auto p-4 sm:p-5">
+          <Section icon="route" title="Chặng lấy hàng (LSP01)">
+            <div className="py-2">
+              <LoTrinhVanChuyen
+                tu={{
+                  loai: "shop",
+                  ten: order.TenShop,
+                  diaChi: fullPickupAddress(order),
+                }}
+                den={diemKhoTuDuLieu(order, "Kho_")}
+              />
+            </div>
+          </Section>
+
           <Section icon="storefront" title="Lấy hàng tại shop">
             <InfoRow icon="store" label="Cửa hàng" strong>
               {order.TenShop}
@@ -161,7 +177,10 @@ const OrderDetailModal = ({
             )}
           </Section>
 
-          <Section icon="local_shipping" title="Giao cho khách">
+          <Section
+            icon="local_shipping"
+            title="Địa chỉ giao cuối (chặng LSP03)"
+          >
             <InfoRow icon="person" label="Người nhận" strong>
               {order.TenNguoiNhan}
             </InfoRow>
@@ -177,7 +196,7 @@ const OrderDetailModal = ({
                 "—"
               )}
             </InfoRow>
-            <InfoRow icon="home_pin" label="Địa chỉ giao" strong>
+            <InfoRow icon="home_pin" label="Địa chỉ giao cuối" strong>
               {order.DiaChiGiao}
             </InfoRow>
             <InfoRow icon="sticky_note_2" label="Ghi chú của khách">
@@ -803,11 +822,17 @@ const DonChoLay = () => {
                                   </span>
                                 )}
                               </p>
+                              <LoTrinhVanChuyen
+                                nhan="Chặng lấy hàng (LSP01)"
+                                tu={{
+                                  loai: "shop",
+                                  ten: o.TenShop,
+                                  diaChi: fullPickupAddress(o),
+                                }}
+                                den={diemKhoTuDuLieu(o, "Kho_")}
+                              />
                               <p className="text-[#64748B]">
-                                <b>Lấy tại:</b> {fullPickupAddress(o)}
-                              </p>
-                              <p className="text-[#64748B]">
-                                <b>Giao đến:</b> {o.DiaChiGiao}
+                                <b>Địa chỉ giao cuối:</b> {o.DiaChiGiao}
                               </p>
                               <p className="text-[#64748B]">
                                 <b>Người nhận:</b> {o.TenNguoiNhan}
@@ -897,8 +922,11 @@ const DonChoLay = () => {
                 <div className="min-w-0">
                   <p className="font-bold text-[#0F172A]">Đơn: {item.DTS_Ma}</p>
                   <p className="text-sm text-gray-500">Shop: {item.TenShop}</p>
+                  <p className="text-xs font-semibold text-green-700">
+                    Đã mang về: {item.Kho_Ten || "—"}
+                  </p>
                   <p className="truncate text-xs text-gray-400">
-                    Giao: {item.TenNguoiNhan} • {formatVND(item.TongTien)}
+                    Khách cuối: {item.TenNguoiNhan} • {formatVND(item.TongTien)}
                   </p>
                 </div>
               </div>

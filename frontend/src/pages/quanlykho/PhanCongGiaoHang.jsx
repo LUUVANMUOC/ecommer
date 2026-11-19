@@ -3,6 +3,10 @@ import { AuthContext } from "../../contexts/AuthContext";
 import phanCongGiaoHangService from "../../services/quanlykho/phanCongGiaoHangService";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import LoTrinhVanChuyen, {
+  diemKhachTuDuLieu,
+  diemKhoTuDuLieu,
+} from "../../components/common/LoTrinhVanChuyen";
 
 const PhanCongGiaoHang = () => {
   const { user } = useContext(AuthContext);
@@ -238,12 +242,14 @@ const PhanCongGiaoHang = () => {
                     </span>
                   </div>
                   <div className="space-y-2 text-sm flex-1">
+                    <LoTrinhVanChuyen
+                      nhan="Chặng giao hàng (LSP03)"
+                      tu={diemKhoTuDuLieu(o, "Kho_")}
+                      den={diemKhachTuDuLieu(o)}
+                    />
                     <p>
                       <b className="text-[#334155]">Khách:</b> {o.TenKhach} -{" "}
                       {o.SdtKhach}
-                    </p>
-                    <p className="text-[#64748B]">
-                      <b>Giao đến:</b> {o.DiaChiGiao}
                     </p>
                     <p className="text-[#64748B]">
                       <b>Tổng tiền:</b>{" "}

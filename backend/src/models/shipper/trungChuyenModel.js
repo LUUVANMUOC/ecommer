@@ -6,9 +6,17 @@ const ShipperTrungChuyenModel = {
     const query = `
       SELECT ttc.dts_ma AS "DTS_Ma", ttc.ttc_thoidiemtao AS "ThoiDiemGui", dts.dts_tongtienkhachhangthanhtoan AS "TongTien", gh.gh_ten AS "TenShop",
         ttc.kho_di_ma AS "Kho_Di_Ma", k_di.kho_ten AS "Kho_Di_Ten",
+        dc_di.dc_mota AS "Kho_Di_DiaChi", x_di.xa_ten AS "Kho_Di_Xa", t_di.tinh_ten AS "Kho_Di_Tinh",
         ttc.kho_den_ma AS "Kho_Den_Ma", k_den.kho_ten AS "Kho_Den_Ten",
+        dc_den.dc_mota AS "Kho_Den_DiaChi", x_den.xa_ten AS "Kho_Den_Xa", t_den.tinh_ten AS "Kho_Den_Tinh",
         ttnh.ttnh_diachisnapshot AS "DiaChiGiao", ttnh.ttnh_ten AS "TenKhach", ttnh.ttnh_sdt AS "SdtKhach"
       FROM thongtintrungchuyen ttc JOIN donhangtheoshop dts ON ttc.dts_ma = dts.dts_ma JOIN gianhang gh ON dts.gh_ma = gh.gh_ma JOIN kho k_di ON ttc.kho_di_ma = k_di.kho_ma JOIN kho k_den ON ttc.kho_den_ma = k_den.kho_ma JOIN donhangkhachmua dm ON dts.dm_ma = dm.dm_ma JOIN thongtinnhanhang ttnh ON dm.ttnh_ma = ttnh.ttnh_ma
+      LEFT JOIN diachi dc_di ON k_di.dc_ma = dc_di.dc_ma
+      LEFT JOIN xaphuong x_di ON dc_di.xa_ma = x_di.xa_ma
+      LEFT JOIN tinhtp t_di ON x_di.tinh_ma = t_di.tinh_ma
+      LEFT JOIN diachi dc_den ON k_den.dc_ma = dc_den.dc_ma
+      LEFT JOIN xaphuong x_den ON dc_den.xa_ma = x_den.xa_ma
+      LEFT JOIN tinhtp t_den ON x_den.tinh_ma = t_den.tinh_ma
       WHERE ttc.shipper_trungchuyen_ma = $1 AND ttc.ttc_thoidiemdi IS NULL
         AND EXISTS (SELECT 1 FROM phieu_kho pk WHERE pk.dts_ma = ttc.dts_ma AND pk.pk_ly_do = 'TRUNG_CHUYEN_DI' AND pk.pk_trangthai = 'DA_XAC_NHAN')
       ORDER BY ttc.kho_den_ma ASC, ttc.ttc_thoidiemtao ASC
@@ -21,13 +29,21 @@ const ShipperTrungChuyenModel = {
     const res = await pool.query(`
       SELECT ttc.dts_ma AS "DTS_Ma", ttc.ttc_thoidiemdi AS "ThoiGian", gh.gh_ten AS "TenShop",
         ttc.kho_di_ma AS "Kho_Di_Ma", k_di.kho_ten AS "Kho_Di_Ten",
+        dc_di.dc_mota AS "Kho_Di_DiaChi", x_di.xa_ten AS "Kho_Di_Xa", t_di.tinh_ten AS "Kho_Di_Tinh",
         ttc.kho_den_ma AS "Kho_Den_Ma", k_den.kho_ten AS "Kho_Den_Ten",
+        dc_den.dc_mota AS "Kho_Den_DiaChi", x_den.xa_ten AS "Kho_Den_Xa", t_den.tinh_ten AS "Kho_Den_Tinh",
         ttc.ttc_hinhanh AS "HinhAnh", ttc.ttc_ghichu AS "GhiChu"
       FROM thongtintrungchuyen ttc
       JOIN donhangtheoshop dts ON ttc.dts_ma = dts.dts_ma
       JOIN gianhang gh ON dts.gh_ma = gh.gh_ma
       JOIN kho k_di ON ttc.kho_di_ma = k_di.kho_ma
       JOIN kho k_den ON ttc.kho_den_ma = k_den.kho_ma
+      LEFT JOIN diachi dc_di ON k_di.dc_ma = dc_di.dc_ma
+      LEFT JOIN xaphuong x_di ON dc_di.xa_ma = x_di.xa_ma
+      LEFT JOIN tinhtp t_di ON x_di.tinh_ma = t_di.tinh_ma
+      LEFT JOIN diachi dc_den ON k_den.dc_ma = dc_den.dc_ma
+      LEFT JOIN xaphuong x_den ON dc_den.xa_ma = x_den.xa_ma
+      LEFT JOIN tinhtp t_den ON x_den.tinh_ma = t_den.tinh_ma
       WHERE ttc.shipper_trungchuyen_ma = $1 AND ttc.ttc_thoidiemdi IS NOT NULL
       ORDER BY ttc.ttc_thoidiemdi DESC
     `, [shipper_ma]);

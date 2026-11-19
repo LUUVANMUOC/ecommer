@@ -12,16 +12,26 @@ const QLKPhanCongModel = {
         
         gh.gh_ten AS "TenShop",
         dc.dc_mota AS "DiaChiLayHang",
+        x_shop.xa_ten AS "Xa_LayHang",
+        t_shop.tinh_ten AS "Tinh_LayHang",
         
         k.kho_ma AS "Kho_Ma",
-        k.kho_ten AS "Kho_Ten"
+        k.kho_ten AS "Kho_Ten",
+        dc_kho.dc_mota AS "Kho_DiaChi",
+        x_kho.xa_ten AS "Kho_Xa",
+        t_kho.tinh_ten AS "Kho_Tinh"
         
       FROM donhangtheoshop dts
       JOIN gianhang gh ON dts.gh_ma = gh.gh_ma
       JOIN diachi dc ON dts.dc_layhangma = dc.dc_ma
+      LEFT JOIN xaphuong x_shop ON dc.xa_ma = x_shop.xa_ma
+      LEFT JOIN tinhtp t_shop ON x_shop.tinh_ma = t_shop.tinh_ma
       
       -- Đảm bảo địa chỉ lấy hàng (Shop) cùng Xã với Kho hiện tại
       JOIN kho k ON dc.xa_ma = (SELECT xa_ma FROM diachi WHERE dc_ma = k.dc_ma)
+      LEFT JOIN diachi dc_kho ON k.dc_ma = dc_kho.dc_ma
+      LEFT JOIN xaphuong x_kho ON dc_kho.xa_ma = x_kho.xa_ma
+      LEFT JOIN tinhtp t_kho ON x_kho.tinh_ma = t_kho.tinh_ma
       
       WHERE k.kho_ma = $1
         AND (SELECT ttdh_ma FROM chitiettrangthaidonhang WHERE dts_ma = dts.dts_ma ORDER BY ctttdh_thoidiem DESC LIMIT 1) = 'TTDH02'

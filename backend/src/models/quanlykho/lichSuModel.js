@@ -1,4 +1,12 @@
 const pool = require('../../config/db');
+const {
+  TIMELINE_SQL,
+  layNguCanh,
+  layNguCanhNhieu,
+  loTrinhDayDu,
+  ganLoTrinh,
+  ganChangHienTai,
+} = require('../common/loTrinhVanChuyen');
 
 const LichSuModel = {
   // ===== 1. DANH SÁCH LỊCH SỬ =====
@@ -13,7 +21,7 @@ const LichSuModel = {
         -- 1. Phân công LSP01
         SELECT ttlh.dts_ma AS "DTS_Ma", 'Phân công LSP01' AS "HanhDong",
                ttlh.ttlh_thoidiemtao AS "ThoiGian", s.shipper_ten AS "NguoiThucHien",
-               'DIEU_PHOI' AS "LoaiSuKien"
+               'DIEU_PHOI' AS "LoaiSuKien", 'LSP01_PHANCONG' AS "MaSuKien"
         FROM thongtinlayhang ttlh
         JOIN shipper s ON ttlh.shipper_ma = s.shipper_ma
         WHERE s.kho_ma = $1
@@ -21,7 +29,7 @@ const LichSuModel = {
         UNION ALL
         -- 2. LSP01 đã lấy hàng
         SELECT ttlh.dts_ma, 'LSP01 đã lấy hàng từ Shop',
-               ttlh.ttlh_thoidiem, s.shipper_ten, 'SHIPPER'
+               ttlh.ttlh_thoidiem, s.shipper_ten, 'SHIPPER', 'LSP01_LAY'
         FROM thongtinlayhang ttlh
         JOIN shipper s ON ttlh.shipper_ma = s.shipper_ma
         WHERE s.kho_ma = $1 AND ttlh.ttlh_thoidiem IS NOT NULL
@@ -29,7 +37,7 @@ const LichSuModel = {
         UNION ALL
         -- 3. Nhập kho từ LSP01
         SELECT pk.dts_ma, 'Xác nhận nhập kho (từ LSP01)',
-               pk.pk_thoigian_xacnhan, 'Thủ kho', 'THU_KHO'
+               pk.pk_thoigian_xacnhan, 'Thủ kho', 'THU_KHO', 'LSP01_NHAP'
         FROM phieu_kho pk
         WHERE pk.kho_ma = $1 AND pk.pk_ly_do = 'TU_LSP01'
           AND pk.pk_trangthai = 'DA_XAC_NHAN'
@@ -37,7 +45,7 @@ const LichSuModel = {
         UNION ALL
         -- 4. Gửi trung chuyển
         SELECT ttc.dts_ma, 'Gửi trung chuyển (LSP02)',
-               ttc.ttc_thoidiemtao, s.shipper_ten, 'DIEU_PHOI'
+               ttc.ttc_thoidiemtao, s.shipper_ten, 'DIEU_PHOI', 'LSP02_PHANCONG'
         FROM thongtintrungchuyen ttc
         JOIN shipper s ON ttc.shipper_trungchuyen_ma = s.shipper_ma
         WHERE ttc.kho_di_ma = $1
@@ -45,7 +53,7 @@ const LichSuModel = {
         UNION ALL
         -- 5. Xuất kho gửi LSP02
         SELECT pk.dts_ma, 'Xác nhận xuất kho (gửi LSP02)',
-               pk.pk_thoigian_xacnhan, 'Thủ kho', 'THU_KHO'
+               pk.pk_thoigian_xacnhan, 'Thủ kho', 'THU_KHO', 'LSP02_XUAT'
         FROM phieu_kho pk
         WHERE pk.kho_ma = $1 AND pk.pk_ly_do = 'TRUNG_CHUYEN_DI'
           AND pk.pk_trangthai = 'DA_XAC_NHAN'
@@ -53,7 +61,7 @@ const LichSuModel = {
         UNION ALL
         -- 6. LSP02 giao tới kho đích
         SELECT ttc.dts_ma, 'LSP02 đã giao tới Kho',
-               ttc.ttc_thoidiemdi, s.shipper_ten, 'SHIPPER'
+               ttc.ttc_thoidiemdi, s.shipper_ten, 'SHIPPER', 'LSP02_GIAO'
         FROM thongtintrungchuyen ttc
         JOIN shipper s ON ttc.shipper_trungchuyen_ma = s.shipper_ma
         WHERE ttc.kho_den_ma = $1 AND ttc.ttc_thoidiemdi IS NOT NULL
@@ -61,14 +69,14 @@ const LichSuModel = {
         UNION ALL
         -- 7. Kho đích nhận hàng
         SELECT ttc.dts_ma, 'Đã nhận hàng từ Kho đi',
-               ttc.ttc_thoidiemden, 'Kho Đích', 'THU_KHO'
+               ttc.ttc_thoidiemden, 'Kho Đích', 'THU_KHO', 'LSP02_NHAP'
         FROM thongtintrungchuyen ttc
         WHERE ttc.kho_den_ma = $1 AND ttc.ttc_thoidiemden IS NOT NULL
 
         UNION ALL
         -- 8. Nhập kho từ LSP02
         SELECT pk.dts_ma, 'Xác nhận nhập kho (từ LSP02)',
-               pk.pk_thoigian_xacnhan, 'Thủ kho', 'THU_KHO'
+               pk.pk_thoigian_xacnhan, 'Thủ kho', 'THU_KHO', 'LSP02_NHAP'
         FROM phieu_kho pk
         WHERE pk.kho_ma = $1 AND pk.pk_ly_do = 'TRUNG_CHUYEN_DEN'
           AND pk.pk_trangthai = 'DA_XAC_NHAN'
@@ -76,7 +84,7 @@ const LichSuModel = {
         UNION ALL
         -- 9. Phân công LSP03
         SELECT ttgh.dts_ma, 'Phân công LSP03',
-               ttgh.ttgh_thoidiemtao, s.shipper_ten, 'DIEU_PHOI'
+               ttgh.ttgh_thoidiemtao, s.shipper_ten, 'DIEU_PHOI', 'LSP03_PHANCONG'
         FROM thongtingiaohang ttgh
         JOIN shipper s ON ttgh.shipper_ma = s.shipper_ma
         WHERE s.kho_ma = $1
@@ -84,7 +92,7 @@ const LichSuModel = {
         UNION ALL
         -- 10. Xuất kho giao LSP03
         SELECT pk.dts_ma, 'Xác nhận xuất kho (giao LSP03)',
-               pk.pk_thoigian_xacnhan, 'Thủ kho', 'THU_KHO'
+               pk.pk_thoigian_xacnhan, 'Thủ kho', 'THU_KHO', 'LSP03_XUAT'
         FROM phieu_kho pk
         WHERE pk.kho_ma = $1 AND pk.pk_ly_do = 'GIAO_LSP03'
           AND pk.pk_trangthai = 'DA_XAC_NHAN'
@@ -92,7 +100,7 @@ const LichSuModel = {
         UNION ALL
         -- 11. LSP03 giao khách
         SELECT ttgh.dts_ma, 'LSP03 đã giao hàng cho Khách',
-               ttgh.ttgh_thoidiem, s.shipper_ten, 'SHIPPER'
+               ttgh.ttgh_thoidiem, s.shipper_ten, 'SHIPPER', 'LSP03_GIAO'
         FROM thongtingiaohang ttgh
         JOIN shipper s ON ttgh.shipper_ma = s.shipper_ma
         WHERE s.kho_ma = $1 AND ttgh.ttgh_thoidiem IS NOT NULL
@@ -106,7 +114,8 @@ const LichSuModel = {
       LIMIT 1000
     `;
     const res = await pool.query(query, [kho_ma]);
-    return res.rows;
+    const nguCanh = await layNguCanhNhieu(res.rows.map((r) => r.DTS_Ma));
+    return ganLoTrinh(res.rows, nguCanh);
   },
 
   // ===== 2. CHI TIẾT ĐẦY ĐỦ 1 ĐƠN (chỉ khi đơn thuộc kho này) =====
@@ -219,123 +228,11 @@ const LichSuModel = {
       [dts_ma]
     );
 
-    // 3. Timeline toàn bộ hành trình (11 mốc)
-    const timelineRes = await pool.query(
-      `-- 1. Trạng thái hệ thống chung
-       SELECT ctttdh.ctttdh_thoidiem AS "ThoiGian", 'Hệ thống' AS "NguoiThucHien",
-              ttdh.ttdh_ten AS "HanhDong", ctttdh.ctttdh_ghichu AS "GhiChu", NULL::text AS "HinhAnh",
-              NULL::varchar AS "Shipper_Ma", NULL::varchar AS "Shipper_Ten", NULL::varchar AS "Shipper_SDT",
-              NULL::text AS "Shipper_HinhAnh", NULL::varchar AS "Kho_Ma", NULL::varchar AS "Kho_Ten",
-              NULL::varchar AS "Kho_Den_Ma", NULL::varchar AS "Kho_Den_Ten", 'HE_THONG' AS "LoaiSuKien"
-       FROM chitiettrangthaidonhang ctttdh
-       JOIN trangthaidonhang ttdh ON ctttdh.ttdh_ma = ttdh.ttdh_ma
-       WHERE ctttdh.dts_ma = $1
-
-       UNION ALL
-       -- 2. Phân công LSP01
-       SELECT ttlh.ttlh_thoidiemtao, 'Quản lý kho', 'Phân công Lấy Hàng (LSP01)', 'Giao việc cho shipper', NULL::text,
-              s.shipper_ma, s.shipper_ten, s.shipper_sdt, s.shipper_hinhanh,
-              k.kho_ma, k.kho_ten, NULL::varchar, NULL::varchar, 'DIEU_PHOI'
-       FROM thongtinlayhang ttlh
-       JOIN shipper s ON ttlh.shipper_ma = s.shipper_ma
-       JOIN kho k ON s.kho_ma = k.kho_ma
-       WHERE ttlh.dts_ma = $1
-
-       UNION ALL
-       -- 3. LSP01 lấy hàng
-       SELECT ttlh.ttlh_thoidiem, s.shipper_ten, 'LSP01 đã lấy hàng từ Shop', ttlh.ttlh_ghichu, ttlh.ttlh_hinhanh,
-              s.shipper_ma, s.shipper_ten, s.shipper_sdt, s.shipper_hinhanh,
-              k.kho_ma, k.kho_ten, NULL::varchar, NULL::varchar, 'SHIPPER'
-       FROM thongtinlayhang ttlh
-       JOIN shipper s ON ttlh.shipper_ma = s.shipper_ma
-       JOIN kho k ON s.kho_ma = k.kho_ma
-       WHERE ttlh.dts_ma = $1 AND ttlh.ttlh_thoidiem IS NOT NULL
-
-       UNION ALL
-       -- 4. Nhập kho từ LSP01
-       SELECT pk.pk_thoigian_xacnhan, 'Thủ kho', 'Thủ kho xác nhận Nhập kho (Từ LSP01)', pk.pk_ghichu, pk.pk_hinhanh,
-              s.shipper_ma, s.shipper_ten, s.shipper_sdt, s.shipper_hinhanh,
-              k.kho_ma, k.kho_ten, NULL::varchar, NULL::varchar, 'THU_KHO'
-       FROM phieu_kho pk
-       JOIN kho k ON pk.kho_ma = k.kho_ma
-       LEFT JOIN shipper s ON pk.shipper_ma = s.shipper_ma
-       WHERE pk.dts_ma = $1 AND pk.pk_ly_do = 'TU_LSP01' AND pk.pk_trangthai = 'DA_XAC_NHAN'
-
-       UNION ALL
-       -- 5. Phân công LSP02
-       SELECT ttc.ttc_thoidiemtao, 'Quản lý kho', 'Phân công Trung Chuyển (LSP02)', 'Giao việc cho shipper', NULL::text,
-              s.shipper_ma, s.shipper_ten, s.shipper_sdt, s.shipper_hinhanh,
-              k_di.kho_ma, k_di.kho_ten, k_den.kho_ma, k_den.kho_ten, 'DIEU_PHOI'
-       FROM thongtintrungchuyen ttc
-       JOIN shipper s ON ttc.shipper_trungchuyen_ma = s.shipper_ma
-       JOIN kho k_di ON ttc.kho_di_ma = k_di.kho_ma
-       JOIN kho k_den ON ttc.kho_den_ma = k_den.kho_ma
-       WHERE ttc.dts_ma = $1
-
-       UNION ALL
-       -- 6. Xuất kho gửi LSP02
-       SELECT pk.pk_thoigian_xacnhan, 'Thủ kho', 'Thủ kho xác nhận Xuất kho (Giao LSP02)', pk.pk_ghichu, pk.pk_hinhanh,
-              s.shipper_ma, s.shipper_ten, s.shipper_sdt, s.shipper_hinhanh,
-              k.kho_ma, k.kho_ten, NULL::varchar, NULL::varchar, 'THU_KHO'
-       FROM phieu_kho pk
-       JOIN kho k ON pk.kho_ma = k.kho_ma
-       LEFT JOIN shipper s ON pk.shipper_ma = s.shipper_ma
-       WHERE pk.dts_ma = $1 AND pk.pk_ly_do = 'TRUNG_CHUYEN_DI' AND pk.pk_trangthai = 'DA_XAC_NHAN'
-
-       UNION ALL
-       -- 7. LSP02 giao tới kho đích
-       SELECT ttc.ttc_thoidiemdi, s.shipper_ten, 'LSP02 đã giao tới Kho Đích', ttc.ttc_ghichu, ttc.ttc_hinhanh,
-              s.shipper_ma, s.shipper_ten, s.shipper_sdt, s.shipper_hinhanh,
-              k_di.kho_ma, k_di.kho_ten, k_den.kho_ma, k_den.kho_ten, 'SHIPPER'
-       FROM thongtintrungchuyen ttc
-       JOIN shipper s ON ttc.shipper_trungchuyen_ma = s.shipper_ma
-       JOIN kho k_di ON ttc.kho_di_ma = k_di.kho_ma
-       JOIN kho k_den ON ttc.kho_den_ma = k_den.kho_ma
-       WHERE ttc.dts_ma = $1 AND ttc.ttc_thoidiemdi IS NOT NULL
-
-       UNION ALL
-       -- 8. Nhập kho từ LSP02
-       SELECT pk.pk_thoigian_xacnhan, 'Thủ kho đích', 'Thủ kho Đích xác nhận Nhập kho (Từ LSP02)', pk.pk_ghichu, pk.pk_hinhanh,
-              s.shipper_ma, s.shipper_ten, s.shipper_sdt, s.shipper_hinhanh,
-              k.kho_ma, k.kho_ten, NULL::varchar, NULL::varchar, 'THU_KHO'
-       FROM phieu_kho pk
-       JOIN kho k ON pk.kho_ma = k.kho_ma
-       LEFT JOIN shipper s ON pk.shipper_ma = s.shipper_ma
-       WHERE pk.dts_ma = $1 AND pk.pk_ly_do = 'TRUNG_CHUYEN_DEN' AND pk.pk_trangthai = 'DA_XAC_NHAN'
-
-       UNION ALL
-       -- 9. Phân công LSP03
-       SELECT ttgh.ttgh_thoidiemtao, 'Quản lý kho', 'Phân công Giao Hàng (LSP03)', 'Giao việc cho shipper', NULL::text,
-              s.shipper_ma, s.shipper_ten, s.shipper_sdt, s.shipper_hinhanh,
-              k.kho_ma, k.kho_ten, NULL::varchar, NULL::varchar, 'DIEU_PHOI'
-       FROM thongtingiaohang ttgh
-       JOIN shipper s ON ttgh.shipper_ma = s.shipper_ma
-       JOIN kho k ON s.kho_ma = k.kho_ma
-       WHERE ttgh.dts_ma = $1
-
-       UNION ALL
-       -- 10. Xuất kho giao LSP03
-       SELECT pk.pk_thoigian_xacnhan, 'Thủ kho đích', 'Thủ kho Đích xác nhận Xuất kho (Giao LSP03)', pk.pk_ghichu, pk.pk_hinhanh,
-              s.shipper_ma, s.shipper_ten, s.shipper_sdt, s.shipper_hinhanh,
-              k.kho_ma, k.kho_ten, NULL::varchar, NULL::varchar, 'THU_KHO'
-       FROM phieu_kho pk
-       JOIN kho k ON pk.kho_ma = k.kho_ma
-       LEFT JOIN shipper s ON pk.shipper_ma = s.shipper_ma
-       WHERE pk.dts_ma = $1 AND pk.pk_ly_do = 'GIAO_LSP03' AND pk.pk_trangthai = 'DA_XAC_NHAN'
-
-       UNION ALL
-       -- 11. LSP03 giao khách
-       SELECT ttgh.ttgh_thoidiem, s.shipper_ten, 'LSP03 đã giao hàng cho Khách', ttgh.ttgh_ghichu, ttgh.ttgh_hinhanh,
-              s.shipper_ma, s.shipper_ten, s.shipper_sdt, s.shipper_hinhanh,
-              k.kho_ma, k.kho_ten, NULL::varchar, NULL::varchar, 'SHIPPER'
-       FROM thongtingiaohang ttgh
-       JOIN shipper s ON ttgh.shipper_ma = s.shipper_ma
-       JOIN kho k ON s.kho_ma = k.kho_ma
-       WHERE ttgh.dts_ma = $1 AND ttgh.ttgh_thoidiem IS NOT NULL
-
-       ORDER BY "ThoiGian" ASC`,
-      [dts_ma]
-    );
+    // 3. Timeline toàn bộ hành trình (11 mốc) + lộ trình từng chặng
+    const [timelineRes, nguCanh] = await Promise.all([
+      pool.query(TIMELINE_SQL, [dts_ma]),
+      layNguCanh(dts_ma),
+    ]);
 
     // 4. Phiếu kho liên quan
     const phieuRes = await pool.query(
@@ -355,7 +252,8 @@ const LichSuModel = {
     return {
       info: infoRes.rows[0],
       items: itemsRes.rows,
-      timeline: timelineRes.rows,
+      loTrinh: loTrinhDayDu(nguCanh),
+      timeline: ganLoTrinh(timelineRes.rows, nguCanh),
       phieuKho: phieuRes.rows,
     };
   },

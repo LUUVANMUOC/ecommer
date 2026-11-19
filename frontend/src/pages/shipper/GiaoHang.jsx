@@ -5,6 +5,10 @@ import ToastNotification from "../../components/common/Crud/ToastNotification";
 import DateGroupedList from "../../components/common/DateGroupedList";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import { toAssetUrl } from "../../utils/accountUtils";
+import LoTrinhVanChuyen, {
+  diemKhachTuDuLieu,
+  diemKhoTuDuLieu,
+} from "../../components/common/LoTrinhVanChuyen";
 
 const GiaoHang = () => {
   const { user } = useContext(AuthContext);
@@ -81,7 +85,7 @@ const GiaoHang = () => {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#0F172A]">Quản Lý Giao Hàng</h1>
         <p className="text-sm text-[#64748B] mt-1">
-          Đơn hàng giao đến tay khách hàng
+          Đơn hàng giao từ kho đến tay khách hàng (chặng LSP03)
         </p>
       </div>
 
@@ -138,12 +142,14 @@ const GiaoHang = () => {
                   </span>
                 </div>
                 <div className="space-y-2 text-sm flex-1">
+                  <LoTrinhVanChuyen
+                    nhan="Chặng giao hàng (LSP03)"
+                    tu={diemKhoTuDuLieu(o, "Kho_")}
+                    den={diemKhachTuDuLieu(o)}
+                  />
                   <p>
                     <b className="text-[#334155]">Khách:</b> {o.TenKhach} -{" "}
                     {o.SdtKhach}
-                  </p>
-                  <p className="text-[#64748B]">
-                    <b>Giao đến:</b> {o.DiaChiGiao}
                   </p>
                   <p className="text-[#64748B]">
                     <b>Tổng tiền:</b>{" "}
@@ -196,7 +202,15 @@ const GiaoHang = () => {
                 )}
                 <div>
                   <p className="font-bold text-[#0F172A]">Đơn: {item.DTS_Ma}</p>
-                  <p className="text-sm text-gray-500">Khách: {item.TenShop}</p>
+                  <p className="text-sm text-gray-500">
+                    Khách: {item.TenKhach || "—"}
+                  </p>
+                  <p className="text-xs font-semibold text-blue-700 mt-0.5">
+                    {item.Kho_Ten || "—"} → {item.TenKhach || "Khách"}
+                  </p>
+                  <p className="text-xs text-gray-400 truncate max-w-md">
+                    Giao: {item.DiaChiGiao || "—"}
+                  </p>
                 </div>
               </div>
               <div className="text-right">
@@ -228,6 +242,11 @@ const GiaoHang = () => {
               </button>
             </div>
             <form onSubmit={handleSubmit} className="p-6 space-y-4">
+              <LoTrinhVanChuyen
+                nhan="Chặng giao hàng (LSP03)"
+                tu={diemKhoTuDuLieu(selectedOrder, "Kho_")}
+                den={diemKhachTuDuLieu(selectedOrder)}
+              />
               <div>
                 <label className="block text-sm font-semibold mb-1">
                   Ảnh minh chứng <span className="text-red-500">*</span>

@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import adminDonHangService from "../../services/san/adminDonHangService";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import LoTrinhVanChuyen from "../../components/common/LoTrinhVanChuyen";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
@@ -552,6 +553,14 @@ const QuanLyDonHangAdmin = () => {
                         </span>{" "}
                         Lịch Sử Vận Chuyển Chi Tiết
                       </h4>
+                      {orderDetail.loTrinh?.length > 1 && (
+                        <div className="mb-4">
+                          <LoTrinhVanChuyen
+                            nhan="Toàn trình vận chuyển"
+                            loTrinh={orderDetail.loTrinh}
+                          />
+                        </div>
+                      )}
                       <div className="relative border-l-2 border-indigo-200 ml-4 space-y-6 pb-4">
                         {orderDetail.timeline?.map((item, index) => {
                           const config =
@@ -625,25 +634,23 @@ const QuanLyDonHangAdmin = () => {
                                       </div>
                                     </div>
                                   )}
-                                  {item.Kho_Ma && (
-                                    <div className="bg-gray-50 border border-gray-100 p-2 rounded-lg text-xs">
-                                      <span className="text-gray-500">
+                                  {(item.Diem_Di || item.Diem_Den) ? (
+                                    <LoTrinhVanChuyen
+                                      compact
+                                      nhan={item.TenChang}
+                                      tu={item.Diem_Di}
+                                      den={item.Diem_Den}
+                                      cungKho={item.CungKho}
+                                    />
+                                  ) : (
+                                    item.Kho_Ma && (
+                                      <p className="text-xs text-gray-500">
                                         Kho xử lý:{" "}
-                                      </span>
-                                      <b className="text-indigo-700">
-                                        {item.Kho_Ten}
-                                      </b>
-                                      {item.Kho_Den_Ten && (
-                                        <>
-                                          <span className="material-symbols-outlined text-[12px] align-middle mx-1">
-                                            trending_flat
-                                          </span>
-                                          <b className="text-indigo-700">
-                                            {item.Kho_Den_Ten}
-                                          </b>
-                                        </>
-                                      )}
-                                    </div>
+                                        <b className="text-indigo-700">
+                                          {item.Kho_Ten}
+                                        </b>
+                                      </p>
+                                    )
                                   )}
                                   {item.HinhAnh && (
                                     <div className="mt-1">

@@ -129,7 +129,7 @@ const AdminLogin = () => {
             </button>
           </form>
 
-          <div className="mt-6 text-center text-body-sm text-on-surface-variant">
+          {/* <div className="mt-6 text-center text-body-sm text-on-surface-variant">
             Chưa có tài khoản?{" "}
             <Link
               to="/admin/register"
@@ -137,7 +137,7 @@ const AdminLogin = () => {
             >
               Đăng ký ngay
             </Link>
-          </div>
+          </div> */}
         </div>
       </div>
     </div>

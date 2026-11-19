@@ -39,6 +39,12 @@ const ORDER_FIELDS = `
 
         ttlh.ttlh_thoidiemtao AS "ThoiDiemPhanCong",
 
+        k.kho_ma AS "Kho_Ma",
+        k.kho_ten AS "Kho_Ten",
+        dc_kho.dc_mota AS "Kho_DiaChi",
+        x_kho.xa_ten AS "Kho_Xa",
+        t_kho.tinh_ten AS "Kho_Tinh",
+
         (SELECT json_agg(json_build_object(
           'Ctsp_Ma', ctdh.ctsp_ma,
           'TenSanPham', sp.sp_ten,
@@ -69,6 +75,11 @@ const ORDER_JOINS = `
       JOIN khoiluongkienhang kl ON dts.klkh_ma = kl.klkh_ma
       LEFT JOIN magiamgia_shop mgg_s ON dts.mgg_shop_ma = mgg_s.mgg_shop_ma
       LEFT JOIN magiamgia_vanchuyen mgg_vc ON dts.mgg_vc_ma = mgg_vc.mgg_vc_ma
+      LEFT JOIN shipper sh ON ttlh.shipper_ma = sh.shipper_ma
+      LEFT JOIN kho k ON sh.kho_ma = k.kho_ma
+      LEFT JOIN diachi dc_kho ON k.dc_ma = dc_kho.dc_ma
+      LEFT JOIN xaphuong x_kho ON dc_kho.xa_ma = x_kho.xa_ma
+      LEFT JOIN tinhtp t_kho ON x_kho.tinh_ma = t_kho.tinh_ma
 `;
 
 const ShipperDonHangModel = {

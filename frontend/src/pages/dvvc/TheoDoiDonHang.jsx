@@ -6,6 +6,7 @@ import theoDoiService from "../../services/dvvc/theoDoiService";
 import { toAssetUrl } from "../../utils/accountUtils";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import LoTrinhVanChuyen from "../../components/common/LoTrinhVanChuyen";
 
 const STATUS_MAP = {
   TTDH01: { text: "Chờ xác nhận", color: "bg-gray-100 text-gray-700" },
@@ -247,7 +248,7 @@ const TheoDoiDonHangDVVC = () => {
                 <th className="p-4 font-semibold">Mã Đơn</th>
                 <th className="p-4 font-semibold">Ngày Lập</th>
                 <th className="p-4 font-semibold">Shop</th>
-                <th className="p-4 font-semibold">Lộ trình (Kho)</th>
+                <th className="p-4 font-semibold">Chặng hiện tại</th>
                 <th className="p-4 font-semibold">Trạng Thái</th>
                 <th className="p-4 font-semibold text-right">Thao Tác</th>
               </tr>
@@ -285,12 +286,22 @@ const TheoDoiDonHangDVVC = () => {
                     <td className="p-4 font-semibold text-[#0F172A]">
                       {o.TenShop}
                     </td>
-                    <td className="p-4 text-sm text-gray-600">
-                      <span className="material-symbols-outlined text-[14px] align-middle mr-1 text-indigo-500">
-                        warehouse
-                      </span>
-                      {o.Kho_Lay_Hang || o.Kho_Di || "--"}
-                      {o.Kho_Den && o.Kho_Den !== o.Kho_Di && ` ➔ ${o.Kho_Den}`}
+                    <td className="p-4 text-sm text-gray-600 min-w-[260px]">
+                      {o.Diem_Di || o.Diem_Den ? (
+                        <LoTrinhVanChuyen
+                          compact
+                          tu={o.Diem_Di}
+                          den={o.Diem_Den}
+                          cungKho={o.CungKho}
+                        />
+                      ) : (
+                        <>
+                          <span className="material-symbols-outlined text-[14px] align-middle mr-1 text-indigo-500">
+                            warehouse
+                          </span>
+                          Chưa phân công chặng nào
+                        </>
+                      )}
                     </td>
                     <td className="p-4">
                       <span
@@ -346,6 +357,15 @@ const TheoDoiDonHangDVVC = () => {
                 </div>
               ) : detail ? (
                 <>
+                  {detail.loTrinh?.length > 1 && (
+                    <div className="mb-4">
+                      <LoTrinhVanChuyen
+                        nhan="Toàn trình vận chuyển"
+                        loTrinh={detail.loTrinh}
+                      />
+                    </div>
+                  )}
+
                   <div className="bg-white rounded-2xl p-5 mb-8 border border-gray-100 shadow-sm grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                     <p>
                       <b className="text-gray-600">Khách hàng:</b>{" "}
@@ -355,7 +375,7 @@ const TheoDoiDonHangDVVC = () => {
                       <b className="text-gray-600">Shop:</b> {detail.TenShop}
                     </p>
                     <p className="md:col-span-2">
-                      <b className="text-gray-600">Giao đến:</b>{" "}
+                      <b className="text-gray-600">Địa chỉ giao cuối:</b>{" "}
                       {detail.DiaChiGiao}
                     </p>
                     <p>
@@ -459,42 +479,26 @@ const TheoDoiDonHangDVVC = () => {
                                 </div>
                               )}
 
-                              {/* Kho Route (nếu có) */}
-                              {item.Kho_Ma && (
-                                <div className="bg-indigo-50/50 border border-indigo-100 p-3 rounded-xl text-sm">
-                                  {item.Kho_Den_Ma ? (
-                                    <div className="flex items-center gap-2">
-                                      <div>
-                                        <p className="text-xs text-gray-500">
-                                          Từ kho:
-                                        </p>
-                                        <p className="font-bold text-indigo-700">
-                                          {item.Kho_Ten}
-                                        </p>
-                                      </div>
-                                      <span className="material-symbols-outlined text-indigo-400">
-                                        trending_flat
-                                      </span>
-                                      <div>
-                                        <p className="text-xs text-gray-500">
-                                          Đến kho:
-                                        </p>
-                                        <p className="font-bold text-indigo-700">
-                                          {item.Kho_Den_Ten}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  ) : (
-                                    <div>
-                                      <p className="text-xs text-gray-500">
-                                        Kho thực hiện:
-                                      </p>
-                                      <p className="font-bold text-indigo-700">
-                                        {item.Kho_Ten}
-                                      </p>
-                                    </div>
-                                  )}
-                                </div>
+                              {/* Chặng đi/đến của sự kiện */}
+                              {(item.Diem_Di || item.Diem_Den) ? (
+                                <LoTrinhVanChuyen
+                                  compact
+                                  nhan={item.TenChang}
+                                  tu={item.Diem_Di}
+                                  den={item.Diem_Den}
+                                  cungKho={item.CungKho}
+                                />
+                              ) : (
+                                item.Kho_Ma && (
+                                  <div className="bg-indigo-50/50 border border-indigo-100 p-3 rounded-xl text-sm">
+                                    <p className="text-xs text-gray-500">
+                                      Kho thực hiện:
+                                    </p>
+                                    <p className="font-bold text-indigo-700">
+                                      {item.Kho_Ten}
+                                    </p>
+                                  </div>
+                                )
                               )}
 
                               {/* Ảnh minh chứng */}

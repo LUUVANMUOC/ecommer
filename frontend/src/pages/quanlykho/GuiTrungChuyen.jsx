@@ -3,6 +3,9 @@ import { AuthContext } from "../../contexts/AuthContext";
 import trungChuyenService from "../../services/quanlykho/trungChuyenService";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import LoTrinhVanChuyen, {
+  diemKhoTuDuLieu,
+} from "../../components/common/LoTrinhVanChuyen";
 
 const GuiTrungChuyen = () => {
   const { user } = useContext(AuthContext);
@@ -145,7 +148,7 @@ const GuiTrungChuyen = () => {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-[#0F172A]">Gửi Trung Chuyển</h1>
         <p className="text-sm text-[#64748B] mt-1">
-          Danh sách đơn hàng đã lấy từ Shop, cần điều phối đến kho đích
+          Đơn đã lấy từ Shop, cần chuyển từ kho hiện tại đến kho đích
         </p>
       </div>
 
@@ -250,10 +253,10 @@ const GuiTrungChuyen = () => {
                       <b className="text-[#334155]">Shop:</b> {order.TenShop}
                     </p>
                     <p className="text-[#64748B]">
-                      <b>Lấy tại:</b> {order.DiaChiLayHang}
+                      <b>Điểm lấy ban đầu:</b> {order.DiaChiLayHang}
                     </p>
                     <p className="text-[#64748B]">
-                      <b>Giao đến:</b> {order.DiaChiGiao}
+                      <b>Địa chỉ giao cuối:</b> {order.DiaChiGiao}
                     </p>
                     <p className="text-[#64748B]">
                       <b>Tổng tiền:</b>{" "}
@@ -261,9 +264,13 @@ const GuiTrungChuyen = () => {
                         {formatVND(order.TongTien)}
                       </span>
                     </p>
-                    <p className="text-indigo-600 font-semibold bg-indigo-50 p-2 rounded mt-2">
-                      Kho đích: {order.Kho_Den_Ten}
-                    </p>
+
+                    <LoTrinhVanChuyen
+                      className="mt-2"
+                      nhan="Chặng trung chuyển (LSP02)"
+                      tu={diemKhoTuDuLieu(order, "Kho_Di_")}
+                      den={diemKhoTuDuLieu(order, "Kho_Den_")}
+                    />
                   </div>
 
                   <div className="mt-4 pt-4 border-t border-[#F1F5F9]">

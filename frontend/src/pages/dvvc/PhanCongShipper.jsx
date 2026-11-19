@@ -3,6 +3,10 @@ import { AuthContext } from "../../contexts/AuthContext";
 import phanCongService from "../../services/dvvc/phanCongService";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import LoTrinhVanChuyen, {
+  diemKhoTuDuLieu,
+  diemShopTuDuLieu,
+} from "../../components/common/LoTrinhVanChuyen";
 
 const PhanCongShipper = () => {
   const { user } = useContext(AuthContext);
@@ -119,18 +123,11 @@ const PhanCongShipper = () => {
                 </div>
 
                 <div className="space-y-2 text-sm flex-1">
-                  <p>
-                    <b className="text-[#334155]">Shop:</b> {order.TenShop}
-                  </p>
-                  <p className="text-[#64748B]">
-                    <b>Lấy tại:</b> {order.DiaChiLayHang}
-                  </p>
-                  <p className="text-[#64748B]">
-                    <b>Kho tiếp nhận:</b>{" "}
-                    <span className="text-indigo-600 font-semibold">
-                      {order.Kho_Ten}
-                    </span>
-                  </p>
+                  <LoTrinhVanChuyen
+                    nhan="Chặng lấy hàng (LSP01)"
+                    tu={diemShopTuDuLieu(order)}
+                    den={diemKhoTuDuLieu(order, "Kho_")}
+                  />
                 </div>
 
                 <div className="mt-4 pt-4 border-t border-[#F1F5F9]">

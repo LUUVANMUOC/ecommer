@@ -4,6 +4,7 @@ import { AuthContext } from "../../contexts/AuthContext";
 import axiosClient from "../../config/axiosClient";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import { toAssetUrl } from "../../utils/accountUtils";
+import LoTrinhVanChuyen from "../../components/common/LoTrinhVanChuyen";
 
 const TT_COLOR = {
   TTDH01: "bg-yellow-50 text-yellow-700 border-yellow-200",
@@ -143,7 +144,7 @@ const ChiTietLichSu = () => {
     );
 
   if (!data) return null;
-  const { info, items, timeline, phieuKho } = data;
+  const { info, items, timeline, phieuKho, loTrinh = [] } = data;
   const ttColor =
     TT_COLOR[info.MaTrangThaiHienTai] ||
     "bg-gray-50 text-gray-700 border-gray-200";
@@ -234,6 +235,13 @@ const ChiTietLichSu = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* CỘT TRÁI */}
         <div className="lg:col-span-2 space-y-6">
+          {/* 0. LỘ TRÌNH VẬN CHUYỂN */}
+          {loTrinh.length > 1 && (
+            <Card icon="route" title="Lộ Trình Vận Chuyển">
+              <LoTrinhVanChuyen loTrinh={loTrinh} />
+            </Card>
+          )}
+
           {/* 1. THÔNG TIN ĐƠN */}
           <Card icon="receipt_long" title="Thông Tin Đơn Hàng">
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4 text-sm">
@@ -549,11 +557,23 @@ const ChiTietLichSu = () => {
                         {formatDateTime(t.ThoiGian)}
                         {t.NguoiThucHien ? ` • ${t.NguoiThucHien}` : ""}
                       </p>
-                      {t.Kho_Ten && (
-                        <p className="text-xs text-gray-500">
-                          Kho: {t.Kho_Ten}
-                          {t.Kho_Den_Ten ? ` → ${t.Kho_Den_Ten}` : ""}
-                        </p>
+                      {t.Diem_Di || t.Diem_Den ? (
+                        <div className="mt-1.5">
+                          <LoTrinhVanChuyen
+                            compact
+                            nhan={t.TenChang}
+                            tu={t.Diem_Di}
+                            den={t.Diem_Den}
+                            cungKho={t.CungKho}
+                          />
+                        </div>
+                      ) : (
+                        t.Kho_Ten && (
+                          <p className="text-xs text-gray-500">
+                            Kho: {t.Kho_Ten}
+                            {t.Kho_Den_Ten ? ` → ${t.Kho_Den_Ten}` : ""}
+                          </p>
+                        )
                       )}
                       {t.GhiChu && (
                         <p className="text-xs italic text-gray-500 mt-1">
