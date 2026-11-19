@@ -21,6 +21,23 @@ const TRANG_THAI_LABEL = {
   CO_VAN_DE: { label: "Có vấn đề", color: "bg-red-50 text-red-700" },
 };
 
+const moTaShipper = (ten, vaiTro) =>
+  ten ? `${ten}${vaiTro ? ` (${vaiTro})` : ""}` : "";
+
+// Nguồn: shipper (nếu nhập) + vị trí lấy hàng/kho đi
+const moTaNguon = (d) => {
+  const shipper = moTaShipper(d.Nguon_Shipper, d.Shipper_VaiTro);
+  const viTri = d.Nguon_ViTri || d.Kho_Ten || "—";
+  return shipper ? `${shipper} — ${viTri}` : viTri;
+};
+
+// Đích: shipper (nếu xuất) + vị trí giao/kho đến
+const moTaDich = (d) => {
+  const shipper = moTaShipper(d.Dich_Shipper, d.Shipper_VaiTro);
+  const viTri = d.Dich_ViTri || d.Kho_Ten || "—";
+  return shipper ? `${shipper} — ${viTri}` : viTri;
+};
+
 const ChiTietPhieuKho = () => {
   const { pk_ma } = useParams();
   const navigate = useNavigate();
@@ -236,6 +253,14 @@ const ChiTietPhieuKho = () => {
             <span class="label">Địa chỉ giao:</span>
             <span class="value">${data.DiaChiGiao || "—"}</span>
           </div>
+          <div class="info-row">
+            <span class="label">Từ:</span>
+            <span class="value">${moTaNguon(data)}</span>
+          </div>
+          <div class="info-row">
+            <span class="label">Đến:</span>
+            <span class="value">${moTaDich(data)}</span>
+          </div>
         </div>
 
         <table class="items">
@@ -404,6 +429,52 @@ const ChiTietPhieuKho = () => {
                   <p className="text-[#0F172A] italic">{data.GhiChu}</p>
                 </div>
               )}
+            </div>
+
+            {/* Hành trình nguồn → đích */}
+            <div className="mt-4 rounded-xl border border-indigo-100 bg-indigo-50/60 p-4 text-sm">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-indigo-500 uppercase tracking-wider mb-1">
+                    Từ
+                  </p>
+                  <p className="font-semibold text-[#0F172A]">
+                    {data.Nguon_Shipper || data.Nguon_ViTri || "—"}
+                  </p>
+                  {data.Nguon_Shipper && (
+                    <>
+                      {data.Shipper_VaiTro && (
+                        <p className="text-xs text-indigo-600 font-semibold">
+                          {data.Shipper_VaiTro}
+                        </p>
+                      )}
+                      <p className="text-xs text-[#64748B]">
+                        {data.Nguon_ViTri || "—"}
+                      </p>
+                    </>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs text-indigo-500 uppercase tracking-wider mb-1">
+                    Đến
+                  </p>
+                  <p className="font-semibold text-[#0F172A]">
+                    {data.Dich_Shipper || data.Dich_ViTri || "—"}
+                  </p>
+                  {data.Dich_Shipper && (
+                    <>
+                      {data.Shipper_VaiTro && (
+                        <p className="text-xs text-indigo-600 font-semibold">
+                          {data.Shipper_VaiTro}
+                        </p>
+                      )}
+                      <p className="text-xs text-[#64748B]">
+                        {data.Dich_ViTri || "—"}
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
             </div>
           </div>
 

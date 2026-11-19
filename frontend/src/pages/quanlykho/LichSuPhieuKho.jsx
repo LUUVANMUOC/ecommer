@@ -52,6 +52,23 @@ const TABS = [
   { key: "XUAT", label: "Xuất kho" },
 ];
 
+// Ô "Từ" / "Đến": ưu tiên hiện shipper + vai trò, kèm vị trí
+const DiemCell = ({ shipper, vaiTro, viTri }) => (
+  <div className="min-w-[150px]">
+    {shipper ? (
+      <>
+        <p className="font-semibold text-sm text-[#0F172A]">{shipper}</p>
+        {vaiTro && (
+          <p className="text-xs text-indigo-600 font-semibold">{vaiTro}</p>
+        )}
+        {viTri && <p className="text-xs text-[#64748B]">{viTri}</p>}
+      </>
+    ) : (
+      <p className="font-semibold text-sm text-[#0F172A]">{viTri || "—"}</p>
+    )}
+  </div>
+);
+
 const LichSuPhieuKho = () => {
   const { user } = useContext(AuthContext);
   const kho_ma = user?.kho_ma;
@@ -141,13 +158,14 @@ const LichSuPhieuKho = () => {
       ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse min-w-[900px]">
+            <table className="w-full text-left border-collapse min-w-[1100px]">
               <thead>
                 <tr className="bg-[#F8FAFC] text-[#64748B] text-sm border-b border-[#E2E8F0]">
                   <th className="p-4 font-semibold w-32">Mã phiếu</th>
                   <th className="p-4 font-semibold w-32">Loại</th>
                   <th className="p-4 font-semibold">Đơn hàng</th>
-                  <th className="p-4 font-semibold">Shipper</th>
+                  <th className="p-4 font-semibold">Từ</th>
+                  <th className="p-4 font-semibold">Đến</th>
                   <th className="p-4 font-semibold w-40">Thời gian</th>
                   <th className="p-4 font-semibold w-32 text-center">
                     Trạng thái
@@ -201,20 +219,18 @@ const LichSuPhieuKho = () => {
                         </p>
                       </td>
                       <td className="p-4">
-                        {p.Shipper_Ten ? (
-                          <>
-                            <p className="font-medium text-sm text-[#0F172A]">
-                              {p.Shipper_Ten}
-                            </p>
-                            <p className="text-xs text-[#64748B]">
-                              {p.Shipper_SDT}
-                            </p>
-                          </>
-                        ) : (
-                          <span className="text-sm text-gray-400 italic">
-                            —
-                          </span>
-                        )}
+                        <DiemCell
+                          shipper={p.Nguon_Shipper}
+                          vaiTro={p.Shipper_VaiTro}
+                          viTri={p.Nguon_ViTri}
+                        />
+                      </td>
+                      <td className="p-4">
+                        <DiemCell
+                          shipper={p.Dich_Shipper}
+                          vaiTro={p.Shipper_VaiTro}
+                          viTri={p.Dich_ViTri}
+                        />
                       </td>
                       <td className="p-4">
                         <p className="text-xs text-[#64748B]">

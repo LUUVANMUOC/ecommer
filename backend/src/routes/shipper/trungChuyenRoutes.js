@@ -16,6 +16,8 @@ const upload = multer({ storage });
 
 router.get('/dang-di-duong/:shipper_ma', ShipperTrungChuyenController.getDonDangTrungChuyen);
 router.get('/lich-su/:shipper_ma', ShipperTrungChuyenController.getLichSu); // Route lấy lịch sử
+// Đặt trước '/:dts_ma/...' để không bị bắt nhầm
+router.put('/giao-toi-kho-hang-loat/:shipper_ma', upload.single('hinhanh'), ShipperTrungChuyenController.giaoHangToiKhoBatch);
 router.put('/:dts_ma/giao-toi-kho/:shipper_ma', upload.single('hinhanh'), ShipperTrungChuyenController.giaoHangToiKho);
 
 module.exports = router;

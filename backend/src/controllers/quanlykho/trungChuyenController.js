@@ -28,22 +28,6 @@ const TrungChuyenController = {
       const result = await TrungChuyenService.guiTrungChuyenBatch(kho_di_ma, shipper_trungchuyen_ma, danh_sach);
       res.status(201).json(result);
     } catch (error) { res.status(400).json({ message: error.message }); }
-  },
-
-  getDonChoNhan: async (req, res) => {
-    try {
-      const data = await TrungChuyenService.getDonChoNhan(req.params.kho_den_ma);
-      res.json(data);
-    } catch (error) { res.status(500).json({ message: error.message }); }
-  },
-
-  nhanHang: async (req, res) => {
-    try {
-      const { dts_ma } = req.params;
-      const { kho_den_ma } = req.body;
-      const result = await TrungChuyenService.nhanHang(dts_ma, kho_den_ma);
-      res.status(200).json({ message: "Đã nhận hàng trung chuyển!", data: result });
-    } catch (error) { res.status(400).json({ message: error.message }); }
   }
 };
 

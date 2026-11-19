@@ -7,6 +7,10 @@ const shipperTrungChuyenService = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
       getLichSu: (shipper_ma) => axiosClient.get(`/dvvc/shipper/trung-chuyen/lich-su/${shipper_ma}`),
+  giaoHangToiKhoBatch: (shipper_ma, formData) =>
+    axiosClient.put(`/dvvc/shipper/trung-chuyen/giao-toi-kho-hang-loat/${shipper_ma}`, formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
 };
 
 export default shipperTrungChuyenService;

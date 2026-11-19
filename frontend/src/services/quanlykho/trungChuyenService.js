@@ -6,9 +6,6 @@ const trungChuyenService = {
   guiTrungChuyen: (data) => axiosClient.post('/quan-ly-kho/trung-chuyen/gui', data),
   guiTrungChuyenBatch: (data) =>
     axiosClient.post('/quan-ly-kho/trung-chuyen/gui-hang-loat', data),
-
-  getDonChoNhan: (kho_den_ma) => axiosClient.get(`/quan-ly-kho/trung-chuyen/cho-nhan/${kho_den_ma}`),
-  nhanHang: (dts_ma, kho_den_ma) => axiosClient.put(`/quan-ly-kho/trung-chuyen/nhan/${dts_ma}`, { kho_den_ma }),
 };
 
 export default trungChuyenService;

@@ -47,26 +47,6 @@ const TrungChuyenModel = {
       await client.query('COMMIT');
       return res.rows[0];
     } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
-  },
-
-  getDonChoNhan: async (kho_den_ma) => {
-    const res = await pool.query(`
-      SELECT ttc.dts_ma AS "DTS_Ma", ttc.ttc_thoidiemtao AS "ThoiDiemGui", dts.dts_tongtienkhachhangthanhtoan AS "TongTien", gh.gh_ten AS "TenShop", s.shipper_ten AS "TenShipperGui", s.shipper_sdt AS "SdtShipperGui", k_di.kho_ten AS "Kho_Di_Ten", ttnh.ttnh_diachisnapshot AS "DiaChiGiao"
-      FROM thongtintrungchuyen ttc JOIN donhangtheoshop dts ON ttc.dts_ma = dts.dts_ma JOIN gianhang gh ON dts.gh_ma = gh.gh_ma JOIN shipper s ON ttc.shipper_trungchuyen_ma = s.shipper_ma JOIN kho k_di ON ttc.kho_di_ma = k_di.kho_ma JOIN donhangkhachmua dm ON dts.dm_ma = dm.dm_ma JOIN thongtinnhanhang ttnh ON dm.ttnh_ma = ttnh.ttnh_ma
-      WHERE ttc.kho_den_ma = $1 AND ttc.ttc_thoidiemdi IS NOT NULL AND ttc.ttc_thoidiemden IS NULL ORDER BY ttc.ttc_thoidiemdi ASC
-    `, [kho_den_ma]);
-    return res.rows;
-  },
-
-  nhanHang: async (dts_ma, kho_den_ma) => {
-    const client = await pool.connect();
-    try {
-      await client.query('BEGIN');
-      // Chỉ cập nhật thời gian nhận, KHÔNG tạo phiếu (vì phiếu do Thủ kho duyệt trên giao diện)
-      const res = await client.query(`UPDATE thongtintrungchuyen SET ttc_thoidiemden = NOW() WHERE dts_ma = $1 AND kho_den_ma = $2 AND ttc_thoidiemden IS NULL RETURNING *`, [dts_ma, kho_den_ma]);
-      await client.query('COMMIT');
-      return res.rows.length > 0 ? res.rows[0] : null;
-    } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
   }
 };
 module.exports = TrungChuyenModel;

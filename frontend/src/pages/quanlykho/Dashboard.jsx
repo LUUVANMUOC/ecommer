@@ -18,7 +18,6 @@ const QuanLyKhoDashboard = () => {
           path: "/quan-ly-kho/phan-cong-shipper",
         },
         { title: "Gửi trung chuyển", path: "/quan-ly-kho/gui-trung-chuyen" },
-        { title: "Nhận trung chuyển", path: "/quan-ly-kho/nhan-trung-chuyen" },
         {
           title: "Phân công giao hàng",
           path: "/quan-ly-kho/phan-cong-giao-hang",

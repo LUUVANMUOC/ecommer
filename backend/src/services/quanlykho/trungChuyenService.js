@@ -55,18 +55,6 @@ const TrungChuyenService = {
 
     const thanhCong = ketQua.filter((r) => r.ok).length;
     return { tongSo: ds.length, thanhCong, boQua: ds.length - thanhCong, ketQua };
-  },
-
-  getDonChoNhan: async (kho_den_ma) => {
-    return await TrungChuyenModel.getDonChoNhan(kho_den_ma);
-  },
-
-  nhanHang: async (dts_ma, kho_den_ma) => {
-    const result = await TrungChuyenModel.nhanHang(dts_ma, kho_den_ma);
-    if (!result) {
-      throw new Error("Đơn hàng không tồn tại hoặc đã được nhận trước đó!");
-    }
-    return result;
   }
 };
 

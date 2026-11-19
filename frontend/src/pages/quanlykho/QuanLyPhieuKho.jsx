@@ -5,6 +5,52 @@ import { formatVND } from "../../components/shop/SanPhamShared";
 import { toAssetUrl } from "../../utils/accountUtils";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
 
+const moTaShipper = (ten, vaiTro) => {
+  if (!ten) return "—";
+  return vaiTro ? `${ten} (${vaiTro})` : ten;
+};
+
+// Khối mô tả nguồn → đích của phiếu nhập/xuất
+const HuongDiBlock = ({ o }) => {
+  const isNhap = o.Loai === "NHAP";
+  return (
+    <div className="mb-3 rounded-xl border border-indigo-100 bg-indigo-50/60 p-3 text-xs text-indigo-900">
+      <p className="flex items-start gap-1.5">
+        <span className="material-symbols-outlined text-[16px] shrink-0">
+          {isNhap ? "move_to_inbox" : "outbox"}
+        </span>
+        <span className="min-w-0">
+          {isNhap ? (
+            <>
+              <b>Nhập từ:</b> {moTaShipper(o.Nguon_Shipper, o.Shipper_VaiTro)}
+              {o.Nguon_ViTri && (
+                <span className="block text-indigo-700/80 truncate">
+                  Vị trí: {o.Nguon_ViTri}
+                </span>
+              )}
+              <span className="block mt-0.5">
+                <b>Vào kho:</b> {o.Dich_ViTri || o.Kho_Ten || "—"}
+              </span>
+            </>
+          ) : (
+            <>
+              <b>Xuất cho:</b> {moTaShipper(o.Dich_Shipper, o.Shipper_VaiTro)}
+              {o.Dich_ViTri && (
+                <span className="block text-indigo-700/80 truncate">
+                  Đi tới: {o.Dich_ViTri}
+                </span>
+              )}
+              <span className="block mt-0.5">
+                <b>Từ kho:</b> {o.Nguon_ViTri || o.Kho_Ten || "—"}
+              </span>
+            </>
+          )}
+        </span>
+      </p>
+    </div>
+  );
+};
+
 const QuanLyPhieuKho = () => {
   const { user } = useContext(AuthContext);
   const kho_ma = user?.kho_ma;
@@ -341,8 +387,15 @@ const QuanLyPhieuKho = () => {
                         {o.Shipper_Ten}
                       </p>
                       <p className="text-xs text-[#64748B]">{o.Shipper_SDT}</p>
+                      {o.Shipper_VaiTro && (
+                        <p className="text-xs text-indigo-600 font-semibold">
+                          {o.Shipper_VaiTro}
+                        </p>
+                      )}
                     </div>
                   </div>
+
+                  <HuongDiBlock o={o} />
 
                   <div className="space-y-1.5 text-sm flex-1">
                     <p>
@@ -550,14 +603,29 @@ const QuanLyPhieuKho = () => {
                   Danh sách phiếu ({selected.length})
                 </label>
                 <div className="max-h-32 overflow-y-auto rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-2 space-y-1">
-                  {selected.map((pk) => (
-                    <p
-                      key={pk}
-                      className="font-mono text-xs text-[#334155] px-2 py-1 bg-white rounded border border-[#F1F5F9]"
-                    >
-                      {pk}
-                    </p>
-                  ))}
+                  {selected.map((pk) => {
+                    const don = orders.find((o) => o.PK_Ma === pk);
+                    return (
+                      <p
+                        key={pk}
+                        className="text-xs text-[#334155] px-2 py-1 bg-white rounded border border-[#F1F5F9]"
+                      >
+                        <span className="font-mono font-bold">{pk}</span>
+                        {don && (
+                          <span className="text-gray-500">
+                            {" "}
+                            — {don.Loai === "NHAP" ? "Nhập từ" : "Xuất cho"}{" "}
+                            {don.Loai === "NHAP"
+                              ? don.Nguon_Shipper || "—"
+                              : don.Dich_Shipper || "—"}
+                            {don.Loai === "NHAP"
+                              ? ` · ${don.Nguon_ViTri || "?"} → ${don.Dich_ViTri || don.Kho_Ten || "kho"}`
+                              : ` · ${don.Nguon_ViTri || don.Kho_Ten || "kho"} → ${don.Dich_ViTri || "?"}`}
+                          </span>
+                        )}
+                      </p>
+                    );
+                  })}
                 </div>
               </div>
 

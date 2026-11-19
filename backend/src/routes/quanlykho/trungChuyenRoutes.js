@@ -8,8 +8,7 @@ router.get('/shipper-lsp02/:kho_di_ma', TrungChuyenController.getShippersLSP02);
 router.post('/gui', TrungChuyenController.guiTrungChuyen);
 router.post('/gui-hang-loat', TrungChuyenController.guiTrungChuyenBatch);
 
-// Dành cho Kho Đích (Nhận)
-router.get('/cho-nhan/:kho_den_ma', TrungChuyenController.getDonChoNhan);
-router.put('/nhan/:dts_ma', TrungChuyenController.nhanHang);
+// Kho đích xác nhận nhận hàng: dùng chung màn hình Quản lý phiếu kho (phiếu NHAP/TRUNG_CHUYEN_DEN)
+// để tránh 2 nơi cùng ghi trạng thái nhận hàng.
 
 module.exports = router;

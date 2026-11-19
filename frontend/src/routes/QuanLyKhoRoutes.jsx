@@ -5,7 +5,6 @@ import QuanLyKhoDashboard from "../pages/quanlykho/Dashboard";
 import QuanLyShipper from "../pages/quanlykho/QuanLyShipper";
 import PhanCongShipper from "../pages/quanlykho/PhanCongShipper";
 import GuiTrungChuyen from "../pages/quanlykho/GuiTrungChuyen";
-import NhanTrungChuyen from "../pages/quanlykho/NhanTrungChuyen";
 import PhanCongGiaoHang from "../pages/quanlykho/PhanCongGiaoHang";
 import LichSuKho from "../pages/quanlykho/LichSuKho";
 import ChiTietLichSu from "../pages/quanlykho/ChiTietLichSu";
@@ -45,7 +44,6 @@ const QuanLyKhoRoutes = () => {
           <Route path="quan-ly-shipper" element={<QuanLyShipper />} />
           <Route path="phan-cong-shipper" element={<PhanCongShipper />} />
           <Route path="gui-trung-chuyen" element={<GuiTrungChuyen />} />
-          <Route path="nhan-trung-chuyen" element={<NhanTrungChuyen />} />
           <Route path="phan-cong-giao-hang" element={<PhanCongGiaoHang />} />
           <Route path="lich-su" element={<LichSuKho />} />
           <Route path="lich-su/:dts_ma" element={<ChiTietLichSu />} />

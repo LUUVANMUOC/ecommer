@@ -1,5 +1,49 @@
 const pool = require('../../config/db');
 
+// Nhãn vai trò shipper theo loại dịch vụ (LSP01 lấy hàng, LSP02 trung chuyển, LSP03 giao hàng)
+const VAI_TRO_SHIPPER = {
+  LSP01: 'LSP01 - Lấy hàng',
+  LSP02: 'LSP02 - Trung chuyển',
+  LSP03: 'LSP03 - Giao hàng',
+};
+
+const tenKho = (ten) => ten || null;
+
+// Suy ra "nguồn → đích" cho từng phiếu nhập/xuất từ dữ liệu đã có (không cần thêm cột DB)
+const ganHuongDi = (rows) => {
+  for (const r of rows) {
+    const khoHienTai = tenKho(r.Kho_Ten);
+    r.Shipper_VaiTro = VAI_TRO_SHIPPER[r.Shipper_LSP] || r.Shipper_LSP || null;
+    r.Nguon_Shipper = null;
+    r.Dich_Shipper = null;
+    r.Nguon_ViTri = null;
+    r.Dich_ViTri = null;
+
+    if (r.LyDo === 'TU_LSP01') {
+      // Nhập từ shipper lấy hàng tại Shop
+      r.Nguon_Shipper = r.Shipper_Ten || null;
+      r.Nguon_ViTri = r.DiaChiLayHang || r.DiaChiShop || null;
+      r.Dich_ViTri = khoHienTai;
+    } else if (r.LyDo === 'TRUNG_CHUYEN_DEN') {
+      // Nhập từ shipper trung chuyển, hàng đi từ kho gửi
+      r.Nguon_Shipper = r.Shipper_Ten || null;
+      r.Nguon_ViTri = tenKho(r.Kho_Di_Ten);
+      r.Dich_ViTri = khoHienTai;
+    } else if (r.LyDo === 'TRUNG_CHUYEN_DI') {
+      // Xuất cho shipper trung chuyển, hàng đi tới kho đích
+      r.Nguon_ViTri = khoHienTai;
+      r.Dich_Shipper = r.Shipper_Ten || null;
+      r.Dich_ViTri = tenKho(r.Kho_Den_Ten);
+    } else if (r.LyDo === 'GIAO_LSP03') {
+      // Xuất cho shipper giao hàng, đi tới địa chỉ khách
+      r.Nguon_ViTri = khoHienTai;
+      r.Dich_Shipper = r.Shipper_Ten || null;
+      r.Dich_ViTri = r.DiaChiGiao || null;
+    }
+  }
+  return rows;
+};
+
 const PhieuKhoModel = {
   taoPhieu: async (clientOrData, maybeData) => {
     const client = maybeData ? clientOrData : await pool.connect();
@@ -44,17 +88,31 @@ const PhieuKhoModel = {
       SELECT 
         pk.pk_ma AS "PK_Ma", pk.dts_ma AS "DTS_Ma", pk.pk_loai AS "Loai",
         pk.pk_ly_do AS "LyDo", pk.pk_thoigian_tao AS "ThoiGianTao",
-        s.shipper_ma AS "Shipper_Ma", s.shipper_ten AS "Shipper_Ten", s.shipper_sdt AS "Shipper_SDT", s.shipper_hinhanh AS "Shipper_HinhAnh",
+        pk.kho_ma AS "Kho_Ma", k.kho_ten AS "Kho_Ten",
+        s.shipper_ma AS "Shipper_Ma", s.shipper_ten AS "Shipper_Ten", s.shipper_sdt AS "Shipper_SDT",
+        s.shipper_hinhanh AS "Shipper_HinhAnh", s.lsp_ma AS "Shipper_LSP",
         gh.gh_ten AS "TenShop", dc_shop.dc_mota AS "DiaChiLayHang",
         ttnh.ttnh_diachisnapshot AS "DiaChiGiao", ttnh.ttnh_ten AS "TenKhach", ttnh.ttnh_sdt AS "SdtKhach",
-        dts.dts_tongtienkhachhangthanhtoan AS "TongTien"
+        dts.dts_tongtienkhachhangthanhtoan AS "TongTien",
+        ttc.kho_di_ma AS "Kho_Di_Ma", k_di.kho_ten AS "Kho_Di_Ten",
+        ttc.kho_den_ma AS "Kho_Den_Ma", k_den.kho_ten AS "Kho_Den_Ten"
       FROM phieu_kho pk
       JOIN donhangtheoshop dts ON pk.dts_ma = dts.dts_ma
+      JOIN kho k ON pk.kho_ma = k.kho_ma
       JOIN gianhang gh ON dts.gh_ma = gh.gh_ma
       JOIN diachi dc_shop ON dts.dc_layhangma = dc_shop.dc_ma
       JOIN donhangkhachmua dm ON dts.dm_ma = dm.dm_ma
       JOIN thongtinnhanhang ttnh ON dm.ttnh_ma = ttnh.ttnh_ma
       LEFT JOIN shipper s ON pk.shipper_ma = s.shipper_ma
+      LEFT JOIN LATERAL (
+        SELECT t.kho_di_ma, t.kho_den_ma
+        FROM thongtintrungchuyen t
+        WHERE t.dts_ma = dts.dts_ma
+        ORDER BY t.ttc_thoidiemtao DESC
+        LIMIT 1
+      ) ttc ON TRUE
+      LEFT JOIN kho k_di ON ttc.kho_di_ma = k_di.kho_ma
+      LEFT JOIN kho k_den ON ttc.kho_den_ma = k_den.kho_ma
       WHERE pk.kho_ma = $1 AND pk.pk_loai = $2 AND pk.pk_trangthai = 'CHO_XAC_NHAN'
       ORDER BY pk.pk_thoigian_tao ASC
     `;
@@ -71,7 +129,7 @@ const PhieuKhoModel = {
       );
       pk.items = itemsRes.rows;
     }
-    return res.rows;
+    return ganHuongDi(res.rows);
   },
 
   xacNhanNhap: async (pk_ma, kho_ma, hinhanh, ghichu) => {
@@ -151,29 +209,56 @@ const PhieuKhoModel = {
   getLichSu: async (kho_ma, loai, lyDo) => {
     const query = `
       SELECT pk.pk_ma AS "PK_Ma", pk.dts_ma AS "DTS_Ma", pk.pk_loai AS "Loai", pk.pk_ly_do AS "LyDo", pk.pk_trangthai AS "TrangThai", pk.pk_thoigian_tao AS "ThoiGianTao", pk.pk_thoigian_xacnhan AS "ThoiGianXacNhan", pk.pk_hinhanh AS "HinhAnh", pk.pk_ghichu AS "GhiChu",
-        s.shipper_ma AS "Shipper_Ma", s.shipper_ten AS "Shipper_Ten", s.shipper_sdt AS "Shipper_SDT", gh.gh_ten AS "TenShop", ttnh.ttnh_ten AS "TenKhach"
+        pk.kho_ma AS "Kho_Ma", k.kho_ten AS "Kho_Ten",
+        s.shipper_ma AS "Shipper_Ma", s.shipper_ten AS "Shipper_Ten", s.shipper_sdt AS "Shipper_SDT", s.lsp_ma AS "Shipper_LSP",
+        gh.gh_ten AS "TenShop", dc_shop.dc_mota AS "DiaChiLayHang", ttnh.ttnh_ten AS "TenKhach", ttnh.ttnh_diachisnapshot AS "DiaChiGiao",
+        ttc.kho_di_ma AS "Kho_Di_Ma", k_di.kho_ten AS "Kho_Di_Ten",
+        ttc.kho_den_ma AS "Kho_Den_Ma", k_den.kho_ten AS "Kho_Den_Ten"
       FROM phieu_kho pk
       JOIN donhangtheoshop dts ON pk.dts_ma = dts.dts_ma
+      JOIN kho k ON pk.kho_ma = k.kho_ma
       JOIN gianhang gh ON dts.gh_ma = gh.gh_ma
+      LEFT JOIN diachi dc_shop ON dts.dc_layhangma = dc_shop.dc_ma
       JOIN donhangkhachmua dm ON dts.dm_ma = dm.dm_ma
       JOIN thongtinnhanhang ttnh ON dm.ttnh_ma = ttnh.ttnh_ma
       LEFT JOIN shipper s ON pk.shipper_ma = s.shipper_ma
+      LEFT JOIN LATERAL (
+        SELECT t.kho_di_ma, t.kho_den_ma
+        FROM thongtintrungchuyen t
+        WHERE t.dts_ma = dts.dts_ma
+        ORDER BY t.ttc_thoidiemtao DESC
+        LIMIT 1
+      ) ttc ON TRUE
+      LEFT JOIN kho k_di ON ttc.kho_di_ma = k_di.kho_ma
+      LEFT JOIN kho k_den ON ttc.kho_den_ma = k_den.kho_ma
       WHERE pk.kho_ma = $1 AND ($2::text IS NULL OR pk.pk_loai = $2) AND ($3::text IS NULL OR pk.pk_ly_do = $3)
       ORDER BY pk.pk_thoigian_tao DESC LIMIT 500
     `;
     const res = await pool.query(query, [kho_ma, loai || null, lyDo || null]);
-    return res.rows;
+    return ganHuongDi(res.rows);
   },
 
   getChiTiet: async (pk_ma) => {
     const pkRes = await pool.query(`
         SELECT pk.pk_ma AS "PK_Ma", pk.dts_ma AS "DTS_Ma", pk.pk_loai AS "Loai", pk.pk_ly_do AS "LyDo", pk.pk_trangthai AS "TrangThai", pk.pk_hinhanh AS "HinhAnh", pk.pk_ghichu AS "GhiChu", pk.pk_thoigian_tao AS "ThoiGianTao", pk.pk_thoigian_xacnhan AS "ThoiGianXacNhan",
           k.kho_ma AS "Kho_Ma", k.kho_ten AS "Kho_Ten", k.kho_hinhanh AS "Kho_HinhAnh", kc.dc_mota AS "Kho_DiaChi", kt.tinh_ten AS "Kho_Tinh", kx.xa_ten AS "Kho_Xa", d.dvvc_ma AS "DVVC_Ma", d.dvvc_ten AS "DVVC_Ten",
-          s.shipper_ma AS "Shipper_Ma", s.shipper_ten AS "Shipper_Ten", s.shipper_sdt AS "Shipper_SDT", gh.gh_ten AS "TenShop", dcs.dc_mota AS "DiaChiShop", ttnh.ttnh_ten AS "TenKhach", ttnh.ttnh_sdt AS "SdtKhach", ttnh.ttnh_diachisnapshot AS "DiaChiGiao", dts.dts_tongtienkhachhangthanhtoan AS "TongTien"
+          s.shipper_ma AS "Shipper_Ma", s.shipper_ten AS "Shipper_Ten", s.shipper_sdt AS "Shipper_SDT", s.shipper_hinhanh AS "Shipper_HinhAnh", s.lsp_ma AS "Shipper_LSP",
+          gh.gh_ten AS "TenShop", dcs.dc_mota AS "DiaChiShop", dcs.dc_mota AS "DiaChiLayHang", ttnh.ttnh_ten AS "TenKhach", ttnh.ttnh_sdt AS "SdtKhach", ttnh.ttnh_diachisnapshot AS "DiaChiGiao", dts.dts_tongtienkhachhangthanhtoan AS "TongTien",
+          ttc.kho_di_ma AS "Kho_Di_Ma", k_di.kho_ten AS "Kho_Di_Ten",
+          ttc.kho_den_ma AS "Kho_Den_Ma", k_den.kho_ten AS "Kho_Den_Ten"
         FROM phieu_kho pk
         JOIN kho k ON pk.kho_ma = k.kho_ma JOIN diachi kc ON k.dc_ma = kc.dc_ma JOIN xaphuong kx ON kc.xa_ma = kx.xa_ma JOIN tinhtp kt ON kx.tinh_ma = kt.tinh_ma JOIN donvivanchuyen d ON k.dvvc_ma = d.dvvc_ma
         JOIN donhangtheoshop dts ON pk.dts_ma = dts.dts_ma JOIN gianhang gh ON dts.gh_ma = gh.gh_ma JOIN diachi dcs ON dts.dc_layhangma = dcs.dc_ma JOIN donhangkhachmua dm ON dts.dm_ma = dm.dm_ma JOIN thongtinnhanhang ttnh ON dm.ttnh_ma = ttnh.ttnh_ma
         LEFT JOIN shipper s ON pk.shipper_ma = s.shipper_ma
+        LEFT JOIN LATERAL (
+          SELECT t.kho_di_ma, t.kho_den_ma
+          FROM thongtintrungchuyen t
+          WHERE t.dts_ma = dts.dts_ma
+          ORDER BY t.ttc_thoidiemtao DESC
+          LIMIT 1
+        ) ttc ON TRUE
+        LEFT JOIN kho k_di ON ttc.kho_di_ma = k_di.kho_ma
+        LEFT JOIN kho k_den ON ttc.kho_den_ma = k_den.kho_ma
         WHERE pk.pk_ma = $1 LIMIT 1
       `, [pk_ma]);
 
@@ -186,7 +271,7 @@ const PhieuKhoModel = {
       `, [phieu.DTS_Ma]);
 
     phieu.items = itemsRes.rows;
-    return phieu;
+    return ganHuongDi([phieu])[0];
   },
 };
 module.exports = PhieuKhoModel;
