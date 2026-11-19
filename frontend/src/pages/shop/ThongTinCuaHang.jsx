@@ -68,8 +68,8 @@ const useBankAccount = (ownerId, notify) => {
   const [linkedBank, setLinkedBank] = useState(null);
   const [bankForm, setBankForm] = useState(EMPTY_BANK_FORM);
   const [savingBank, setSavingBank] = useState(false);
-  // Secret không bao giờ được tải về máy khách: chỉ biết đã cấu hình hay chưa + 4 ký tự cuối
-  const [secretInfo, setSecretInfo] = useState({ has: false, hint: "" });
+  // Secret không bao giờ được tải về máy khách: chỉ biết đã lưu hay chưa + lúc nào
+  const [secretInfo, setSecretInfo] = useState({ has: false, savedAt: null });
 
   const updateBankForm = useCallback(
     (patch) => setBankForm((prev) => ({ ...prev, ...patch })),
@@ -88,7 +88,7 @@ const useBankAccount = (ownerId, notify) => {
       setLinkedBank(resLinked.data);
       setSecretInfo({
         has: !!resLinked.data.sepay_webhook_secret_set,
-        hint: resLinked.data.sepay_webhook_secret_hint || "",
+        savedAt: resLinked.data.sepay_webhook_secret_saved_at || null,
       });
       setBankForm({
         nh_ma: resLinked.data.nh_ma || resLinked.data.nganhang_ma,
@@ -127,7 +127,7 @@ const useBankAccount = (ownerId, notify) => {
       setLinkedBank(res.data);
       setSecretInfo({
         has: !!res.data?.sepay_webhook_secret_set,
-        hint: res.data?.sepay_webhook_secret_hint || "",
+        savedAt: res.data?.sepay_webhook_secret_saved_at || null,
       });
       // Xoá secret khỏi form sau khi lưu (không giữ nguyên văn trong state)
       setBankForm((prev) => ({ ...prev, sepay_webhook_secret: "" }));
@@ -443,7 +443,7 @@ const ThongTinCuaHang = () => {
               }
               placeholder={
                 secretInfo.has
-                  ? `Đã cấu hình ${secretInfo.hint} — để trống nếu không đổi`
+                  ? "Đã lưu secret — để trống nếu không đổi"
                   : "Dán Secret Key của webhook SePay vào đây..."
               }
               className="w-full px-4 py-3 rounded-xl border border-blue-300 outline-none focus:border-blue-500"
@@ -453,8 +453,12 @@ const ThongTinCuaHang = () => {
                 <span className="material-symbols-outlined text-[16px]">
                   verified_user
                 </span>
-                Đã lưu secret {secretInfo.hint}. Chỉ nhập khi bạn muốn đổi secret
-                mới.
+                {secretInfo.savedAt
+                  ? `Đã lưu chuỗi bạn nhập vào lúc ${new Date(
+                      secretInfo.savedAt,
+                    ).toLocaleString("vi-VN", { hour12: false })}.`
+                  : "Đã lưu chuỗi bạn nhập vào trước đây."}{" "}
+                Chỉ nhập khi bạn muốn đổi secret mới.
               </p>
             )}
             <p className="text-xs text-blue-600 mt-2">

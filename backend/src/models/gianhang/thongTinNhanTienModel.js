@@ -1,4 +1,5 @@
 const pool = require('../../config/db');
+const { danhDauDaLuu } = require('../../config/secretSavedAt');
 
 const ThongTinNhanTienModel = {
     // 1. Lấy thông tin nhận tiền
@@ -11,6 +12,8 @@ const ThongTinNhanTienModel = {
                     tt.ttnt_gianhang_tentaikhoan,
                     tt.ttnt_gianhang_sotaikhoan,
                     tt.sepay_webhook_secret, -- 🟢 Đã thêm cột này
+                    -- Dùng to_jsonb để không lỗi nếu migration chưa chạy
+                    to_jsonb(tt)->>'sepay_webhook_secret_saved_at' AS "sepay_webhook_secret_saved_at",
                     nh.nhg_ten,
                     nh.nhg_logo
                 FROM thongtinnhantien_gianhang tt
@@ -71,6 +74,16 @@ const ThongTinNhanTienModel = {
                 data.ttnt_gianhang_sotaikhoan,
                 secretLuu // 🟢 Đã mã hoá (hoặc giữ nguyên bản cũ)
             ]);
+
+            // Chỉ ghi mốc thời gian khi người dùng nhập secret mới
+            if (secretMoi) {
+                await danhDauDaLuu(
+                    (sql, params) => client.query(sql, params),
+                    'thongtinnhantien_gianhang',
+                    'gh_ma',
+                    data.gh_ma
+                );
+            }
 
             await client.query('COMMIT');
             return result.rows[0];

@@ -108,14 +108,4 @@ const decrypt = (stored) => {
   }
 };
 
-/**
- * Che secret khi trả về trình duyệt: chỉ giữ 4 ký tự cuối.
- * @returns {string|null} ví dụ "••••2i2T"
- */
-const mask = (secret) => {
-  if (!secret) return null;
-  const value = String(secret);
-  return `••••${value.slice(-4)}`;
-};
-
-module.exports = { encrypt, decrypt, mask };
+module.exports = { encrypt, decrypt };

@@ -1,5 +1,5 @@
 const ThongTinNhanTienModel = require('../../models/gianhang/thongTinNhanTienModel');
-const { encrypt, decrypt, mask } = require('../../config/secretCrypto');
+const { encrypt, decrypt } = require('../../config/secretCrypto');
 
 const ThongTinNhanTienController = {
     // 1. Lấy thông tin (KHÔNG trả secret nguyên văn)
@@ -13,7 +13,9 @@ const ThongTinNhanTienController = {
             delete ketQua.sepay_webhook_secret;
 
             ketQua.sepay_webhook_secret_set = !!secret;
-            ketQua.sepay_webhook_secret_hint = mask(secret);
+            // Thời điểm lưu secret (null nếu secret có từ trước khi thêm cột này)
+            ketQua.sepay_webhook_secret_saved_at =
+                data.sepay_webhook_secret_saved_at || null;
 
             res.status(200).json(ketQua);
         } catch (error) {

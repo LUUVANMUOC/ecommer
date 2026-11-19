@@ -44,8 +44,8 @@ const ThongTinDVVC = () => {
   const [bankForm, setBankForm] = useState(EMPTY_BANK_FORM);
   const [savingBank, setSavingBank] = useState(false);
   const [qrBank, setQrBank] = useState(null);
-  // Secret không bao giờ được tải về máy khách: chỉ biết đã cấu hình hay chưa + 4 ký tự cuối
-  const [secretInfo, setSecretInfo] = useState({ has: false, hint: "" });
+  // Secret không bao giờ được tải về máy khách: chỉ biết đã lưu hay chưa + lúc nào
+  const [secretInfo, setSecretInfo] = useState({ has: false, savedAt: null });
 
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
@@ -77,7 +77,7 @@ const ThongTinDVVC = () => {
 
       setSecretInfo({
         has: !!data.sepay_webhook_secret_set,
-        hint: data.sepay_webhook_secret_hint || "",
+        savedAt: data.sepay_webhook_secret_saved_at || null,
       });
 
       if (data.NganHang_Ma) {
@@ -433,7 +433,7 @@ const ThongTinDVVC = () => {
                       }
                       placeholder={
                         secretInfo.has
-                          ? `Đã cấu hình ${secretInfo.hint} — để trống nếu không đổi`
+                          ? "Đã lưu secret — để trống nếu không đổi"
                           : "Dán Secret Key của webhook SePay vào đây..."
                       }
                       className="w-full px-4 py-3 rounded-xl border border-blue-300 outline-none focus:border-blue-500"
@@ -443,8 +443,12 @@ const ThongTinDVVC = () => {
                         <span className="material-symbols-outlined text-[16px]">
                           verified_user
                         </span>
-                        Đã lưu secret {secretInfo.hint}. Chỉ nhập khi bạn muốn đổi
-                        secret mới.
+                        {secretInfo.savedAt
+                          ? `Đã lưu chuỗi bạn nhập vào lúc ${new Date(
+                              secretInfo.savedAt,
+                            ).toLocaleString("vi-VN", { hour12: false })}.`
+                          : "Đã lưu chuỗi bạn nhập vào trước đây."}{" "}
+                        Chỉ nhập khi bạn muốn đổi secret mới.
                       </p>
                     )}
                     <p className="text-xs text-blue-600 mt-2">

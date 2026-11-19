@@ -1,4 +1,5 @@
 const db = require('../../config/db');
+const { danhDauDaLuu } = require('../../config/secretSavedAt');
 
 const DvvcProfileModel = {
     // 1. Lấy thông tin Profile (Đã thêm sepay_webhook_secret)
@@ -20,6 +21,12 @@ const DvvcProfileModel = {
                   WHERE s.dvvc_ma = d.dvvc_ma
                     AND s.sepay_webhook_secret IS NOT NULL
                   LIMIT 1) AS "sepay_webhook_secret",
+                -- Dùng to_jsonb để không lỗi nếu migration chưa chạy
+                (SELECT to_jsonb(s3)->>'sepay_webhook_secret_saved_at'
+                   FROM thongtinnhantien_dvvc s3
+                  WHERE s3.dvvc_ma = d.dvvc_ma
+                    AND s3.sepay_webhook_secret IS NOT NULL
+                  LIMIT 1) AS "sepay_webhook_secret_saved_at",
                 nh.nhg_ten AS "NHG_Ten", 
                 nh.nhg_logo AS "NHG_Logo"
             FROM donvivanchuyen d
@@ -77,6 +84,17 @@ const DvvcProfileModel = {
             data.sepay_webhook_secret || null // 🟢 Truyền dữ liệu Secret
         ];
         const result = await db.query(query, values);
+
+        // Chỉ ghi mốc thời gian khi người dùng nhập secret mới
+        if (data.sepay_webhook_secret) {
+            await danhDauDaLuu(
+                (sql, params) => db.query(sql, params),
+                'thongtinnhantien_dvvc',
+                'dvvc_ma',
+                dvvc_ma
+            );
+        }
+
         return result.rows[0];
     },
 

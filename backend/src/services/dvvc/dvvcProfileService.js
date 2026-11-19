@@ -2,7 +2,7 @@ const DvvcProfileModel = require('../../models/dvvc/dvvcProfileModel');
 const bcrypt = require('bcryptjs');
 const fs = require('fs');
 const path = require('path');
-const { encrypt, decrypt, mask } = require('../../config/secretCrypto');
+const { encrypt, decrypt } = require('../../config/secretCrypto');
 
 const UPLOAD_DIR = path.join(__dirname, '../../../public/uploads/dvvc');
 
@@ -17,7 +17,9 @@ const DvvcProfileService = {
         delete ketQua.sepay_webhook_secret;
 
         ketQua.sepay_webhook_secret_set = !!secret;
-        ketQua.sepay_webhook_secret_hint = mask(secret);
+        // Thời điểm lưu secret (null nếu secret có từ trước khi thêm cột này)
+        ketQua.sepay_webhook_secret_saved_at =
+            data.sepay_webhook_secret_saved_at || null;
 
         return ketQua;
     },
