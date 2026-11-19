@@ -19,6 +19,14 @@ const QuanLyPhieuKho = () => {
   const [ghichu, setGhichu] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  // ── Xác nhận hàng loạt ────────────────────────────────────────
+  const [selected, setSelected] = useState([]);
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkPhoto, setBulkPhoto] = useState(null);
+  const [bulkPhotoPreview, setBulkPhotoPreview] = useState(null);
+  const [bulkGhichu, setBulkGhichu] = useState("");
+  const [bulkSubmitting, setBulkSubmitting] = useState(false);
+
   const [toast, setToast] = useState({
     show: false,
     message: "",
@@ -45,6 +53,11 @@ const QuanLyPhieuKho = () => {
   useEffect(() => {
     fetchData();
   }, [kho_ma, activeTab]);
+
+  // Đổi tab thì bỏ lựa chọn cũ (không trộn phiếu nhập và phiếu xuất)
+  useEffect(() => {
+    setSelected([]);
+  }, [activeTab]);
 
   const handleOpenModal = (order) => {
     setSelectedOrder(order);
@@ -92,6 +105,87 @@ const QuanLyPhieuKho = () => {
       showToast(err.response?.data?.message || "Lỗi xác nhận", "error");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  // ── Chọn nhiều phiếu ─────────────────────────────────────────
+  const toggleOne = (pk_ma) => {
+    setSelected((prev) =>
+      prev.includes(pk_ma) ? prev.filter((ma) => ma !== pk_ma) : [...prev, pk_ma]
+    );
+  };
+
+  const toggleAll = () => {
+    setSelected((prev) =>
+      prev.length === orders.length ? [] : orders.map((o) => o.PK_Ma)
+    );
+  };
+
+  const handleOpenBulk = () => {
+    if (selected.length === 0)
+      return showToast("Vui lòng chọn ít nhất 1 phiếu!", "error");
+    setBulkPhoto(null);
+    setBulkPhotoPreview(null);
+    setBulkGhichu("");
+    setBulkOpen(true);
+  };
+
+  const handleCloseBulk = () => {
+    if (bulkSubmitting) return;
+    setBulkOpen(false);
+    setBulkPhoto(null);
+    setBulkPhotoPreview(null);
+    setBulkGhichu("");
+  };
+
+  const handleBulkPhotoChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setBulkPhoto(file);
+    setBulkPhotoPreview(URL.createObjectURL(file));
+  };
+
+  const handleBulkSubmit = async (e) => {
+    e.preventDefault();
+    if (!bulkPhoto) return showToast("Vui lòng chọn ảnh minh chứng!", "error");
+
+    setBulkSubmitting(true);
+    try {
+      const fd = new FormData();
+      fd.append("hinhanh", bulkPhoto);
+      fd.append("kho_ma", kho_ma);
+      fd.append("danh_sach", JSON.stringify(selected));
+      if (bulkGhichu) fd.append("ghichu", bulkGhichu);
+
+      const res =
+        activeTab === "NHAP"
+          ? await phieuKhoService.xacNhanNhapBatch(fd)
+          : await phieuKhoService.xacNhanXuatBatch(fd);
+
+      const { tongSo, thanhCong } = res.data;
+      const tenLoai = activeTab === "NHAP" ? "nhập" : "xuất";
+
+      if (thanhCong === tongSo) {
+        showToast(`Đã xác nhận ${thanhCong}/${tongSo} phiếu ${tenLoai} kho!`);
+      } else {
+        const loi = (res.data.ketQua || []).filter((r) => !r.ok);
+        const chiTiet = loi
+          .slice(0, 3)
+          .map((r) => `${r.pk_ma} (${r.ly_do})`)
+          .join(", ");
+        showToast(
+          `Đã xác nhận ${thanhCong}/${tongSo} phiếu. Bỏ qua: ${chiTiet}${loi.length > 3 ? "..." : ""}`,
+          "error"
+        );
+      }
+
+      setBulkOpen(false);
+      setSelected([]);
+      fetchData();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Lỗi xác nhận hàng loạt", "error");
+    } finally {
+      setBulkSubmitting(false);
     }
   };
 
@@ -143,113 +237,178 @@ const QuanLyPhieuKho = () => {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-          {orders.map((o) => (
-            <div
-              key={o.PK_Ma}
-              className={`bg-white rounded-2xl shadow-sm border-t-4 p-5 flex flex-col ${
-                activeTab === "NHAP"
-                  ? "border-t-indigo-500"
-                  : "border-t-orange-500"
-              } border-l border-r border-b border-[#E2E8F0]`}
-            >
-              <div className="flex justify-between items-center mb-3 border-b pb-2">
-                <div>
-                  <span
-                    className={`font-mono text-sm font-bold ${activeTab === "NHAP" ? "text-indigo-600" : "text-orange-600"}`}
-                  >
-                    {o.PK_Ma}
-                  </span>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    Đơn: <b className="text-gray-700">{o.DTS_Ma}</b>
-                  </p>
-                </div>
-                <span
-                  className={`text-xs px-2 py-1 rounded font-bold ${activeTab === "NHAP" ? "bg-indigo-50 text-indigo-600" : "bg-orange-50 text-orange-600"}`}
-                >
-                  Chờ {activeTab === "NHAP" ? "nhập" : "xuất"}
+        <>
+          {/* Thanh công cụ xác nhận hàng loạt */}
+          <div className="mb-4 flex flex-wrap items-center gap-3 rounded-2xl border border-[#E2E8F0] bg-white px-4 py-3 shadow-sm">
+            <label className="flex items-center gap-2 text-sm font-semibold text-[#334155] cursor-pointer select-none">
+              <input
+                type="checkbox"
+                className="w-4 h-4 cursor-pointer"
+                checked={orders.length > 0 && selected.length === orders.length}
+                onChange={toggleAll}
+                disabled={bulkSubmitting}
+              />
+              Chọn tất cả ({orders.length})
+            </label>
+
+            <span className="text-sm text-[#64748B]">
+              Đã chọn: <b className="text-indigo-600">{selected.length}</b>
+            </span>
+
+            <div className="ml-auto flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={handleOpenBulk}
+                disabled={bulkSubmitting || selected.length === 0}
+                className={`px-4 py-2 text-white text-sm font-bold rounded-lg disabled:bg-gray-400 disabled:cursor-not-allowed whitespace-nowrap ${
+                  activeTab === "NHAP"
+                    ? "bg-indigo-600 hover:bg-indigo-700"
+                    : "bg-orange-600 hover:bg-orange-700"
+                }`}
+              >
+                <span className="material-symbols-outlined text-[18px] align-middle mr-1">
+                  {activeTab === "NHAP" ? "move_to_inbox" : "outbox"}
                 </span>
-              </div>
+                Xác nhận {activeTab === "NHAP" ? "nhập" : "xuất"}{" "}
+                {selected.length} phiếu
+              </button>
 
-              <div className="flex items-center gap-3 mb-3 pb-3 border-b border-[#F1F5F9]">
-                <img
-                  src={toAssetUrl(o.Shipper_HinhAnh)}
-                  alt=""
-                  className="w-10 h-10 rounded-full object-cover border border-[#E2E8F0]"
-                  onError={(e) => {
-                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(o.Shipper_Ten || "S")}&background=random&color=fff`;
-                  }}
-                />
-                <div className="min-w-0">
-                  <p className="font-bold text-sm text-[#0F172A] truncate">
-                    {o.Shipper_Ten}
-                  </p>
-                  <p className="text-xs text-[#64748B]">{o.Shipper_SDT}</p>
-                </div>
-              </div>
-
-              <div className="space-y-1.5 text-sm flex-1">
-                <p>
-                  <b className="text-[#334155]">Shop:</b> {o.TenShop}
-                </p>
-                <p className="text-[#64748B] text-xs">
-                  <b>Lấy tại:</b> {o.DiaChiLayHang}
-                </p>
-                <p className="text-[#64748B] text-xs">
-                  <b>Giao đến:</b> {o.DiaChiGiao}
-                </p>
-                <p className="text-[#64748B]">
-                  <b>Tổng tiền:</b>{" "}
-                  <span className="text-[#DC2626] font-bold">
-                    {formatVND(o.TongTien)}
-                  </span>
-                </p>
-
-                {o.items?.length > 0 && (
-                  <div className="mt-2 pt-2 border-t border-[#F1F5F9]">
-                    <p className="text-xs font-semibold text-gray-500 mb-1">
-                      Sản phẩm ({o.items.length}):
-                    </p>
-                    {o.items.slice(0, 3).map((it, idx) => (
-                      <p
-                        key={idx}
-                        className="text-xs text-gray-600 truncate leading-5"
-                      >
-                        • {it.TenSanPham}{" "}
-                        {it.TenPhanLoai ? `(${it.TenPhanLoai})` : ""} ×{" "}
-                        {it.SoLuong}
-                      </p>
-                    ))}
-                    {o.items.length > 3 && (
-                      <p className="text-xs text-gray-400 italic mt-0.5">
-                        ... và {o.items.length - 3} sản phẩm khác
-                      </p>
-                    )}
-                  </div>
-                )}
-              </div>
-
-              <div className="mt-4 pt-4 border-t border-[#F1F5F9]">
+              {selected.length > 0 && (
                 <button
-                  onClick={() => handleOpenModal(o)}
-                  className={`w-full py-2.5 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-1 ${
+                  type="button"
+                  onClick={() => setSelected([])}
+                  disabled={bulkSubmitting}
+                  className="px-3 py-2 text-sm font-semibold text-[#64748B] hover:text-[#0F172A]"
+                >
+                  Bỏ chọn
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {orders.map((o) => {
+              const isChecked = selected.includes(o.PK_Ma);
+              return (
+                <div
+                  key={o.PK_Ma}
+                  className={`bg-white rounded-2xl shadow-sm border-t-4 p-5 flex flex-col ${
                     activeTab === "NHAP"
-                      ? "bg-indigo-600 hover:bg-indigo-700"
-                      : "bg-orange-600 hover:bg-orange-700"
+                      ? "border-t-indigo-500"
+                      : "border-t-orange-500"
+                  } border-l border-r border-b border-[#E2E8F0] ${
+                    isChecked ? "ring-2 ring-indigo-300" : ""
                   }`}
                 >
-                  <span className="material-symbols-outlined text-[18px]">
-                    {activeTab === "NHAP" ? "move_to_inbox" : "outbox"}
-                  </span>
-                  Xác nhận {activeTab === "NHAP" ? "Nhập" : "Xuất"} kho
-                </button>
-              </div>
-            </div>
-          ))}
-        </div>
+                  <div className="flex justify-between items-center mb-3 border-b pb-2">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={isChecked}
+                        onChange={() => toggleOne(o.PK_Ma)}
+                        disabled={bulkSubmitting}
+                        className="w-4 h-4 cursor-pointer"
+                      />
+                      <div>
+                        <span
+                          className={`font-mono text-sm font-bold ${activeTab === "NHAP" ? "text-indigo-600" : "text-orange-600"}`}
+                        >
+                          {o.PK_Ma}
+                        </span>
+                        <p className="text-xs text-gray-400 mt-0.5">
+                          Đơn: <b className="text-gray-700">{o.DTS_Ma}</b>
+                        </p>
+                      </div>
+                    </div>
+                    <span
+                      className={`text-xs px-2 py-1 rounded font-bold ${activeTab === "NHAP" ? "bg-indigo-50 text-indigo-600" : "bg-orange-50 text-orange-600"}`}
+                    >
+                      Chờ {activeTab === "NHAP" ? "nhập" : "xuất"}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 mb-3 pb-3 border-b border-[#F1F5F9]">
+                    <img
+                      src={toAssetUrl(o.Shipper_HinhAnh)}
+                      alt=""
+                      className="w-10 h-10 rounded-full object-cover border border-[#E2E8F0]"
+                      onError={(e) => {
+                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(o.Shipper_Ten || "S")}&background=random&color=fff`;
+                      }}
+                    />
+                    <div className="min-w-0">
+                      <p className="font-bold text-sm text-[#0F172A] truncate">
+                        {o.Shipper_Ten}
+                      </p>
+                      <p className="text-xs text-[#64748B]">{o.Shipper_SDT}</p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5 text-sm flex-1">
+                    <p>
+                      <b className="text-[#334155]">Shop:</b> {o.TenShop}
+                    </p>
+                    <p className="text-[#64748B] text-xs">
+                      <b>Lấy tại:</b> {o.DiaChiLayHang}
+                    </p>
+                    <p className="text-[#64748B] text-xs">
+                      <b>Giao đến:</b> {o.DiaChiGiao}
+                    </p>
+                    <p className="text-[#64748B]">
+                      <b>Tổng tiền:</b>{" "}
+                      <span className="text-[#DC2626] font-bold">
+                        {formatVND(o.TongTien)}
+                      </span>
+                    </p>
+
+                    {o.items?.length > 0 && (
+                      <div className="mt-2 pt-2 border-t border-[#F1F5F9]">
+                        <p className="text-xs font-semibold text-gray-500 mb-1">
+                          Sản phẩm ({o.items.length}):
+                        </p>
+                        {o.items.slice(0, 3).map((it, idx) => (
+                          <p
+                            key={idx}
+                            className="text-xs text-gray-600 truncate leading-5"
+                          >
+                            • {it.TenSanPham}{" "}
+                            {it.TenPhanLoai ? `(${it.TenPhanLoai})` : ""} ×{" "}
+                            {it.SoLuong}
+                          </p>
+                        ))}
+                        {o.items.length > 3 && (
+                          <p className="text-xs text-gray-400 italic mt-0.5">
+                            ... và {o.items.length - 3} sản phẩm khác
+                          </p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-4 pt-4 border-t border-[#F1F5F9]">
+                    <button
+                      onClick={() => handleOpenModal(o)}
+                      disabled={bulkSubmitting}
+                      className={`w-full py-2.5 text-white rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-1 disabled:bg-gray-400 ${
+                        activeTab === "NHAP"
+                          ? "bg-indigo-600 hover:bg-indigo-700"
+                          : "bg-orange-600 hover:bg-orange-700"
+                      }`}
+                    >
+                      <span className="material-symbols-outlined text-[18px]">
+                        {activeTab === "NHAP" ? "move_to_inbox" : "outbox"}
+                      </span>
+                      Xác nhận {activeTab === "NHAP" ? "Nhập" : "Xuất"} kho
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>
       )}
 
-      {/* MODAL */}
+      {/* MODAL XÁC NHẬN TỪNG PHIẾU */}
       {selectedOrder && (
         <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl w-full max-w-md overflow-hidden shadow-xl max-h-[90vh] overflow-y-auto">
@@ -344,6 +503,118 @@ const QuanLyPhieuKho = () => {
                   }`}
                 >
                   {submitting ? "Đang xử lý..." : "Xác Nhận"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL XÁC NHẬN HÀNG LOẠT */}
+      {bulkOpen && (
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4">
+          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-xl max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b border-[#E2E8F0] flex justify-between items-center sticky top-0 bg-white z-10">
+              <div>
+                <h3 className="text-xl font-bold text-[#0F172A]">
+                  Xác Nhận {activeTab === "NHAP" ? "Nhập" : "Xuất"} Kho Hàng Loạt
+                </h3>
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Gồm <b className="text-indigo-600">{selected.length}</b> phiếu
+                </p>
+              </div>
+              <button
+                onClick={handleCloseBulk}
+                disabled={bulkSubmitting}
+                className="text-gray-400 hover:text-red-500 disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleBulkSubmit} className="p-6 space-y-4">
+              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-800 flex gap-2">
+                <span className="material-symbols-outlined text-[20px] shrink-0">
+                  info
+                </span>
+                <p>
+                  Hành động này xác nhận hàng hóa thực tế đã{" "}
+                  {activeTab === "NHAP" ? "vào" : "ra"} khỏi kho cho{" "}
+                  <b>tất cả {selected.length} phiếu</b> bên dưới. Một ảnh minh
+                  chứng sẽ được dùng chung cho cả lô.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">
+                  Danh sách phiếu ({selected.length})
+                </label>
+                <div className="max-h-32 overflow-y-auto rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-2 space-y-1">
+                  {selected.map((pk) => (
+                    <p
+                      key={pk}
+                      className="font-mono text-xs text-[#334155] px-2 py-1 bg-white rounded border border-[#F1F5F9]"
+                    >
+                      {pk}
+                    </p>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">
+                  Ảnh minh chứng chung <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="file"
+                  accept="image/*"
+                  required
+                  onChange={handleBulkPhotoChange}
+                  className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-indigo-50 file:text-indigo-600 file:font-semibold"
+                />
+                {bulkPhotoPreview && (
+                  <img
+                    src={bulkPhotoPreview}
+                    alt="Preview"
+                    className="mt-3 w-full h-40 object-cover rounded-xl border border-[#E2E8F0]"
+                  />
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold mb-1">
+                  Ghi chú chung (không bắt buộc)
+                </label>
+                <textarea
+                  rows={2}
+                  value={bulkGhichu}
+                  onChange={(e) => setBulkGhichu(e.target.value)}
+                  placeholder="VD: Lô hàng đủ kiện, nguyên vẹn..."
+                  className="w-full px-4 py-2.5 rounded-xl border border-[#E2E8F0] outline-none focus:border-indigo-500 resize-none"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t">
+                <button
+                  type="button"
+                  onClick={handleCloseBulk}
+                  disabled={bulkSubmitting}
+                  className="px-6 py-2.5 rounded-xl font-semibold text-[#64748B] hover:bg-gray-100 disabled:opacity-50"
+                >
+                  Hủy
+                </button>
+                <button
+                  type="submit"
+                  disabled={bulkSubmitting}
+                  className={`px-8 py-2.5 text-white rounded-xl font-bold disabled:bg-gray-400 ${
+                    activeTab === "NHAP"
+                      ? "bg-indigo-600 hover:bg-indigo-700"
+                      : "bg-orange-600 hover:bg-orange-700"
+                  }`}
+                >
+                  {bulkSubmitting
+                    ? "Đang xử lý..."
+                    : `Xác nhận ${selected.length} phiếu`}
                 </button>
               </div>
             </form>

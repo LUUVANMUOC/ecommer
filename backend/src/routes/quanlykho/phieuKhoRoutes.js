@@ -18,6 +18,9 @@ router.get('/cho-xac-nhan/:kho_ma', PhieuKhoController.getChoXacNhan);
 router.get('/lich-su/:kho_ma', PhieuKhoController.getLichSu);
 router.put('/xac-nhan/:pk_ma', upload.single('hinhanh'), PhieuKhoController.xacNhanNhap);
 router.put('/xac-nhan-xuat/:pk_ma', upload.single('hinhanh'), PhieuKhoController.xacNhanXuat);
+// Xác nhận hàng loạt: 1 ảnh minh chứng chung cho cả lô
+router.put('/xac-nhan-nhap-hang-loat', upload.single('hinhanh'), PhieuKhoController.xacNhanNhapBatch);
+router.put('/xac-nhan-xuat-hang-loat', upload.single('hinhanh'), PhieuKhoController.xacNhanXuatBatch);
 router.get('/:pk_ma', PhieuKhoController.getChiTiet);
 
 module.exports = router;

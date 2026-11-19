@@ -14,6 +14,16 @@ const phieuKhoService = {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
 
+  xacNhanNhapBatch: (formData) =>
+    axiosClient.put('/quan-ly-kho/phieu-kho/xac-nhan-nhap-hang-loat', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+
+  xacNhanXuatBatch: (formData) =>
+    axiosClient.put('/quan-ly-kho/phieu-kho/xac-nhan-xuat-hang-loat', formData, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    }),
+
   getLichSu: (kho_ma, params = {}) =>
     axiosClient.get(`/quan-ly-kho/phieu-kho/lich-su/${kho_ma}`, { params }),
 
