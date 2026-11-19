@@ -21,6 +21,14 @@ const QLKPhanCongController = {
       const result = await QLKPhanCongService.assignShipper(dts_ma, shipper_ma);
       res.status(201).json({ message: "Phân công thành công!", data: result });
     } catch (error) { res.status(400).json({ message: error.message }); }
+  },
+
+  assignShipperBatch: async (req, res) => {
+    try {
+      const { shipper_ma, danh_sach_dts } = req.body;
+      const result = await QLKPhanCongService.assignShipperBatch(shipper_ma, danh_sach_dts);
+      res.status(201).json(result);
+    } catch (error) { res.status(400).json({ message: error.message }); }
   }
 };
 

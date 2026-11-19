@@ -44,14 +44,24 @@ const QLKPhanCongModel = {
   },
 
   // 3. Phân công Shipper
+  // Guard: chỉ chèn khi đơn CHƯA có thông tin lấy hàng và vẫn đang ở TTDH02.
+  // Trả về null nếu đơn đã bị người khác phân công / không còn chờ lấy hàng.
   assignShipper: async (dts_ma, shipper_ma) => {
     const query = `
       INSERT INTO thongtinlayhang (dts_ma, shipper_ma, ttlh_thoidiemtao)
-      VALUES ($1, $2, NOW())
+      SELECT $1::varchar, $2::varchar, NOW()
+      WHERE NOT EXISTS (SELECT 1 FROM thongtinlayhang WHERE dts_ma = $1::varchar)
+        AND EXISTS (
+          SELECT 1 FROM donhangtheoshop dts
+          WHERE dts.dts_ma = $1::varchar
+            AND (SELECT ttdh_ma FROM chitiettrangthaidonhang
+                 WHERE dts_ma = dts.dts_ma
+                 ORDER BY ctttdh_thoidiem DESC LIMIT 1) = 'TTDH02'
+        )
       RETURNING *;
     `;
     const res = await pool.query(query, [dts_ma, shipper_ma]);
-    return res.rows[0];
+    return res.rows[0] || null;
   }
 };
 

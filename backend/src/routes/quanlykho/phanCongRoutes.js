@@ -5,5 +5,6 @@ const QLKPhanCongController = require('../../controllers/quanlykho/phanCongContr
 router.get('/don-cho-lay/:kho_ma', QLKPhanCongController.getPendingOrders);
 router.get('/shipper-theo-kho/:kho_ma', QLKPhanCongController.getShippersByKho);
 router.post('/phan-cong', QLKPhanCongController.assignShipper);
+router.post('/phan-cong-hang-loat', QLKPhanCongController.assignShipperBatch);
 
 module.exports = router;

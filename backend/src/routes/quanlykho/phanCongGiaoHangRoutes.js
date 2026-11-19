@@ -5,5 +5,6 @@ const PhanCongGiaoHangController = require('../../controllers/quanlykho/phanCong
 router.get('/don-cho-phan-cong/:kho_ma', PhanCongGiaoHangController.getDonChoPhanCong);
 router.get('/shipper-lsp03/:kho_ma', PhanCongGiaoHangController.getShippersLSP03);
 router.post('/phan-cong', PhanCongGiaoHangController.phanCongGiaoHang);
+router.post('/phan-cong-hang-loat', PhanCongGiaoHangController.phanCongGiaoHangBatch);
 
 module.exports = router;

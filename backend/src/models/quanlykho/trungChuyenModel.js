@@ -28,8 +28,18 @@ const TrungChuyenModel = {
     const client = await pool.connect();
     try {
       await client.query('BEGIN');
-      const res = await client.query(`INSERT INTO thongtintrungchuyen (dts_ma, shipper_trungchuyen_ma, kho_di_ma, kho_den_ma, ttc_ghichu) VALUES ($1, $2, $3, $4, $5) RETURNING *`, [data.dts_ma, data.shipper_trungchuyen_ma, data.kho_di_ma, data.kho_den_ma, data.ghichu || null]);
-      
+      // Guard: chỉ chèn khi đơn CHƯA có thông tin trung chuyển (chống double-click / 2 người cùng bấm)
+      const res = await client.query(
+        `INSERT INTO thongtintrungchuyen (dts_ma, shipper_trungchuyen_ma, kho_di_ma, kho_den_ma, ttc_ghichu)
+         SELECT $1::varchar, $2::varchar, $3::varchar, $4::varchar, $5::text
+         WHERE NOT EXISTS (SELECT 1 FROM thongtintrungchuyen WHERE dts_ma = $1::varchar)
+         RETURNING *`,
+        [data.dts_ma, data.shipper_trungchuyen_ma, data.kho_di_ma, data.kho_den_ma, data.ghichu || null]
+      );
+      if (res.rows.length === 0) {
+        throw new Error("Đơn hàng này đã được gửi trung chuyển!");
+      }
+
       // Phiếu xuất ở trạng thái CHỜ XÁC NHẬN
       await PhieuKhoModel.taoPhieu(client, {
         kho_ma: data.kho_di_ma, dts_ma: data.dts_ma, pk_loai: 'XUAT', pk_ly_do: 'TRUNG_CHUYEN_DI', shipper_ma: data.shipper_trungchuyen_ma, pk_trangthai: 'CHO_XAC_NHAN',

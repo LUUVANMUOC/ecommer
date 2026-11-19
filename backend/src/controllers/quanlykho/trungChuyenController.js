@@ -22,6 +22,14 @@ const TrungChuyenController = {
     } catch (error) { res.status(400).json({ message: error.message }); }
   },
 
+  guiTrungChuyenBatch: async (req, res) => {
+    try {
+      const { kho_di_ma, shipper_trungchuyen_ma, danh_sach } = req.body;
+      const result = await TrungChuyenService.guiTrungChuyenBatch(kho_di_ma, shipper_trungchuyen_ma, danh_sach);
+      res.status(201).json(result);
+    } catch (error) { res.status(400).json({ message: error.message }); }
+  },
+
   getDonChoNhan: async (req, res) => {
     try {
       const data = await TrungChuyenService.getDonChoNhan(req.params.kho_den_ma);

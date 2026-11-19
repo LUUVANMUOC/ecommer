@@ -21,6 +21,14 @@ const PhanCongGiaoHangController = {
       const result = await PhanCongGiaoHangService.phanCongGiaoHang(dts_ma, shipper_ma);
       res.status(201).json(result);
     } catch (error) { res.status(400).json({ message: error.message }); }
+  },
+
+  phanCongGiaoHangBatch: async (req, res) => {
+    try {
+      const { shipper_ma, danh_sach_dts } = req.body;
+      const result = await PhanCongGiaoHangService.phanCongGiaoHangBatch(shipper_ma, danh_sach_dts);
+      res.status(201).json(result);
+    } catch (error) { res.status(400).json({ message: error.message }); }
   }
 };
 
