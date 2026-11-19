@@ -54,6 +54,66 @@ const DonHangShopModel = {
     } catch (error) { await client.query('ROLLBACK'); throw error; } finally { client.release(); }
   },
 
+  // Xác nhận nhiều đơn trong CÙNG 1 transaction: tất cả hoặc không.
+  // - Khóa các dòng donhangtheoshop để tránh 2 tab xác nhận cùng lúc.
+  // - Kiểm tra toàn bộ đơn thuộc đúng shop và đang ở TTDH01 trước khi ghi.
+  confirmOrdersByShop: async (gh_ma, danh_sach) => {
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const checkRes = await client.query(
+        `SELECT dts.dts_ma AS "DTS_Ma", dts.gh_ma AS "Gh_Ma",
+           (SELECT ctttdh.ttdh_ma FROM chitiettrangthaidonhang ctttdh
+             WHERE ctttdh.dts_ma = dts.dts_ma
+             ORDER BY ctttdh.ctttdh_thoidiem DESC LIMIT 1) AS "Ttdh_Ma"
+         FROM donhangtheoshop dts
+         WHERE dts.dts_ma = ANY($1::varchar[])
+         FOR UPDATE OF dts`,
+        [danh_sach],
+      );
+
+      const theoMa = new Map(checkRes.rows.map((r) => [r.DTS_Ma, r]));
+      const khongTonTai = [];
+      const khongThuocShop = [];
+      const saiTrangThai = [];
+
+      for (const dts_ma of danh_sach) {
+        const row = theoMa.get(dts_ma);
+        if (!row) khongTonTai.push(dts_ma);
+        else if (row.Gh_Ma !== gh_ma) khongThuocShop.push(dts_ma);
+        else if (row.Ttdh_Ma !== 'TTDH01') saiTrangThai.push(dts_ma);
+      }
+
+      if (khongTonTai.length || khongThuocShop.length || saiTrangThai.length) {
+        const tomTat = (ds) =>
+          ds.length > 5 ? `${ds.slice(0, 5).join(', ')}...` : ds.join(', ');
+        const chiTiet = [
+          khongTonTai.length ? `không tồn tại: ${tomTat(khongTonTai)}` : null,
+          khongThuocShop.length ? `không thuộc shop: ${tomTat(khongThuocShop)}` : null,
+          saiTrangThai.length ? `không ở trạng thái Chờ Xác Nhận: ${tomTat(saiTrangThai)}` : null,
+        ]
+          .filter(Boolean)
+          .join('; ');
+        throw new Error(`Không thể xác nhận cả lô. ${chiTiet}`);
+      }
+
+      await client.query(
+        `INSERT INTO chitiettrangthaidonhang (dts_ma, ttdh_ma, ctttdh_thoidiem, ctttdh_ghichu)
+         SELECT unnest($1::varchar[]), 'TTDH02', NOW(), 'Shop đã xác nhận đơn hàng'`,
+        [danh_sach],
+      );
+
+      await client.query('COMMIT');
+      return { danhSach: danh_sach };
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  },
+
   phanHoiDanhGia: async (dts_ma, ctsp_ma, kh_ma, phanhoi) => {
     const query = `UPDATE danhgiasanpham SET dgsp_phanhoi = $1 WHERE dts_ma = $2 AND ctsp_ma = $3 AND kh_ma = $4 RETURNING *`;
     const res = await pool.query(query, [phanhoi, dts_ma, ctsp_ma, kh_ma]);

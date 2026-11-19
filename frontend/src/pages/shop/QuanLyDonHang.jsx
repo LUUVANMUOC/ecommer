@@ -1,5 +1,5 @@
 // src/pages/shop/QuanLyDonHang.jsx
-import { useState, useEffect, useContext, Fragment } from "react";
+import { useState, useEffect, useContext, Fragment, useMemo } from "react";
 import { AuthContext } from "../../contexts/AuthContext";
 import donHangShopService from "../../services/gianhang/donHangShopService";
 import { formatVND } from "../../components/shop/SanPhamShared";
@@ -72,6 +72,11 @@ const QuanLyDonHang = () => {
   });
   const [confirmingId, setConfirmingId] = useState(null);
 
+  // Xác nhận hàng loạt
+  const [selected, setSelected] = useState([]);
+  const [batchOpen, setBatchOpen] = useState(false);
+  const [submittingBatch, setSubmittingBatch] = useState(false);
+
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [orderDetail, setOrderDetail] = useState(null);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -85,7 +90,14 @@ const QuanLyDonHang = () => {
     if (!gh_ma) return;
     try {
       const res = await donHangShopService.getOrders(gh_ma);
-      setOrders(res.data);
+      const data = res.data || [];
+      setOrders(data);
+      // Bỏ chọn các đơn không còn chờ xác nhận (đã đổi trạng thái ở nơi khác)
+      setSelected((prev) =>
+        prev.filter((ma) =>
+          data.some((o) => o.DTS_Ma === ma && o.TrangThaiHienTai === "TTDH01"),
+        ),
+      );
     } catch (err) {
       showToast("Lỗi tải danh sách đơn hàng", "error");
     } finally {
@@ -108,6 +120,59 @@ const QuanLyDonHang = () => {
       showToast(error.response?.data?.message || "Lỗi!", "error");
     } finally {
       setConfirmingId(null);
+    }
+  };
+
+  // ---- Xác nhận hàng loạt ----
+  const donChoXacNhan = useMemo(
+    () => orders.filter((o) => o.TrangThaiHienTai === "TTDH01"),
+    [orders],
+  );
+
+  const daChonTatCa =
+    donChoXacNhan.length > 0 && selected.length === donChoXacNhan.length;
+
+  const tongTienDaChon = useMemo(
+    () =>
+      orders
+        .filter((o) => selected.includes(o.DTS_Ma))
+        .reduce((tong, o) => tong + Number(o.TongThanhToan || 0), 0),
+    [orders, selected],
+  );
+
+  const toggleChonDon = (dts_ma) => {
+    setSelected((prev) =>
+      prev.includes(dts_ma)
+        ? prev.filter((ma) => ma !== dts_ma)
+        : [...prev, dts_ma],
+    );
+  };
+
+  const toggleChonTatCa = () => {
+    setSelected(daChonTatCa ? [] : donChoXacNhan.map((o) => o.DTS_Ma));
+  };
+
+  const handleConfirmBatch = async () => {
+    if (selected.length === 0) return;
+    setSubmittingBatch(true);
+    try {
+      const res = await donHangShopService.confirmOrdersBatch({
+        gh_ma,
+        danh_sach: selected,
+      });
+      showToast(
+        res.data?.message || `Đã xác nhận ${selected.length} đơn hàng!`,
+      );
+      setBatchOpen(false);
+      setSelected([]);
+      await fetchOrders();
+    } catch (error) {
+      showToast(
+        error.response?.data?.message || "Lỗi xác nhận đơn hàng!",
+        "error",
+      );
+    } finally {
+      setSubmittingBatch(false);
     }
   };
 
@@ -152,9 +217,67 @@ const QuanLyDonHang = () => {
         </div>
       ) : (
         <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] overflow-hidden">
+          {donChoXacNhan.length > 0 && (
+            <div className="flex flex-wrap items-center gap-3 border-b border-[#E2E8F0] bg-blue-50/50 px-4 py-3">
+              <label className="flex items-center gap-2 text-sm font-semibold text-[#334155] cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  className="w-4 h-4 cursor-pointer"
+                  checked={daChonTatCa}
+                  onChange={toggleChonTatCa}
+                  disabled={submittingBatch}
+                />
+                Chọn tất cả đơn chờ xác nhận ({donChoXacNhan.length})
+              </label>
+
+              <span className="text-sm text-[#64748B]">
+                Đã chọn:{" "}
+                <b className="text-[#2563EB]">{selected.length}</b>
+              </span>
+
+              {selected.length > 0 && (
+                <span className="text-sm text-[#64748B]">
+                  Tổng:{" "}
+                  <b className="text-[#DC2626]">
+                    {formatVND(tongTienDaChon)}
+                  </b>
+                </span>
+              )}
+
+              <div className="ml-auto flex items-center gap-2">
+                {selected.length > 0 && (
+                  <button
+                    onClick={() => setSelected([])}
+                    disabled={submittingBatch}
+                    className="px-3 py-2 text-sm font-semibold text-[#64748B] hover:text-[#0F172A] disabled:opacity-50"
+                  >
+                    Bỏ chọn
+                  </button>
+                )}
+                <button
+                  onClick={() => setBatchOpen(true)}
+                  disabled={selected.length === 0 || submittingBatch}
+                  className="px-4 py-2 bg-[#2563EB] text-white text-sm font-bold rounded-lg hover:bg-[#1D4ED8] transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+                >
+                  Xác nhận {selected.length > 0 ? selected.length : ""} đơn
+                </button>
+              </div>
+            </div>
+          )}
+
           <table className="w-full text-left border-collapse">
             <thead>
               <tr className="bg-gray-50 text-[#64748B] text-sm border-b border-[#E2E8F0]">
+                <th className="p-4 w-12">
+                  <input
+                    type="checkbox"
+                    className="w-4 h-4 cursor-pointer"
+                    checked={daChonTatCa}
+                    onChange={toggleChonTatCa}
+                    disabled={submittingBatch || donChoXacNhan.length === 0}
+                    title="Chọn tất cả đơn chờ xác nhận"
+                  />
+                </th>
                 <th className="p-4 font-semibold">Mã Đơn</th>
                 <th className="p-4 font-semibold">Khách Hàng</th>
                 <th className="p-4 font-semibold">Ngày Đặt</th>
@@ -172,7 +295,24 @@ const QuanLyDonHang = () => {
                 const items = Array.isArray(order.items) ? order.items : [];
                 return (
                   <Fragment key={order.DTS_Ma}>
-                    <tr className="hover:bg-gray-50 transition-colors">
+                    <tr
+                      className={`transition-colors ${
+                        selected.includes(order.DTS_Ma)
+                          ? "bg-blue-50/60"
+                          : "hover:bg-gray-50"
+                      }`}
+                    >
+                      <td className="p-4 w-12">
+                        {order.TrangThaiHienTai === "TTDH01" && (
+                          <input
+                            type="checkbox"
+                            className="w-4 h-4 cursor-pointer"
+                            checked={selected.includes(order.DTS_Ma)}
+                            onChange={() => toggleChonDon(order.DTS_Ma)}
+                            disabled={submittingBatch}
+                          />
+                        )}
+                      </td>
                       <td className="p-4 font-bold text-[#2563EB]">
                         {order.DTS_Ma}
                       </td>
@@ -207,7 +347,9 @@ const QuanLyDonHang = () => {
                         {order.TrangThaiHienTai === "TTDH01" && (
                           <button
                             onClick={() => handleConfirmOrder(order.DTS_Ma)}
-                            disabled={confirmingId === order.DTS_Ma}
+                            disabled={
+                              confirmingId === order.DTS_Ma || submittingBatch
+                            }
                             className="px-3 py-1.5 bg-[#2563EB] text-white text-sm font-bold rounded-lg hover:bg-[#1D4ED8] transition-colors disabled:opacity-50"
                           >
                             {confirmingId === order.DTS_Ma
@@ -221,7 +363,7 @@ const QuanLyDonHang = () => {
                     {/* 🟢 SẢN PHẨM CỦA ĐƠN — LUÔN HIỂN THỊ, ĐỦ TẤT CẢ MÓN */}
                     <tr className="bg-white">
                       <td
-                        colSpan={6}
+                        colSpan={7}
                         className="px-4 pb-4 pt-0 border-b border-[#E2E8F0]"
                       >
                         <div className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-3">
@@ -683,6 +825,90 @@ const QuanLyDonHang = () => {
                 className="px-6 py-2 bg-gray-800 text-white font-bold rounded-xl hover:bg-gray-900"
               >
                 Đóng
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ✅ MODAL XÁC NHẬN HÀNG LOẠT */}
+      {batchOpen && (
+        <div className="fixed inset-0 bg-black/50 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-white rounded-3xl w-full max-w-lg overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+            <div className="p-6 border-b border-[#E2E8F0] flex justify-between items-center">
+              <div>
+                <h3 className="text-xl font-bold text-[#0F172A]">
+                  Xác nhận {selected.length} đơn hàng
+                </h3>
+                <p className="text-sm text-[#64748B] mt-0.5">
+                  Tổng giá trị:{" "}
+                  <b className="text-[#DC2626]">
+                    {formatVND(tongTienDaChon)}
+                  </b>
+                </p>
+              </div>
+              <button
+                onClick={() => setBatchOpen(false)}
+                disabled={submittingBatch}
+                className="text-gray-400 hover:text-red-500 bg-gray-50 hover:bg-red-50 p-2 rounded-full transition-colors disabled:opacity-50"
+              >
+                <span className="material-symbols-outlined">close</span>
+              </button>
+            </div>
+
+            <div className="p-6 bg-[#F8FAFC] flex-1 overflow-y-auto">
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-800 flex gap-2 mb-4">
+                <span className="material-symbols-outlined text-[20px] shrink-0">
+                  info
+                </span>
+                <p>
+                  Sau khi xác nhận, <b>tất cả {selected.length} đơn</b> sẽ
+                  chuyển sang <b>Chờ Lấy Hàng</b> và kho phụ trách sẽ được báo
+                  đi lấy hàng. Nếu có đơn không hợp lệ, cả lô sẽ không được xác
+                  nhận.
+                </p>
+              </div>
+
+              <div className="bg-white rounded-xl border border-[#E2E8F0] divide-y divide-[#F1F5F9] max-h-64 overflow-y-auto">
+                {orders
+                  .filter((o) => selected.includes(o.DTS_Ma))
+                  .map((o) => (
+                    <div
+                      key={o.DTS_Ma}
+                      className="flex items-center justify-between gap-3 px-4 py-3"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-bold text-[#2563EB] text-sm">
+                          {o.DTS_Ma}
+                        </p>
+                        <p className="text-xs text-[#64748B] truncate">
+                          {o.TenKhachHang}
+                        </p>
+                      </div>
+                      <span className="text-sm font-bold text-[#DC2626] shrink-0">
+                        {formatVND(o.TongThanhToan)}
+                      </span>
+                    </div>
+                  ))}
+              </div>
+            </div>
+
+            <div className="p-4 border-t border-[#E2E8F0] bg-white flex justify-end gap-3">
+              <button
+                onClick={() => setBatchOpen(false)}
+                disabled={submittingBatch}
+                className="px-6 py-2.5 rounded-xl font-semibold text-[#64748B] hover:bg-gray-100 disabled:opacity-50"
+              >
+                Hủy
+              </button>
+              <button
+                onClick={handleConfirmBatch}
+                disabled={submittingBatch || selected.length === 0}
+                className="px-6 py-2.5 bg-[#2563EB] text-white rounded-xl font-bold hover:bg-[#1D4ED8] disabled:bg-gray-400 disabled:cursor-not-allowed"
+              >
+                {submittingBatch
+                  ? "Đang xử lý..."
+                  : `Xác nhận ${selected.length} đơn`}
               </button>
             </div>
           </div>
