@@ -429,7 +429,14 @@ const ThongTinCuaHang = () => {
             </label>
             <input
               type="password"
-              autoComplete="new-password"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="off"
+              spellCheck={false}
+              name="sepay-webhook-secret"
+              data-1p-ignore="true"
+              data-lpignore="true"
+              data-bwignore="true"
               value={bankForm.sepay_webhook_secret || ""}
               onChange={(e) =>
                 updateBankForm({ sepay_webhook_secret: e.target.value })
@@ -437,7 +444,7 @@ const ThongTinCuaHang = () => {
               placeholder={
                 secretInfo.has
                   ? `Đã cấu hình ${secretInfo.hint} — để trống nếu không đổi`
-                  : "Dán mã Secret lấy từ SePay vào đây..."
+                  : "Dán Secret Key của webhook SePay vào đây..."
               }
               className="w-full px-4 py-3 rounded-xl border border-blue-300 outline-none focus:border-blue-500"
             />
@@ -451,8 +458,9 @@ const ThongTinCuaHang = () => {
               </p>
             )}
             <p className="text-xs text-blue-600 mt-2">
-              * Mã này giúp chống kẻ gian spam tín hiệu thanh toán ảo. Hệ thống
-              không hiển thị lại mã đầy đủ để bảo mật.
+              * Đây là <b>Secret Key</b> trong mục Bảo mật của webhook SePay,{" "}
+              <b>không phải mật khẩu đăng nhập</b> — nếu trình duyệt gợi ý mật
+              khẩu thì bỏ qua. Hệ thống không hiển thị lại mã đầy đủ.
             </p>
           </div>
 
