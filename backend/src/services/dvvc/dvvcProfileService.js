@@ -15,6 +15,7 @@ const DvvcProfileService = {
         const secret = decrypt(data.sepay_webhook_secret);
         const ketQua = { ...data };
         delete ketQua.sepay_webhook_secret;
+        delete ketQua.DVVC_HashPass;
 
         ketQua.sepay_webhook_secret_set = !!secret;
         // Thời điểm lưu secret (null nếu secret có từ trước khi thêm cột này)

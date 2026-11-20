@@ -30,7 +30,14 @@ const DvvcProfileModel = {
                 nh.nhg_ten AS "NHG_Ten", 
                 nh.nhg_logo AS "NHG_Logo"
             FROM donvivanchuyen d
-            LEFT JOIN thongtinnhantien_dvvc tt ON d.dvvc_ma = tt.dvvc_ma
+            LEFT JOIN LATERAL (
+                -- Mỗi ĐVVC chỉ nên có 1 tài khoản; nếu dữ liệu cũ có nhiều dòng
+                -- thì lấy dòng mới nhất, tránh hiển thị nhầm tài khoản cũ.
+                SELECT * FROM thongtinnhantien_dvvc
+                 WHERE dvvc_ma = d.dvvc_ma
+                 ORDER BY ctid DESC
+                 LIMIT 1
+            ) tt ON true
             LEFT JOIN nganhang nh ON tt.nganhang_ma = nh.nhg_ma
             WHERE d.dvvc_ma = $1
         `;
@@ -50,52 +57,76 @@ const DvvcProfileModel = {
         return result.rows[0];
     },
 
-    // 3. Lưu thông tin ngân hàng và Webhook Secret (Đã cập nhật)
+    // 3. Lưu thông tin ngân hàng + Webhook Secret
+    // Mỗi ĐVVC chỉ giữ 1 tài khoản: đổi ngân hàng = thay hẳn dòng cũ,
+    // tránh sinh thêm dòng khiến trang hiển thị lại tài khoản cũ.
     saveBankAccount: async (dvvc_ma, data) => {
-        const query = `
-            INSERT INTO thongtinnhantien_dvvc (
-                dvvc_ma, 
-                nganhang_ma, 
-                ttnt_dvvc_sotaikhoan, 
-                ttnt_dvvc_tentaikhoan,
-                sepay_webhook_secret
-            )
-            VALUES ($1, $2, $3, $4, $5)
-            ON CONFLICT (dvvc_ma, nganhang_ma) 
-            DO UPDATE SET 
-                ttnt_dvvc_sotaikhoan = EXCLUDED.ttnt_dvvc_sotaikhoan,
-                ttnt_dvvc_tentaikhoan = EXCLUDED.ttnt_dvvc_tentaikhoan,
-                -- Không gửi secret mới = giữ nguyên secret đã lưu (không bao giờ xoá oan)
-                sepay_webhook_secret = COALESCE(
-                    EXCLUDED.sepay_webhook_secret,
-                    thongtinnhantien_dvvc.sepay_webhook_secret,
-                    (SELECT s2.sepay_webhook_secret
-                       FROM thongtinnhantien_dvvc s2
-                      WHERE s2.dvvc_ma = $1 AND s2.sepay_webhook_secret IS NOT NULL
-                      LIMIT 1)
-                )
-            RETURNING *
-        `;
-        const values = [
-            dvvc_ma, 
-            data.NganHang_Ma, 
-            data.TTNT_DVVC_SoTaiKhoan, 
-            data.TTNT_DVVC_TenTaiKhoan,
-            data.sepay_webhook_secret || null // 🟢 Truyền dữ liệu Secret
-        ];
-        const result = await db.query(query, values);
+        const client = await db.connect();
+        try {
+            await client.query('BEGIN');
 
-        // Chỉ ghi mốc thời gian khi người dùng nhập secret mới
-        if (data.sepay_webhook_secret) {
-            await danhDauDaLuu(
-                (sql, params) => db.query(sql, params),
-                'thongtinnhantien_dvvc',
-                'dvvc_ma',
-                dvvc_ma
+            // Giữ lại secret cũ nếu lần này để trống
+            const cuRes = await client.query(
+                `SELECT sepay_webhook_secret
+                   FROM thongtinnhantien_dvvc
+                  WHERE dvvc_ma = $1
+                    AND sepay_webhook_secret IS NOT NULL
+                  LIMIT 1`,
+                [dvvc_ma]
             );
-        }
 
-        return result.rows[0];
+            const secretMoi =
+                data.sepay_webhook_secret !== null &&
+                data.sepay_webhook_secret !== undefined &&
+                String(data.sepay_webhook_secret).trim() !== ''
+                    ? String(data.sepay_webhook_secret).trim()
+                    : null;
+
+            const secretLuu = secretMoi || cuRes.rows[0]?.sepay_webhook_secret || null;
+
+            await client.query(
+                'DELETE FROM thongtinnhantien_dvvc WHERE dvvc_ma = $1',
+                [dvvc_ma]
+            );
+
+            const result = await client.query(
+                `INSERT INTO thongtinnhantien_dvvc (
+                    dvvc_ma,
+                    nganhang_ma,
+                    ttnt_dvvc_sotaikhoan,
+                    ttnt_dvvc_tentaikhoan,
+                    sepay_webhook_secret
+                )
+                VALUES ($1, $2, $3, $4, $5)
+                RETURNING *`,
+                [
+                    dvvc_ma,
+                    data.NganHang_Ma,
+                    data.TTNT_DVVC_SoTaiKhoan,
+                    data.TTNT_DVVC_TenTaiKhoan,
+                    secretLuu
+                ]
+            );
+
+            // Chỉ ghi mốc thời gian khi người dùng nhập secret mới
+            if (secretMoi) {
+                await danhDauDaLuu(
+                    (sql, params) => client.query(sql, params),
+                    'thongtinnhantien_dvvc',
+                    'dvvc_ma',
+                    dvvc_ma
+                );
+            }
+
+            await client.query('COMMIT');
+            return result.rows[0];
+        } catch (error) {
+            await client.query('ROLLBACK');
+            console.error('LỖI LƯU THÔNG TIN NHẬN TIỀN ĐVVC:', error.message);
+            throw error;
+        } finally {
+            client.release();
+        }
     },
 
     // 4. Xóa tài khoản ngân hàng

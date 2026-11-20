@@ -88,7 +88,7 @@ const SanThuongMaiModel = {
             LEFT JOIN LATERAL (
                 SELECT * FROM thongtinnhantien_stmdt
                  WHERE stmdt_ma = st.stmdt_ma
-                 ORDER BY nganhang_ma
+                 ORDER BY ctid DESC
                  LIMIT 1
             ) tt ON true
             LEFT JOIN nganhang nh ON tt.nganhang_ma = nh.nhg_ma
