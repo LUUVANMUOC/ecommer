@@ -122,16 +122,8 @@ const taoPhieu = async (duLieu = {}, dsTep = []) => {
     throw loi('Loại sự cố không phù hợp với vai trò của bạn.');
   }
 
-  if (!['TTDH04', 'TTDH05'].includes(don.trang_thai_don)) {
-    throw loi('Chỉ báo sự cố khi đơn đang giao hoặc đã hoàn thành.');
-  }
-
-  if (don.ttgh_thoidiem) {
-    const moc = new Date(don.ttgh_thoidiem).getTime();
-    if (Date.now() - moc > 7 * 86400 * 1000) {
-      throw loi('Đã quá 7 ngày kể từ khi giao hàng.');
-    }
-  }
+  // Cho phép báo sự cố ở mọi trạng thái đơn hàng (kể cả đơn đang xử lý,
+  // đang giao trễ, đã hủy...). Chỉ chặn gửi trùng phiếu còn mở bên dưới.
 
   const trung = await SuCoModel.demPhieuDangMo(
     dts_ma,

@@ -32,7 +32,7 @@ const DON_SELECT = `
 
 const DON_JOIN = `
   JOIN gianhang gh ON gh.gh_ma = dts.gh_ma
-  JOIN donvivanchuyen dv ON dv.dvvc_ma = dts.dvvc_ma
+  LEFT JOIN donvivanchuyen dv ON dv.dvvc_ma = dts.dvvc_ma
   LEFT JOIN donhangkhachmua dm ON dm.dm_ma = dts.dm_ma
   LEFT JOIN khachhang kh ON kh.kh_ma = dm.kh_ma
   LEFT JOIN thongtingiaohang ttgh ON ttgh.dts_ma = dts.dts_ma
@@ -261,12 +261,14 @@ const taoPhieu = async (duLieu, dsTep = []) => {
       ghichu: 'Khởi tạo phiếu sự cố',
     });
 
+    // Ép kiểu tường minh: $1 xuất hiện ở cả SELECT và mệnh đề WHERE,
+    // PostgreSQL suy luận text/varchar lệch nhau nếu không ép kiểu.
     const giu = await client.query(
       `INSERT INTO giu_tien_su_co
          (dts_ma, ycxlsc_ma, gtsc_so_tien, gtsc_ly_do)
-       SELECT $1, $2, $3, $4
+       SELECT $1::varchar(10), $2::varchar(10), $3::numeric, $4::text
         WHERE NOT EXISTS (
-          SELECT 1 FROM chitiet_tat_toan WHERE dts_ma = $1
+          SELECT 1 FROM chitiet_tat_toan WHERE dts_ma = $1::varchar(10)
         )
        ON CONFLICT (dts_ma, ycxlsc_ma) DO NOTHING`,
       [
