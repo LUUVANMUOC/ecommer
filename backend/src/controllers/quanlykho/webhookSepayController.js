@@ -67,7 +67,20 @@ const WebhookSepayController = {
       }
 
       const rawBody = req.body.toString('utf8');
-      const check = verifyHmac(rawBody, req.headers, process.env.SEPAY_WEBHOOK_SECRET);
+
+      // Secret của Sàn: ưu tiên cấu hình trong DB (nhập trên giao diện),
+      // chưa có mới dùng SEPAY_WEBHOOK_SECRET trong .env (tương thích cũ).
+      // Dùng to_jsonb để không lỗi nếu migration thêm cột chưa chạy.
+      const sanRes = await pool.query(
+        `SELECT to_jsonb(s)->>'sepay_webhook_secret' AS secret
+           FROM thongtinnhantien_stmdt s
+          WHERE to_jsonb(s)->>'sepay_webhook_secret' IS NOT NULL
+          LIMIT 1`
+      );
+      const webhookSecret =
+        decrypt(sanRes.rows[0]?.secret) || process.env.SEPAY_WEBHOOK_SECRET || '';
+
+      const check = verifyHmac(rawBody, req.headers, webhookSecret);
       if (!check.ok) return tuChoi(res, 'Sàn', check);
 
       console.log(`✅ Xác thực HMAC Sàn thành công!`);

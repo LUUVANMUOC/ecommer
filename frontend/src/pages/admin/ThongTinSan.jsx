@@ -14,6 +14,7 @@ const EMPTY_BANK_FORM = {
   NganHang_Ma: "",
   TTNT_STMDT_SoTaiKhoan: "",
   TTNT_STMDT_TenTaiKhoan: "",
+  sepay_webhook_secret: "",
 };
 
 const ThongTinSan = () => {
@@ -44,6 +45,8 @@ const ThongTinSan = () => {
   const [bankForm, setBankForm] = useState(EMPTY_BANK_FORM);
   const [savingBank, setSavingBank] = useState(false);
   const [qrBank, setQrBank] = useState(null);
+  // Secret không bao giờ được tải về máy khách: chỉ biết đã lưu hay chưa + lúc nào
+  const [secretInfo, setSecretInfo] = useState({ has: false, savedAt: null });
 
   const showToast = (message, type = "success") => {
     setToast({ show: true, message, type });
@@ -87,8 +90,17 @@ const ThongTinSan = () => {
           NganHang_Ma: data.NganHang_Ma,
           TTNT_STMDT_SoTaiKhoan: data.TTNT_STMDT_SoTaiKhoan,
           TTNT_STMDT_TenTaiKhoan: data.TTNT_STMDT_TenTaiKhoan || "",
+          sepay_webhook_secret: "",
         });
+      } else {
+        setLinkedBank(null);
+        setBankForm(EMPTY_BANK_FORM);
       }
+
+      setSecretInfo({
+        has: !!data.sepay_webhook_secret_set,
+        savedAt: data.sepay_webhook_secret_saved_at || null,
+      });
     } catch (err) {
       showToast("Lỗi tải dữ liệu sàn", "error");
     } finally {
@@ -132,19 +144,21 @@ const ThongTinSan = () => {
   };
 
   const handleSaveBank = async (e) => {
-    e.preventDefault();
+    if (e && e.preventDefault) e.preventDefault();
     if (
       !bankForm.NganHang_Ma ||
       !bankForm.TTNT_STMDT_SoTaiKhoan ||
       !bankForm.TTNT_STMDT_TenTaiKhoan
     )
-      return showToast("Vui lòng nhập đủ thông tin!", "error");
+      return showToast("Vui lòng nhập đủ thông tin ngân hàng!", "error");
 
     setSavingBank(true);
     try {
       await sanThuongMaiService.saveBank(STMDT_Ma, bankForm);
       showToast("Lưu thông tin nhận tiền thành công!");
-      fetchData();
+      await fetchData();
+      // Xoá secret khỏi form sau khi lưu (không giữ nguyên văn trong state)
+      setBankForm((prev) => ({ ...prev, sepay_webhook_secret: "" }));
     } catch (err) {
       showToast(err.response?.data?.message || "Lỗi!", "error");
     } finally {
@@ -159,10 +173,17 @@ const ThongTinSan = () => {
       await sanThuongMaiService.deleteBank(STMDT_Ma);
       setLinkedBank(null);
       setBankForm(EMPTY_BANK_FORM);
+      setSecretInfo({ has: false, savedAt: null });
       showToast("Đã xóa tài khoản!");
     } catch (err) {
       showToast("Lỗi khi xóa!", "error");
     }
+  };
+
+  const handleCopyWebhook = () => {
+    const webhookUrl = `${import.meta.env.VITE_BACKEND_URL || "http://localhost:8080"}/api/webhook/sepay`;
+    navigator.clipboard.writeText(webhookUrl);
+    showToast("Đã copy Link Webhook!");
   };
 
   if (loading)
@@ -330,6 +351,100 @@ const ThongTinSan = () => {
                   onShowQR={setQrBank}
                   saving={savingBank}
                 />
+
+                {/* 🟢 CẤU HÌNH SEPAY DÀNH CHO SÀN (GỘP CHUNG NÚT LƯU) */}
+                <div className="mt-8 p-6 bg-blue-50 border border-blue-200 rounded-2xl">
+                  <h3 className="text-lg font-bold text-blue-900 mb-2 flex items-center gap-2">
+                    <span className="material-symbols-outlined">webhook</span>
+                    Cấu hình nhận tiền tự động (SePay)
+                  </h3>
+                  <p className="text-sm text-blue-700 mb-4">
+                    Để hệ thống tự động xác nhận khi Shop, ĐVVC chuyển tiền tất
+                    toán về Sàn, bạn cần cấu hình Webhook trên trang SePay.
+                  </p>
+
+                  <div className="flex flex-col md:flex-row items-center gap-3 mb-5">
+                    <div className="w-full">
+                      <label className="block text-sm font-semibold text-blue-900 mb-1">
+                        1. Đường link Webhook của Sàn
+                      </label>
+                      <input
+                        type="text"
+                        readOnly
+                        value={`${import.meta.env.VITE_BACKEND_URL || "http://localhost:8080"}/api/webhook/sepay`}
+                        className="w-full px-4 py-3 rounded-xl border border-blue-300 bg-white text-blue-800 font-mono text-sm outline-none"
+                      />
+                    </div>
+                    <button
+                      onClick={handleCopyWebhook}
+                      type="button"
+                      className="mt-6 md:mt-0 px-4 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 whitespace-nowrap"
+                    >
+                      Copy Link
+                    </button>
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold text-blue-900 mb-1">
+                      2. Mã bảo mật (Webhook Secret)
+                    </label>
+                    <input
+                      type="password"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      autoCapitalize="off"
+                      spellCheck={false}
+                      name="sepay-webhook-secret"
+                      data-1p-ignore="true"
+                      data-lpignore="true"
+                      data-bwignore="true"
+                      value={bankForm.sepay_webhook_secret || ""}
+                      onChange={(e) =>
+                        setBankForm((prev) => ({
+                          ...prev,
+                          sepay_webhook_secret: e.target.value,
+                        }))
+                      }
+                      placeholder={
+                        secretInfo.has
+                          ? "Đã lưu secret — để trống nếu không đổi"
+                          : "Dán Secret Key của webhook SePay vào đây..."
+                      }
+                      className="w-full px-4 py-3 rounded-xl border border-blue-300 outline-none focus:border-blue-500"
+                    />
+                    {secretInfo.has && (
+                      <p className="text-xs text-green-700 mt-2 flex items-center gap-1">
+                        <span className="material-symbols-outlined text-[16px]">
+                          verified_user
+                        </span>
+                        {secretInfo.savedAt
+                          ? `Đã lưu chuỗi bạn nhập vào lúc ${new Date(
+                              secretInfo.savedAt,
+                            ).toLocaleString("vi-VN", { hour12: false })}.`
+                          : "Đã lưu chuỗi bạn nhập vào trước đây."}{" "}
+                        Chỉ nhập khi bạn muốn đổi secret mới.
+                      </p>
+                    )}
+                    <p className="text-xs text-blue-600 mt-2">
+                      * Đây là <b>Secret Key</b> trong mục Bảo mật của webhook
+                      SePay, <b>không phải mật khẩu đăng nhập</b> — nếu trình
+                      duyệt gợi ý mật khẩu thì bỏ qua. Hệ thống không hiển thị
+                      lại mã đầy đủ.
+                    </p>
+                  </div>
+
+                  <div className="mt-6 pt-4 border-t border-blue-200 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleSaveBank}
+                      disabled={savingBank}
+                      className="px-6 py-3 bg-slate-900 text-white font-bold rounded-xl hover:bg-slate-800 disabled:bg-gray-400 flex items-center gap-2 shadow-md transition-all"
+                    >
+                      <span className="material-symbols-outlined">save</span>
+                      {savingBank ? "Đang lưu..." : "Lưu toàn bộ thông tin"}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
           )}

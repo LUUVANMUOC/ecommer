@@ -17,6 +17,7 @@ const { encrypt } = require('../src/config/secretCrypto');
 const CAC_BANG = [
   { ten: 'thongtinnhantien_gianhang', cot: 'sepay_webhook_secret' },
   { ten: 'thongtinnhantien_dvvc', cot: 'sepay_webhook_secret' },
+  { ten: 'thongtinnhantien_stmdt', cot: 'sepay_webhook_secret' },
 ];
 
 const apply = process.argv.includes('--apply');
