@@ -1,5 +1,6 @@
 // backend/src/services/suco/suCoService.js
 const SuCoModel = require('../../models/suco/suCoModel');
+const SuCoThanhToanModel = require('../../models/suco/suCoThanhToanModel');
 
 const loi = (message, status = 400) => {
   const error = new Error(message);
@@ -563,6 +564,46 @@ const huyHoanTien = async (ycxlsc_ma, ht_ma, nguoiDuyet, ly_do = '') => {
   return ketQua;
 };
 
+// ---------- Admin: QR nhận tiền cho khoản hoàn tiền ----------
+const timKhoanTrongPhieu = async (ycxlsc_ma, ht_ma) => {
+  const chiTiet = await SuCoModel.layChiTiet(chuoi(ycxlsc_ma));
+  if (!chiTiet) throw loi('Không tìm thấy phiếu sự cố.', 404);
+
+  const khoan = (chiTiet.hoan_tien || []).find(
+    (h) => h.ht_ma === chuoi(ht_ma)
+  );
+  if (!khoan) throw loi('Khoản hoàn tiền không thuộc phiếu này.', 404);
+
+  return { chiTiet, khoan };
+};
+
+const taoQrHoanTien = async (ycxlsc_ma, ht_ma) => {
+  const { chiTiet, khoan } = await timKhoanTrongPhieu(ycxlsc_ma, ht_ma);
+
+  if (chiTiet.phieu.ycxlsc_trang_thai !== 'TTXLSC04') {
+    throw loi('Chỉ tạo QR nhận tiền khi phiếu đã kết luận.', 409);
+  }
+
+  return SuCoThanhToanModel.taoQr(khoan.ht_ma);
+};
+
+const layQrHoanTien = async (ycxlsc_ma, ht_ma) => {
+  const { khoan } = await timKhoanTrongPhieu(ycxlsc_ma, ht_ma);
+  return SuCoThanhToanModel.layTrangThai(khoan.ht_ma);
+};
+
+const huyQrHoanTien = async (ycxlsc_ma, ht_ma) => {
+  const { chiTiet, khoan } = await timKhoanTrongPhieu(ycxlsc_ma, ht_ma);
+
+  const ketQua = await SuCoThanhToanModel.huyQr(khoan.ht_ma);
+  bao({
+    kieu: 'HUY_QR',
+    phieu: { ycxlsc_ma: chiTiet.phieu.ycxlsc_ma },
+    hoan_tien: khoan,
+  });
+  return ketQua;
+};
+
 // ---------- KPI ----------
 const getKpi = () => SuCoModel.getKpi();
 
@@ -582,5 +623,8 @@ module.exports = {
   hoanTat,
   xacNhanChi,
   huyHoanTien,
+  taoQrHoanTien,
+  layQrHoanTien,
+  huyQrHoanTien,
   getKpi,
 };

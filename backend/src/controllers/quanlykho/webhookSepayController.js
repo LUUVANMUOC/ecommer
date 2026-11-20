@@ -2,6 +2,7 @@
 const crypto = require('crypto');
 const pool = require('../../config/db');
 const TatToanModel = require('../../models/quanlykho/tatToanModel');
+const SuCoThanhToanModel = require('../../models/suco/suCoThanhToanModel');
 const { decrypt } = require('../../config/secretCrypto');
 
 // Chống replay: request cũ hơn 5 phút bị từ chối (đúng khuyến nghị của SePay)
@@ -77,9 +78,14 @@ const WebhookSepayController = {
         `👉 Nội dung CK Sàn: "${payload.code || payload.content}" | Số tiền: ${payload.transferAmount}`
       );
 
+      const suCo = await SuCoThanhToanModel.xuLyWebhook('SAN', null, payload);
+      if (suCo.matched) {
+        console.log(`👉 Thanh toán sự cố (Sàn):`, suCo);
+        return res.status(200).json({ success: true, ...suCo });
+      }
+
       const result = await TatToanModel.xuLyWebhook(payload);
       console.log(`👉 Kết quả DB (Sàn):`, result);
-
       return res.status(200).json({ success: true, ...result });
     } catch (error) {
       console.error(`❌ Lỗi xử lý webhook Sàn:`, error);
@@ -125,6 +131,12 @@ const WebhookSepayController = {
         `👉 Nội dung CK Shop: "${payload.code || payload.content}" | Số tiền: ${payload.transferAmount}`
       );
 
+      const suCo = await SuCoThanhToanModel.xuLyWebhook('SHOP', gh_ma, payload);
+      if (suCo.matched) {
+        console.log(`👉 Thanh toán sự cố (Shop ${gh_ma}):`, suCo);
+        return res.status(200).json({ success: true, ...suCo });
+      }
+
       const result = await TatToanModel.xuLyWebhookCuaShop(gh_ma, payload);
       console.log(`👉 Kết quả DB (Shop ${gh_ma}):`, result);
 
@@ -165,6 +177,13 @@ const WebhookSepayController = {
       console.log(`✅ Xác thực HMAC ĐVVC ${dvvc_ma} thành công!`);
 
       const payload = JSON.parse(rawBody);
+
+      const suCo = await SuCoThanhToanModel.xuLyWebhook('DVVC', dvvc_ma, payload);
+      if (suCo.matched) {
+        console.log(`👉 Thanh toán sự cố (ĐVVC ${dvvc_ma}):`, suCo);
+        return res.status(200).json({ success: true, ...suCo });
+      }
+
       const result = await TatToanModel.xuLyWebhookCuaDVVC(dvvc_ma, payload);
 
       return res.status(200).json({ success: true, ...result });

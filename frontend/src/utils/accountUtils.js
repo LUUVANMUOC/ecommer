@@ -21,15 +21,15 @@ export const getBankBin = (bankName) => {
   if (!bankName) return "970436"; // Mặc định VCB
   const name = bankName.toLowerCase().trim();
   
-  if (name === "nh01" || name === "mb" || name.includes("military")) return "970422";
-  if (name === "nh02" || name.includes("vietcombank") || name.includes("vcb")) return "970436";
-  if (name === "nh03" || name.includes("bidv")) return "970418";
-  if (name === "nh04" || name.includes("vpbank") || name.includes("vpb")) return "970432";
+  if (name === "nh01" || name === "nhg01" || name === "mb" || name.includes("military")) return "970422";
+  if (name === "nh02" || name === "nhg02" || name.includes("vietcombank") || name.includes("vcb")) return "970436";
+  if (name === "nh03" || name === "nhg03" || name.includes("bidv")) return "970418";
+  if (name === "nh04" || name === "nhg04" || name === "vp" || name.includes("vpbank") || name.includes("vpb")) return "970432";
   if (name.includes("vietinbank") || name.includes("icb")) return "970415";
   if (name.includes("techcombank") || name.includes("tcb")) return "970407";
   if (name.includes("acb")) return "970416";
   if (name.includes("agribank") || name.includes("vba")) return "970405";
-  if (name.includes("sacombank") || name.includes("stb")) return "970403";
+  if (name === "nh05" || name.includes("sacombank") || name.includes("stb")) return "970403";
   if (name.includes("tpbank") || name.includes("tpb")) return "970423";
   return "970436";
 };

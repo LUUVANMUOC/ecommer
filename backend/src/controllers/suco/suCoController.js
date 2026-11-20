@@ -176,6 +176,31 @@ const SuCoController = {
     );
     return res.status(200).json(data);
   }),
+
+  // ---------- QR nhận tiền (thanh toán sự cố) ----------
+  taoQrHoanTien: xuLy(async (req, res) => {
+    const data = await SuCoService.taoQrHoanTien(
+      req.params.ycxlsc_ma,
+      req.params.ht_ma
+    );
+    return res.status(200).json(data);
+  }),
+
+  getQrHoanTien: xuLy(async (req, res) => {
+    const data = await SuCoService.layQrHoanTien(
+      req.params.ycxlsc_ma,
+      req.params.ht_ma
+    );
+    return res.status(200).json(data);
+  }),
+
+  huyQrHoanTien: xuLy(async (req, res) => {
+    const data = await SuCoService.huyQrHoanTien(
+      req.params.ycxlsc_ma,
+      req.params.ht_ma
+    );
+    return res.status(200).json(data);
+  }),
 };
 
 module.exports = SuCoController;

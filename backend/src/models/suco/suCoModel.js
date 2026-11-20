@@ -464,15 +464,17 @@ const layChiTiet = async (ycxlsc_ma) => {
       [ycxlsc_ma]
     ),
     pool.query(
-      `SELECT ht_ma, ht_sotiengoc, ht_sotienphatsinh, ht_tongtienhoan,
-              ht_thoidiem, ct_tratien, ct_nhantien, ht_trang_thai,
-              ht_phuong_thuc, ht_ly_do, ht_nguoi_xac_nhan, ht_thoi_diem_chi,
-              ht_ma_giao_dich, ht_han_chi,
-              (ht_han_chi < now()
-                AND ht_trang_thai IN ('CHO_CHI','QUA_HAN')) AS qua_han
-         FROM hoantien
-        WHERE ycxlsc_ma = $1
-        ORDER BY ht_thoidiem`,
+      `SELECT h.ht_ma, h.ht_sotiengoc, h.ht_sotienphatsinh, h.ht_tongtienhoan,
+              h.ht_thoidiem, h.ct_tratien, h.ct_nhantien, h.ht_trang_thai,
+              h.ht_phuong_thuc, h.ht_ly_do, h.ht_nguoi_xac_nhan, h.ht_thoi_diem_chi,
+              h.ht_ma_giao_dich, h.ht_han_chi, h.ht_nguon_xac_nhan,
+              q.qr_ma, q.qr_trang_thai, q.qr_thoi_diem_tt,
+              (h.ht_han_chi < now()
+                AND h.ht_trang_thai IN ('CHO_CHI','QUA_HAN')) AS qua_han
+         FROM hoantien h
+         LEFT JOIN qr_hoan_tien q ON q.ht_ma = h.ht_ma
+        WHERE h.ycxlsc_ma = $1
+        ORDER BY h.ht_thoidiem`,
       [ycxlsc_ma]
     ),
     pool.query(
@@ -633,21 +635,31 @@ const ketLuan = async (duLieu) => {
 };
 
 // ---------- Hoàn tiền ----------
-const xacNhanChi = async ({ ht_ma, nguoi, ma_giao_dich }) => {
-  const client = await pool.connect();
+// client: nếu được truyền vào thì dùng lại transaction của bên gọi,
+// không tự BEGIN/COMMIT/ROLLBACK/release.
+const xacNhanChi = async ({
+  ht_ma,
+  nguoi = null,
+  ma_giao_dich,
+  nguon = 'THU_CONG',
+  client: clientNgoai = null,
+}) => {
+  const client = clientNgoai || (await pool.connect());
+  const tuMoGiaoDich = !clientNgoai;
   try {
-    await client.query('BEGIN');
+    if (tuMoGiaoDich) await client.query('BEGIN');
 
     const r = await client.query(
       `UPDATE hoantien
           SET ht_trang_thai = 'DA_CHI',
               ht_thoi_diem_chi = now(),
               ht_nguoi_xac_nhan = $2,
-              ht_ma_giao_dich = $3
+              ht_ma_giao_dich = $3,
+              ht_nguon_xac_nhan = $4
         WHERE ht_ma = $1
           AND ht_trang_thai IN ('CHO_CHI','QUA_HAN')
         RETURNING ycxlsc_ma`,
-      [ht_ma, nguoi, ma_giao_dich || null]
+      [ht_ma, nguoi, ma_giao_dich || null, nguon]
     );
 
     if (!r.rows.length) {
@@ -656,6 +668,17 @@ const xacNhanChi = async ({ ht_ma, nguoi, ma_giao_dich }) => {
         { status: 404 }
       );
     }
+
+    // Đóng QR đang mở (nếu có) để webhook lặp không khớp lại.
+    await client.query(
+      `UPDATE qr_hoan_tien
+          SET qr_trang_thai = 'DA_THANH_TOAN',
+              qr_ma_giao_dich = COALESCE($2, qr_ma_giao_dich),
+              qr_thoi_diem_tt = now()
+        WHERE ht_ma = $1
+          AND qr_trang_thai = 'CHUA_THANH_TOAN'`,
+      [ht_ma, ma_giao_dich || null]
+    );
 
     const ycxlsc_ma = r.rows[0].ycxlsc_ma;
     const conLai = await demHoanTienCho(client, ycxlsc_ma);
@@ -666,17 +689,19 @@ const xacNhanChi = async ({ ht_ma, nguoi, ma_giao_dich }) => {
         client,
         ycxlsc_ma,
         nguoi,
-        'Đã chi xong toàn bộ nghĩa vụ'
+        nguon === 'WEBHOOK'
+          ? 'Ngân hàng báo đã nhận đủ tiền, đóng phiếu'
+          : 'Đã chi xong toàn bộ nghĩa vụ'
       );
     }
 
-    await client.query('COMMIT');
+    if (tuMoGiaoDich) await client.query('COMMIT');
     return { ycxlsc_ma, da_hoan_tat: daHoanTat };
   } catch (error) {
-    await client.query('ROLLBACK');
+    if (tuMoGiaoDich) await client.query('ROLLBACK');
     throw error;
   } finally {
-    client.release();
+    if (tuMoGiaoDich) client.release();
   }
 };
 
@@ -701,6 +726,14 @@ const huyHoanTien = async ({ ht_ma, nguoi, ly_do }) => {
         { status: 404 }
       );
     }
+
+    await client.query(
+      `UPDATE qr_hoan_tien
+          SET qr_trang_thai = 'HUY'
+        WHERE ht_ma = $1
+          AND qr_trang_thai = 'CHUA_THANH_TOAN'`,
+      [ht_ma]
+    );
 
     const ycxlsc_ma = r.rows[0].ycxlsc_ma;
     const conLai = await demHoanTienCho(client, ycxlsc_ma);

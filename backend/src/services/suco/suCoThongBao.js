@@ -105,13 +105,48 @@ const taoNoiDung = (kieu, ctx, payload = {}) => {
       };
     }
 
-    case 'XAC_NHAN_CHI':
+    case 'XAC_NHAN_CHI': {
+      const tuDong = payload.nguon === 'WEBHOOK';
       return {
         tieu_de: cat(`Đã chi tiền sự cố ${ma}`, 200),
-        noi_dung:
-          `Sàn đã xác nhận chi ${tien(payload.hoan_tien?.ht_tongtienhoan)} ` +
-          `cho phiếu ${ma} (đơn ${don}).`,
+        noi_dung: tuDong
+          ? `Hệ thống ghi nhận ${tien(payload.hoan_tien?.ht_tongtienhoan)} ` +
+            `đã vào tài khoản bên nhận cho phiếu ${ma} (đơn ${don}).`
+          : `Sàn đã xác nhận chi ${tien(payload.hoan_tien?.ht_tongtienhoan)} ` +
+            `cho phiếu ${ma} (đơn ${don}).`,
       };
+    }
+
+    case 'THIEU_TIEN': {
+      return {
+        tieu_de: cat(`Chuyển thiếu tiền sự cố ${ma}`, 200),
+        noi_dung:
+          `Khoản chi ${payload.hoan_tien?.ht_ma || ''} của phiếu ${ma} (đơn ${don}) ` +
+          `cần ${tien(payload.so_tien_can)} nhưng mới nhận ${tien(payload.so_tien_nhan)}.\n` +
+          `QR vẫn đang mở. Vui lòng đối soát với bên chuyển tiền.`,
+      };
+    }
+
+    case 'TIEN_KHONG_KHOP': {
+      return {
+        tieu_de: cat(`Tiền vào không khớp QR sự cố ${ma}`, 200),
+        noi_dung:
+          `Có giao dịch ${tien(payload.so_tien_nhan)} với nội dung "${cat(payload.noi_dung_chuyen, 120)}" ` +
+          `nhưng không khớp QR nào đang mở của phiếu ${ma} (đơn ${don}).\n` +
+          `Khoản chi ${payload.hoan_tien?.ht_ma || ''}: ${tien(payload.hoan_tien?.ht_tongtienhoan)}.\n` +
+          `Vui lòng kiểm tra: QR có thể đã bị huỷ hoặc khoản đã được chi cách khác.`,
+      };
+    }
+
+    case 'HUY_QR': {
+      return {
+        tieu_de: cat(`Huỷ QR khoản chi sự cố ${ma}`, 200),
+        noi_dung:
+          `Mã QR nhận tiền của khoản chi ${tien(payload.hoan_tien?.ht_tongtienhoan)} ` +
+          `(phiếu ${ma}, đơn ${don}) đã bị huỷ.\n` +
+          `Vui lòng không chuyển khoản theo mã QR cũ.`,
+      };
+    }
 
     case 'HUY_HOAN_TIEN':
       return {

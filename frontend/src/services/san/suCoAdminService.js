@@ -30,6 +30,17 @@ const suCoAdminService = {
       `${BASE}/${ma(ycxlsc_ma)}/hoan-tien/${ma(ht_ma)}/huy`,
       data
     ),
+
+  taoQrHoanTien: (ycxlsc_ma, ht_ma) =>
+    axiosClient.post(
+      `${BASE}/${ma(ycxlsc_ma)}/hoan-tien/${ma(ht_ma)}/tao-qr`
+    ),
+  getQrHoanTien: (ycxlsc_ma, ht_ma) =>
+    axiosClient.get(`${BASE}/${ma(ycxlsc_ma)}/hoan-tien/${ma(ht_ma)}/qr`),
+  huyQrHoanTien: (ycxlsc_ma, ht_ma) =>
+    axiosClient.post(
+      `${BASE}/${ma(ycxlsc_ma)}/hoan-tien/${ma(ht_ma)}/huy-qr`
+    ),
 };
 
 export default suCoAdminService;

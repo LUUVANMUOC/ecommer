@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import suCoAdminService from "../../services/san/suCoAdminService";
+import { buildVietQrUrl } from "../../utils/accountUtils";
 import {
   Badge,
   HUONG_XU_LY,
@@ -56,6 +57,12 @@ const ChiTietSuCoAdmin = () => {
   const loiKetLuanRef = useRef(null);
   const dangGuiRef = useRef(false);
 
+  // QR nhận tiền của khoản hoàn tiền đang mở
+  const [qr, setQr] = useState(null);
+  const [qrLoi, setQrLoi] = useState("");
+  const [dangTaoQr, setDangTaoQr] = useState(false);
+  const qrPollRef = useRef(null);
+
   useEffect(() => {
     if (loiKetLuan && loiKetLuanRef.current) {
       loiKetLuanRef.current.scrollIntoView({
@@ -96,6 +103,69 @@ const ChiTietSuCoAdmin = () => {
       setDangGui(false);
     }
   };
+
+  const moQr = async (h) => {
+    try {
+      setDangTaoQr(true);
+      setQrLoi("");
+      const res = await suCoAdminService.taoQrHoanTien(ycxlsc_ma, h.ht_ma);
+      setQr({ ...res.data, da_chi: false });
+      await tai();
+    } catch (error) {
+      setQrLoi(
+        error?.response?.data?.message || "Không tạo được mã QR nhận tiền.",
+      );
+    } finally {
+      setDangTaoQr(false);
+    }
+  };
+
+  const huyQr = async (h) => {
+    if (
+      !window.confirm(
+        `Huỷ mã QR của khoản ${h.ht_ma}? Bên chuyển tiền sẽ không dùng được mã này nữa.`,
+      )
+    ) {
+      return;
+    }
+    await chay(
+      () => suCoAdminService.huyQrHoanTien(ycxlsc_ma, h.ht_ma),
+      "Đã huỷ mã QR.",
+    );
+  };
+
+  const dongQr = useCallback(() => {
+    if (qrPollRef.current) clearInterval(qrPollRef.current);
+    qrPollRef.current = null;
+    setQr(null);
+    setQrLoi("");
+  }, []);
+
+  // Webhook báo tiền vào → modal tự chuyển sang trạng thái "đã nhận tiền".
+  useEffect(() => {
+    if (!qr?.ht_ma || qr.da_chi) return undefined;
+    const ht = qr.ht_ma;
+    const id = setInterval(async () => {
+      try {
+        const res = await suCoAdminService.getQrHoanTien(ycxlsc_ma, ht);
+        if (res.data?.trang_thai_hoan_tien === "DA_CHI") {
+          setQr((q) => (q && q.ht_ma === ht ? { ...q, da_chi: true } : q));
+          tai();
+        }
+      } catch {
+        // lỗi mạng tạm thời, lần polling sau thử lại
+      }
+    }, 3000);
+    qrPollRef.current = id;
+    return () => clearInterval(id);
+  }, [qr?.ht_ma, qr?.da_chi, ycxlsc_ma, tai]);
+
+  useEffect(
+    () => () => {
+      if (qrPollRef.current) clearInterval(qrPollRef.current);
+    },
+    [],
+  );
 
   const phieu = data?.phieu;
   const trangThai = phieu?.ycxlsc_trang_thai || "";
@@ -877,17 +947,45 @@ const ChiTietSuCoAdmin = () => {
                       {h.ct_tratien} → {h.ct_nhantien} · hạn{" "}
                       {ngay(h.ht_han_chi)} ·{" "}
                       {h.ht_trang_thai === "DA_CHI"
-                        ? "Đã chi"
+                        ? h.ht_nguon_xac_nhan === "WEBHOOK"
+                          ? "Đã chi · ngân hàng tự xác nhận"
+                          : h.ht_nguon_xac_nhan === "PAYOUT"
+                            ? "Đã chi · chuyển khoản tự động"
+                            : "Đã chi"
                         : h.ht_trang_thai === "HUY"
                           ? "Đã hủy"
                           : h.ht_trang_thai === "QUA_HAN"
                             ? "Quá hạn"
                             : "Chờ chi"}
+                      {h.qr_trang_thai === "CHUA_THANH_TOAN" && (
+                        <span className="ml-1 font-semibold text-indigo-600">
+                          · QR đang mở
+                        </span>
+                      )}
+                      {h.ht_ma_giao_dich && (
+                        <span className="ml-1">· GD {h.ht_ma_giao_dich}</span>
+                      )}
                     </p>
                   </div>
 
                   {cho && (
-                    <div className="flex gap-2">
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        disabled={dangGui || dangTaoQr}
+                        onClick={() => moQr(h)}
+                        className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold disabled:opacity-60"
+                      >
+                        QR nhận tiền
+                      </button>
+                      {h.qr_trang_thai === "CHUA_THANH_TOAN" && (
+                        <button
+                          disabled={dangGui || dangTaoQr}
+                          onClick={() => huyQr(h)}
+                          className="px-3 py-1.5 rounded-lg border border-indigo-200 text-indigo-600 text-xs font-semibold hover:bg-indigo-50 disabled:opacity-60"
+                        >
+                          Huỷ QR
+                        </button>
+                      )}
                       <button
                         disabled={dangGui}
                         onClick={() =>
@@ -964,6 +1062,139 @@ const ChiTietSuCoAdmin = () => {
           ))}
         </ol>
       </Khoi>
+
+      {qr && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between border-b pb-3">
+              <div>
+                <h3 className="text-lg font-bold text-gray-900">
+                  QR nhận tiền · {qr.ht_ma}
+                </h3>
+                <p className="text-xs text-gray-500">
+                  {qr.ben_tra?.ten || qr.ben_tra?.ct_ma} →{" "}
+                  {qr.ben_nhan?.ten || qr.ben_nhan?.ct_ma}
+                </p>
+              </div>
+              <button
+                onClick={dongQr}
+                className="text-2xl leading-none text-gray-400 hover:text-red-500"
+                aria-label="Đóng"
+              >
+                ×
+              </button>
+            </div>
+
+            {qrLoi && (
+              <p className="mb-3 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+                {qrLoi}
+              </p>
+            )}
+
+            <div className="relative flex flex-col items-center">
+              <img
+                src={buildVietQrUrl(qr.ben_nhan, qr.so_tien, qr.noi_dung)}
+                alt={`QR ${qr.ht_ma}`}
+                className="h-64 w-64 rounded-xl border bg-white object-contain"
+              />
+
+              {qr.da_chi && (
+                <div className="absolute inset-0 flex flex-col items-center justify-center rounded-xl bg-white/90 backdrop-blur-sm">
+                  <span className="text-5xl text-emerald-500">✓</span>
+                  <p className="mt-2 font-bold text-emerald-600">
+                    Đã nhận đủ tiền
+                  </p>
+                  <button
+                    onClick={dongQr}
+                    className="mt-3 rounded-lg bg-emerald-600 px-4 py-1.5 text-xs font-bold text-white hover:bg-emerald-700"
+                  >
+                    Đóng
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <dl className="mt-4 space-y-1.5 text-sm">
+              <div className="flex justify-between gap-3">
+                <dt className="text-gray-500">Số tiền</dt>
+                <dd className="font-bold text-gray-900">{tien(qr.so_tien)}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-gray-500">Ngân hàng</dt>
+                <dd className="text-right text-gray-800">
+                  {qr.ben_nhan?.nganhang_ten || "—"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-gray-500">Số tài khoản</dt>
+                <dd className="text-right font-mono text-gray-800">
+                  {qr.ben_nhan?.so_tai_khoan || "—"}
+                </dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-gray-500">Chủ tài khoản</dt>
+                <dd className="text-right text-gray-800">
+                  {qr.ben_nhan?.ten_tai_khoan || qr.ben_nhan?.ten_chu_the || "—"}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-gray-500">Nội dung CK</dt>
+                <dd className="flex items-center gap-2">
+                  <span className="font-mono font-bold text-gray-900">
+                    {qr.noi_dung}
+                  </span>
+                  <button
+                    onClick={() =>
+                      navigator.clipboard?.writeText(String(qr.noi_dung))
+                    }
+                    className="rounded-md border px-2 py-0.5 text-[11px] font-semibold text-gray-600 hover:bg-gray-50"
+                  >
+                    Copy
+                  </button>
+                </dd>
+              </div>
+            </dl>
+
+            <p className="mt-4 rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-700">
+              Khi bên trả chuyển đúng số tiền và nội dung, webhook SePay của bên
+              nhận sẽ tự đóng khoản chi. Nếu bên nhận chưa nối webhook, sau khi
+              nhận đủ tiền hãy bấm “Xác nhận đã chi”.
+            </p>
+          </div>
+        </div>
+      )}
+
+      {!qr && qrLoi && (
+        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl bg-white p-6 shadow-2xl">
+            <div className="mb-3 flex items-start justify-between gap-3">
+              <h3 className="text-lg font-bold text-gray-900">
+                Không tạo được QR nhận tiền
+              </h3>
+              <button
+                onClick={() => setQrLoi("")}
+                className="text-2xl leading-none text-gray-400 hover:text-red-500"
+                aria-label="Đóng"
+              >
+                ×
+              </button>
+            </div>
+            <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-600">
+              {qrLoi}
+            </p>
+            <p className="mt-3 text-xs text-gray-500">
+              Nếu bên nhận chưa cấu hình tài khoản nhận tiền, hãy xác nhận chi
+              thủ công bằng nút “Xác nhận đã chi”.
+            </p>
+            <button
+              onClick={() => setQrLoi("")}
+              className="mt-4 w-full rounded-lg bg-gray-900 px-4 py-2 text-sm font-bold text-white hover:bg-gray-800"
+            >
+              Đóng
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
