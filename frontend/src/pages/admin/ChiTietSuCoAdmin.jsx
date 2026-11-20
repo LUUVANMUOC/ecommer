@@ -1,5 +1,5 @@
 // frontend/src/pages/admin/ChiTietSuCoAdmin.jsx
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import suCoAdminService from "../../services/san/suCoAdminService";
 import {
@@ -14,6 +14,7 @@ import {
 } from "../../components/suco/SuCoUI";
 
 const CHU_THE = [
+  { ma: "CT01", ten: "Sàn" },
   { ma: "CT02", ten: "Người bán" },
   { ma: "CT03", ten: "Đơn vị vận chuyển" },
   { ma: "CT04", ten: "Khách hàng" },
@@ -50,6 +51,19 @@ const ChiTietSuCoAdmin = () => {
     Object.fromEntries(CHU_THE.map((c) => [c.ma, { ...TN_MAC_DINH }])),
   );
   const [chi, setChi] = useState([]);
+  const [tongTien, setTongTien] = useState("");
+  const [loiKetLuan, setLoiKetLuan] = useState("");
+  const loiKetLuanRef = useRef(null);
+  const dangGuiRef = useRef(false);
+
+  useEffect(() => {
+    if (loiKetLuan && loiKetLuanRef.current) {
+      loiKetLuanRef.current.scrollIntoView({
+        behavior: "smooth",
+        block: "center",
+      });
+    }
+  }, [loiKetLuan]);
 
   const tai = useCallback(async () => {
     try {
@@ -89,11 +103,70 @@ const ChiTietSuCoAdmin = () => {
     ["CHO_CHI", "QUA_HAN"].includes(h.ht_trang_thai),
   );
 
+  const baoLoi = (thongDiep) => setLoiKetLuan(thongDiep);
+
   const doiTn = (ma, k, v) =>
-    setTn((t) => ({ ...t, [ma]: { ...t[ma], [k]: v } }));
+    setTn((t) => {
+      const next = { ...t, [ma]: { ...t[ma], [k]: v } };
+      const tong = Number(tongTien) || 0;
+
+      if (k === "chiu" && v) {
+        const soBenChiu = CHU_THE.filter(
+          (c) => c.ma === ma || t[c.ma].chiu,
+        ).length;
+        if (soBenChiu === 1) {
+          next[ma].phan_tram = 100;
+          if (tong > 0) next[ma].so_tien = tong;
+        }
+      }
+
+      if (tong > 0) {
+        if (k === "phan_tram") {
+          next[ma].so_tien = Math.round((tong * (Number(v) || 0)) / 100);
+        } else if (k === "so_tien") {
+          next[ma].phan_tram =
+            Math.round(((Number(v) || 0) / tong) * 10000) / 100;
+        }
+      }
+
+      return next;
+    });
+
+  const doiTongTien = (v) => {
+    setTongTien(v);
+    setLoiKetLuan("");
+    const tong = Number(v) || 0;
+    const benChiu = CHU_THE.filter((c) => tn[c.ma].chiu);
+    if (tong <= 0 || !benChiu.length) return;
+
+    setTn((t) => {
+      const next = { ...t };
+      if (benChiu.length === 1) {
+        const ma = benChiu[0].ma;
+        next[ma] = { ...next[ma], phan_tram: 100, so_tien: tong };
+        return next;
+      }
+      for (const c of benChiu) {
+        const pt = Number(t[c.ma].phan_tram) || 0;
+        next[c.ma] = { ...next[c.ma], so_tien: Math.round((tong * pt) / 100) };
+      }
+      return next;
+    });
+  };
 
   const doiChi = (i, k, v) =>
-    setChi((ds) => ds.map((c, j) => (j === i ? { ...c, [k]: v } : c)));
+    setChi((ds) =>
+      ds.map((c, j) => {
+        if (j !== i) return c;
+        const next = { ...c, [k]: v };
+        if (k === "so_tiengoc" || k === "so_tienphatsinh") {
+          next.tong_tienhoan =
+            (Number(next.so_tiengoc) || 0) +
+            (Number(next.so_tienphatsinh) || 0);
+        }
+        return next;
+      }),
+    );
 
   const tongChi = chi.reduce((s, c) => s + (Number(c.tong_tienhoan) || 0), 0);
   const tongTn = CHU_THE.reduce(
@@ -101,19 +174,160 @@ const ChiTietSuCoAdmin = () => {
     0,
   );
 
-  const dongBoTien = () => {
-    const benChiu = CHU_THE.filter((c) => tn[c.ma].chiu);
-    if (benChiu.length !== 1) {
-      setLoi("Chỉ đồng bộ được khi có đúng 1 bên chịu trách nhiệm.");
+  // Sinh khoản chi từ bên chịu trách nhiệm → bên bị ảnh hưởng.
+  const taoKhoanChi = ({ imLang = false } = {}) => {
+    const benChiu = CHU_THE.filter(
+      (c) => tn[c.ma].chiu && (Number(tn[c.ma].so_tien) || 0) > 0,
+    );
+    const benHuong = CHU_THE.filter((c) => tn[c.ma].huong);
+
+    if (!benChiu.length) {
+      if (!imLang) {
+        setLoiKetLuan("Chưa có bên chịu trách nhiệm với số tiền lớn hơn 0.");
+      }
+      return null;
+    }
+    if (!benHuong.length) {
+      if (!imLang) {
+        setLoiKetLuan("Chưa chọn bên bị ảnh hưởng (bên nhận tiền).");
+      }
+      return null;
+    }
+
+    const ds = [];
+    for (const p of benChiu) {
+      const soTien = Number(tn[p.ma].so_tien) || 0;
+      if (benHuong.length === 1) {
+        ds.push({
+          ...CHI_MAC_DINH,
+          ct_tratien: p.ma,
+          ct_nhantien: benHuong[0].ma,
+          so_tiengoc: soTien,
+          so_tienphatsinh: 0,
+          tong_tienhoan: soTien,
+          ly_do: kl.ket_luan.trim(),
+        });
+        continue;
+      }
+
+      const moiBen = Math.floor(soTien / benHuong.length);
+      benHuong.forEach((h, i) => {
+        const chia =
+          i === benHuong.length - 1
+            ? soTien - moiBen * (benHuong.length - 1)
+            : moiBen;
+        if (chia <= 0) return;
+        ds.push({
+          ...CHI_MAC_DINH,
+          ct_tratien: p.ma,
+          ct_nhantien: h.ma,
+          so_tiengoc: chia,
+          so_tienphatsinh: 0,
+          tong_tienhoan: chia,
+          ly_do: kl.ket_luan.trim(),
+        });
+      });
+    }
+    return ds;
+  };
+
+  const taoKhoanChiTuTrachNhiem = () => {
+    if (
+      chi.length &&
+      !window.confirm(
+        "Thay thế các khoản chi hiện có bằng khoản chi mới từ trách nhiệm?",
+      )
+    ) {
       return;
     }
-    setLoi("");
-    doiTn(benChiu[0].ma, "so_tien", tongChi);
-    doiTn(benChiu[0].ma, "phan_tram", 100);
+    const ds = taoKhoanChi();
+    if (!ds) return;
+    setChi(ds);
+    setLoiKetLuan("");
   };
 
   const guiKetLuan = async () => {
-    if (!kl.ket_luan.trim()) return setLoi("Nhập nội dung kết luận.");
+    // Chặn bấm đúp trước khi React kịp disable nút.
+    if (dangGuiRef.current) return;
+
+    setLoi("");
+
+    if (!kl.ket_luan.trim()) return baoLoi("Nhập nội dung kết luận.");
+
+    const canChi = ["HOAN_TIEN", "BOI_THUONG"].includes(kl.huong_xu_ly);
+    const benChiu = CHU_THE.filter((c) => tn[c.ma].chiu);
+    const benHuong = CHU_THE.filter((c) => tn[c.ma].huong);
+
+    let dsChi = chi;
+    if (canChi && !dsChi.length) {
+      dsChi = taoKhoanChi({ imLang: true }) || [];
+      if (dsChi.length) setChi(dsChi);
+    }
+
+    if (canChi) {
+      if (!benChiu.length) {
+        return baoLoi("Chọn ít nhất một bên chịu trách nhiệm.");
+      }
+      if (!benHuong.length) {
+        return baoLoi("Chọn ít nhất một bên bị ảnh hưởng (bên nhận tiền).");
+      }
+      if (!dsChi.length) {
+        return baoLoi(
+          'Chưa có khoản chi. Nhập số tiền trách nhiệm rồi bấm "Tạo khoản chi từ trách nhiệm".',
+        );
+      }
+      if (dsChi.some((c) => !c.ct_tratien || !c.ct_nhantien)) {
+        return baoLoi("Mỗi khoản chi phải chọn đủ bên trả và bên nhận.");
+      }
+      if (dsChi.some((c) => c.ct_tratien === c.ct_nhantien)) {
+        return baoLoi("Bên trả và bên nhận phải khác nhau.");
+      }
+
+      const chiTinh = dsChi.reduce(
+        (s, c) => s + (Number(c.tong_tienhoan) || 0),
+        0,
+      );
+      if (Math.abs(tongTn - chiTinh) > 0.01) {
+        return baoLoi(
+          `Tổng trách nhiệm (${tien(tongTn)}) và tổng khoản chi (${tien(
+            chiTinh,
+          )}) phải bằng nhau.`,
+        );
+      }
+      if (benChiu.length > 1) {
+        const tongPt = benChiu.reduce(
+          (s, c) => s + (Number(tn[c.ma].phan_tram) || 0),
+          0,
+        );
+        if (Math.round(tongPt) !== 100) {
+          return baoLoi("Tổng % trách nhiệm của các bên phải bằng 100.");
+        }
+      }
+
+      if (Number(tongTien) > 0) {
+        const vuot = benChiu.find(
+          (c) => (Number(tn[c.ma].so_tien) || 0) > Number(tongTien) + 0.01,
+        );
+        if (vuot) {
+          return baoLoi(
+            `Số tiền của ${vuot.ten} không được vượt tổng tiền xử lý.`,
+          );
+        }
+      }
+
+      const giaTriDon = Number(data?.don?.dts_tongtienkhachhangthanhtoan) || 0;
+      if (giaTriDon > 0 && chiTinh > giaTriDon + 0.01) {
+        return baoLoi(
+          `Tổng khoản chi không được vượt quá giá trị đơn hàng (${tien(
+            giaTriDon,
+          )}).`,
+        );
+      }
+    }
+
+    if (kl.huong_xu_ly === "KHONG_DEN" && dsChi.length) {
+      return baoLoi('Hướng "Không đền" không được tạo khoản chi.');
+    }
 
     const dsTN = [];
     for (const c of CHU_THE) {
@@ -136,11 +350,12 @@ const ChiTietSuCoAdmin = () => {
       }
     }
 
-    const benChiu = dsTN.filter((x) => x.vai_tro === "CHIU_TRACH_NHIEM");
-    if (benChiu.length === 1 && !benChiu[0].phan_tram)
-      benChiu[0].phan_tram = 100;
+    const benChiuDs = dsTN.filter((x) => x.vai_tro === "CHIU_TRACH_NHIEM");
+    if (benChiuDs.length === 1 && !benChiuDs[0].phan_tram) {
+      benChiuDs[0].phan_tram = 100;
+    }
 
-    const dsChi = chi.map((c) => ({
+    const payloadChi = dsChi.map((c) => ({
       ct_tratien: c.ct_tratien,
       ct_nhantien: c.ct_nhantien,
       so_tiengoc: Number(c.so_tiengoc) || 0,
@@ -149,17 +364,26 @@ const ChiTietSuCoAdmin = () => {
       ly_do: c.ly_do || "",
     }));
 
-    await chay(
-      () =>
-        suCoAdminService.ketLuan(ycxlsc_ma, {
-          stmdt_ma,
-          ket_luan: kl.ket_luan.trim(),
-          huong_xu_ly: kl.huong_xu_ly,
-          trach_nhiem: dsTN,
-          hoan_tien: dsChi,
-        }),
-      "Đã ghi kết luận.",
-    );
+    try {
+      dangGuiRef.current = true;
+      setDangGui(true);
+      setLoi("");
+      setLoiKetLuan("");
+      await suCoAdminService.ketLuan(ycxlsc_ma, {
+        stmdt_ma,
+        ket_luan: kl.ket_luan.trim(),
+        huong_xu_ly: kl.huong_xu_ly,
+        trach_nhiem: dsTN,
+        hoan_tien: payloadChi,
+      });
+      await tai();
+      window.alert("Đã ghi kết luận.");
+    } catch (error) {
+      setLoiKetLuan(error?.response?.data?.message || "Ghi kết luận thất bại.");
+    } finally {
+      dangGuiRef.current = false;
+      setDangGui(false);
+    }
   };
 
   if (loi && !data) {
@@ -397,6 +621,24 @@ const ChiTietSuCoAdmin = () => {
               </div>
             </div>
 
+            <div className="rounded-xl bg-blue-50/60 border border-blue-100 p-3 flex flex-wrap items-center gap-3">
+              <label className="text-sm font-medium text-gray-700">
+                Tổng tiền xử lý (đ)
+              </label>
+              <input
+                type="number"
+                min="0"
+                value={tongTien}
+                onChange={(e) => doiTongTien(e.target.value)}
+                className="w-40 px-3 py-1.5 border border-gray-200 rounded-lg text-sm text-right"
+                placeholder="VD: 50000"
+              />
+              <span className="text-xs text-gray-500">
+                Nhập tổng tiền rồi chia % cho các bên chịu trách nhiệm; hệ thống
+                tự tính số tiền từng bên.
+              </span>
+            </div>
+
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -464,10 +706,10 @@ const ChiTietSuCoAdmin = () => {
                 <p className="text-sm font-semibold text-gray-700">Khoản chi</p>
                 <div className="flex gap-2">
                   <button
-                    onClick={dongBoTien}
+                    onClick={taoKhoanChiTuTrachNhiem}
                     className="px-3 py-1.5 rounded-lg border border-gray-300 text-xs font-semibold text-gray-700 hover:bg-gray-100"
                   >
-                    Đồng bộ số tiền
+                    Tạo khoản chi từ trách nhiệm
                   </button>
                   <button
                     onClick={() => setChi((ds) => [...ds, { ...CHI_MAC_DINH }])}
@@ -480,8 +722,9 @@ const ChiTietSuCoAdmin = () => {
 
               {!chi.length && (
                 <p className="text-xs text-gray-500">
-                  Chưa có khoản chi. Chọn “Hoàn tiền”/“Bồi thường” thì phải thêm
-                  ít nhất 1 khoản.
+                  Chưa có khoản chi. Chọn “Hoàn tiền”/“Bồi thường” thì bấm “Tạo
+                  khoản chi từ trách nhiệm” (hoặc hệ thống tự tạo khi ghi kết
+                  luận nếu có đúng 1 bên chịu và 1 bên nhận).
                 </p>
               )}
 
@@ -531,14 +774,12 @@ const ChiTietSuCoAdmin = () => {
                     }
                     className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-right"
                   />
-                  <input
-                    type="number"
-                    min="0"
-                    placeholder="Tổng hoàn"
-                    value={c.tong_tienhoan}
-                    onChange={(e) => doiChi(i, "tong_tienhoan", e.target.value)}
-                    className="px-2 py-1.5 border border-gray-200 rounded-lg text-xs text-right"
-                  />
+                  <div
+                    title="Tự tính = Gốc + Phát sinh"
+                    className="px-2 py-1.5 rounded-lg border border-gray-200 bg-gray-50 text-xs text-right text-gray-700"
+                  >
+                    {tien(c.tong_tienhoan)}
+                  </div>
                   <button
                     onClick={() => setChi((ds) => ds.filter((_, j) => j !== i))}
                     className="px-2 py-1.5 rounded-lg text-red-600 text-xs font-semibold hover:bg-red-50"
@@ -563,6 +804,15 @@ const ChiTietSuCoAdmin = () => {
                 )}
               </div>
             </div>
+
+            {loiKetLuan && (
+              <p
+                ref={loiKetLuanRef}
+                className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2"
+              >
+                {loiKetLuan}
+              </p>
+            )}
 
             <div className="flex justify-end">
               <button

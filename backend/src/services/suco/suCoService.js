@@ -14,7 +14,9 @@ const so = (v, macDinh = 0) => {
 };
 
 const CT_HOP_LE = new Set(['CT02', 'CT03', 'CT04', 'CT05']);
+const CHU_THE_HOP_LE = new Set(['CT01', 'CT02', 'CT03', 'CT04', 'CT05']);
 const HUONG_XU_LY = new Set(['KHONG_DEN', 'HOAN_TIEN', 'BOI_THUONG', 'KHAC']);
+const HUONG_CAN_CHI = new Set(['HOAN_TIEN', 'BOI_THUONG']);
 const VAI_TRO = new Set(['CHIU_TRACH_NHIEM', 'BI_ANH_HUONG']);
 const DANG_MO = new Set(['TTXLSC01', 'TTXLSC02', 'TTXLSC03']);
 const DA_DONG = new Set(['TTXLSC05', 'TTXLSC06', 'TTXLSC07']);
@@ -302,7 +304,14 @@ const ketLuan = async (ycxlsc_ma, duLieu = {}, nguoiDuyet) => {
   const phieu = await SuCoModel.layPhieuGon(chuoi(ycxlsc_ma));
   if (!phieu) throw loi('Không tìm thấy phiếu sự cố.', 404);
 
-  kiemTraChuyen(phieu.ycxlsc_trang_thai, 'TTXLSC04');
+  // Chỉ kết luận khi phiếu còn đang xử lý. Chặn bấm lặp / mở 2 tab
+  // để không tạo trùng khoản chi và ghi đè trách nhiệm.
+  if (!['TTXLSC02', 'TTXLSC03'].includes(phieu.ycxlsc_trang_thai)) {
+    throw loi(
+      'Chỉ có thể ghi kết luận khi phiếu đang xem xét hoặc đang chờ bổ sung.',
+      409
+    );
+  }
 
   const ket_luan = chuoi(duLieu.ket_luan);
   const huong_xu_ly = chuoi(duLieu.huong_xu_ly).toUpperCase();
@@ -315,25 +324,47 @@ const ketLuan = async (ycxlsc_ma, duLieu = {}, nguoiDuyet) => {
     : []
   ).map((t) => {
     const vai_tro = chuoi(t.vai_tro).toUpperCase();
+    const ct_ma = chuoi(t.ct_ma).toUpperCase();
     if (!VAI_TRO.has(vai_tro)) throw loi('Vai trò trách nhiệm không hợp lệ.');
+    if (!CHU_THE_HOP_LE.has(ct_ma)) throw loi('Chủ thể trách nhiệm không hợp lệ.');
+
+    const phan_tram = so(t.phan_tram);
+    const so_tien = so(t.so_tien);
+
+    if (phan_tram < 0 || phan_tram > 100) {
+      throw loi('Tỷ lệ trách nhiệm phải trong khoảng 0 - 100%.');
+    }
+    if (so_tien < 0) throw loi('Số tiền trách nhiệm không hợp lệ.');
+
     return {
-      ct_ma: chuoi(t.ct_ma).toUpperCase(),
+      ct_ma,
       vai_tro,
-      phan_tram: so(t.phan_tram),
-      so_tien: so(t.so_tien),
+      phan_tram,
+      so_tien,
     };
   });
 
-  const dsHoanTien = (Array.isArray(duLieu.hoan_tien)
+  let dsHoanTien = (Array.isArray(duLieu.hoan_tien)
     ? duLieu.hoan_tien
     : []
   ).map((h) => {
+    const ct_tratien = chuoi(h.ct_tratien).toUpperCase();
+    const ct_nhantien = chuoi(h.ct_nhantien).toUpperCase();
+    if (!CHU_THE_HOP_LE.has(ct_tratien) || !CHU_THE_HOP_LE.has(ct_nhantien)) {
+      throw loi('Bên trả hoặc bên nhận tiền không hợp lệ.');
+    }
+
     const so_tiengoc = so(h.so_tiengoc);
     const so_tienphatsinh = so(h.so_tienphatsinh);
     const tong_tienhoan = so(h.tong_tienhoan);
+
+    if (so_tiengoc < 0 || so_tienphatsinh < 0 || tong_tienhoan < 0) {
+      throw loi('Số tiền hoàn không hợp lệ.');
+    }
+
     return {
-      ct_tratien: chuoi(h.ct_tratien).toUpperCase(),
-      ct_nhantien: chuoi(h.ct_nhantien).toUpperCase(),
+      ct_tratien,
+      ct_nhantien,
       so_tiengoc,
       so_tienphatsinh,
       tong_tienhoan,
@@ -341,15 +372,37 @@ const ketLuan = async (ycxlsc_ma, duLieu = {}, nguoiDuyet) => {
     };
   });
 
+  // Tự tạo khoản chi khi có đúng 1 bên chịu trách nhiệm (có tiền)
+  // và đúng 1 bên bị ảnh hưởng. Giúp API vẫn dùng được khi client
+  // chỉ gửi trách nhiệm mà quên gửi khoản chi.
+  if (!dsHoanTien.length && HUONG_CAN_CHI.has(huong_xu_ly)) {
+    const benTra = dsTrachNhiem.filter(
+      (x) => x.vai_tro === 'CHIU_TRACH_NHIEM' && x.so_tien > 0
+    );
+    const benNhan = dsTrachNhiem.filter(
+      (x) => x.vai_tro === 'BI_ANH_HUONG'
+    );
+
+    if (benTra.length === 1 && benNhan.length === 1) {
+      dsHoanTien = [
+        {
+          ct_tratien: benTra[0].ct_ma,
+          ct_nhantien: benNhan[0].ct_ma,
+          so_tiengoc: benTra[0].so_tien,
+          so_tienphatsinh: 0,
+          tong_tienhoan: benTra[0].so_tien,
+          ly_do: ket_luan,
+        },
+      ];
+    }
+  }
+
   const canChi = dsHoanTien.length > 0;
 
   if (huong_xu_ly === 'KHONG_DEN' && canChi) {
     throw loi('Hướng "không đền" không được tạo khoản hoàn tiền.');
   }
-  if (
-    (huong_xu_ly === 'HOAN_TIEN' || huong_xu_ly === 'BOI_THUONG') &&
-    !canChi
-  ) {
+  if (HUONG_CAN_CHI.has(huong_xu_ly) && !canChi) {
     throw loi('Hướng xử lý này bắt buộc phải có khoản hoàn tiền.');
   }
 
@@ -401,6 +454,13 @@ const ketLuan = async (ycxlsc_ma, duLieu = {}, nguoiDuyet) => {
 
     if (Math.abs(tongTrachNhiem - tongHoan) > 0.01) {
       throw loi('Tổng số tiền trách nhiệm phải bằng tổng tiền hoàn.');
+    }
+
+    // Không cho hoàn vượt giá trị đơn hàng.
+    const don = await SuCoModel.layDonHang(phieu.dts_ma);
+    const giaTriDon = so(don?.dts_tongtienkhachhangthanhtoan);
+    if (giaTriDon > 0 && tongHoan > giaTriDon + 0.01) {
+      throw loi('Tổng tiền hoàn không được vượt quá giá trị đơn hàng.');
     }
   }
 
