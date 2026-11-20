@@ -13,19 +13,4 @@ router.post('/:ycxlsc_ma/ket-luan', Controller.ketLuan);
 router.post('/:ycxlsc_ma/tu-choi', Controller.tuChoi);
 router.post('/:ycxlsc_ma/hoan-tat', Controller.hoanTat);
 
-router.post(
-  '/:ycxlsc_ma/hoan-tien/:ht_ma/xac-nhan',
-  Controller.xacNhanChi
-);
-router.post(
-  '/:ycxlsc_ma/hoan-tien/:ht_ma/tao-qr',
-  Controller.taoQrHoanTien
-);
-router.get('/:ycxlsc_ma/hoan-tien/:ht_ma/qr', Controller.getQrHoanTien);
-router.post(
-  '/:ycxlsc_ma/hoan-tien/:ht_ma/huy-qr',
-  Controller.huyQrHoanTien
-);
-router.post('/:ycxlsc_ma/hoan-tien/:ht_ma/huy', Controller.huyHoanTien);
-
 module.exports = router;

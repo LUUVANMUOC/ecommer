@@ -2,7 +2,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import suCoService from "../../services/suco/suCoService";
-import { buildVietQrUrl } from "../../utils/accountUtils";
 import {
   Badge,
   ChonTep,
@@ -17,211 +16,15 @@ import {
   tien,
 } from "../../components/suco/SuCoUI";
 
-const NGUON_XAC_NHAN = {
-  WEBHOOK: "Ngân hàng tự xác nhận",
-  PAYOUT: "Chi tự động (SePay Payout)",
-  THU_CONG: "Sàn xác nhận thủ công",
-};
-
-const TEN_TRANG_THAI_TT = {
-  DA_CHI: "Đã thanh toán",
-  HUY: "Đã huỷ khoản",
-  QUA_HAN: "Quá hạn chuyển tiền",
-  CHO_CHI: "Chờ chuyển tiền",
-};
-
-// Thẻ thanh toán của một khoản hoàn tiền/bồi thường.
-// Bên trả thấy STK + QR bên nhận; bên nhận thấy mình sắp nhận bao nhiêu từ ai.
-const TheThanhToan = ({ khoan, ct_ma, onBaoChuyen, dangGui }) => {
-  const tt = khoan.thanh_toan;
-  if (!tt) return null;
-
-  const vaiTro = khoan.vai_tro_thanh_toan;
-  const nhan = tt.ben_nhan || {};
-  const tra = tt.ben_tra || {};
-  const conMo = ["CHO_CHI", "QUA_HAN"].includes(khoan.ht_trang_thai);
-  const daChi = khoan.ht_trang_thai === "DA_CHI";
-  const daHuy = khoan.ht_trang_thai === "HUY";
-  const qrMo = tt.qr?.qr_trang_thai === "CHUA_THANH_TOAN";
-  const qrBiHuy = tt.qr?.qr_trang_thai === "HUY";
-  const thieuTk = Boolean(nhan.thieu_tk);
-
-  const bank = {
-    so_tai_khoan: nhan.so_tai_khoan,
-    ten_tai_khoan: nhan.ten_tai_khoan,
-    nganhang_ten: nhan.nganhang_ten,
-    nganhang_ma: nhan.nganhang_ma,
-  };
-  const coBank = !thieuTk && Boolean(nhan.so_tai_khoan) && !qrBiHuy;
-  const qrUrl =
-    vaiTro === "TRA" && conMo && qrMo && coBank
-      ? buildVietQrUrl(bank, tt.so_tien, tt.noi_dung)
-      : "";
-
-  const mauVien = daChi
-    ? "border-emerald-200 bg-emerald-50/40"
-    : daHuy
-      ? "border-gray-200 bg-gray-50"
-      : vaiTro === "TRA"
-        ? "border-amber-200 bg-amber-50/30"
-        : "border-blue-200 bg-blue-50/30";
-
-  return (
-    <div className={`rounded-2xl border p-4 ${mauVien}`}>
-      <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-gray-500">
-            {vaiTro === "TRA"
-              ? "Bạn cần chuyển khoản"
-              : vaiTro === "NHAN"
-                ? "Bạn sẽ nhận được"
-                : "Khoản thanh toán"}
-          </p>
-          <p className="text-xl font-bold text-gray-800">{tien(tt.so_tien)}</p>
-          <p className="text-sm text-gray-600">
-            {vaiTro === "TRA" ? (
-              <>
-                cho <b>{nhan.ten}</b>
-              </>
-            ) : vaiTro === "NHAN" ? (
-              <>
-                từ <b>{tra.ten}</b>
-              </>
-            ) : (
-              <>
-                {tra.ten} → {nhan.ten}
-              </>
-            )}
-          </p>
-        </div>
-        <div className="text-right text-xs">
-          <p className="font-semibold text-gray-700">
-            {TEN_TRANG_THAI_TT[khoan.ht_trang_thai] || khoan.ht_trang_thai}
-          </p>
-          {khoan.ht_ma && (
-            <p className="text-gray-500">Nội dung CK: {khoan.ht_ma}</p>
-          )}
-          {conMo && tt.het_han && (
-            <p className="text-amber-700">Hạn: {ngay(tt.het_han)}</p>
-          )}
-          {daChi && (
-            <p className="text-emerald-700">
-              {NGUON_XAC_NHAN[khoan.ht_nguon_xac_nhan] || "Đã xác nhận"}
-              {khoan.ht_ma_giao_dich
-                ? ` · GD ${khoan.ht_ma_giao_dich}`
-                : ""}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {conMo && coBank ? (
-        <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-start">
-          <div className="text-sm space-y-0.5">
-            <p>
-              <span className="text-gray-500">Ngân hàng:</span>{" "}
-              <b>{nhan.nganhang_ten}</b>
-            </p>
-            <p>
-              <span className="text-gray-500">Số tài khoản:</span>{" "}
-              <b className="tracking-wide">{nhan.so_tai_khoan}</b>
-            </p>
-            <p>
-              <span className="text-gray-500">Chủ tài khoản:</span>{" "}
-              {nhan.ten_tai_khoan}
-            </p>
-            <p>
-              <span className="text-gray-500">Nội dung chuyển:</span>{" "}
-              <b>{tt.noi_dung}</b>
-            </p>
-            {vaiTro === "TRA" && conMo && (
-              <p className="text-xs text-amber-700 pt-1">
-                Chuyển đúng số tiền và đúng nội dung. Chuyển thiếu sẽ chưa được
-                xác nhận thanh toán.
-              </p>
-            )}
-          </div>
-          {qrUrl && (
-            <img
-              src={qrUrl}
-              alt={`QR ${tt.noi_dung}`}
-              className="h-44 w-44 rounded-xl border border-white bg-white object-contain"
-            />
-          )}
-          {qrUrl && (
-            <a
-              href={qrUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-xs text-blue-600 font-semibold sm:col-span-2"
-            >
-              Mở ảnh QR
-            </a>
-          )}
-        </div>
-      ) : qrBiHuy ? (
-        <p className="mt-2 text-xs text-gray-600">
-          Mã QR của khoản này đã bị huỷ. Vui lòng liên hệ Sàn trước khi chuyển
-          tiền để tránh chuyển sai.
-        </p>
-      ) : (
-        <p className="mt-2 text-xs text-gray-600">
-          {nhan.ly_do ||
-            "Bên nhận chưa có tài khoản nhận tiền. Sàn sẽ xác nhận thanh toán thủ công sau khi hai bên đối chiếu."}
-        </p>
-      )}
-
-      {daChi && vaiTro === "TRA" && (
-        <p className="mt-2 text-xs text-emerald-700">
-          Khoản này đã được xác nhận thanh toán — bạn không cần chuyển thêm.
-        </p>
-      )}
-
-      {khoan.ht_baochuyen_luc && !daChi && !daHuy && (
-        <p className="mt-2 text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1">
-          Bạn đã báo chuyển lúc {ngay(khoan.ht_baochuyen_luc)} · chờ Sàn đối
-          soát.
-        </p>
-      )}
-
-      {vaiTro === "TRA" && conMo && !qrBiHuy && (
-        <div className="mt-3 flex justify-end">
-          <button
-            onClick={() => onBaoChuyen(khoan)}
-            disabled={dangGui}
-            className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-sm font-bold"
-          >
-            Tôi đã chuyển khoản
-          </button>
-        </div>
-      )}
-
-      {ct_ma === "CT01" && vaiTro === "QUAN_TRI" && conMo && (
-        <p className="mt-2 text-xs text-gray-500">
-          Bên chịu trách nhiệm là Sàn — dùng màn hình quản trị để xác nhận.
-        </p>
-      )}
-    </div>
-  );
-};
-
 const ChiTietSuCoPage = ({ vaiTro, basePath }) => {
   const { ycxlsc_ma } = useParams();
   const { ct_ma, ma } = useMemo(() => layNguoiDung(vaiTro), [vaiTro]);
 
   const [data, setData] = useState(null);
   const [loi, setLoi] = useState("");
-  const [loiThaoTac, setLoiThaoTac] = useState("");
-  const [thongBao, setThongBao] = useState("");
   const [anh, setAnh] = useState([]);
   const [pdf, setPdf] = useState([]);
   const [dangGui, setDangGui] = useState(false);
-  const [bill, setBill] = useState(null);
-  const [billGhiChu, setBillGhiChu] = useState("");
-  const [billAnh, setBillAnh] = useState([]);
-  const [billPdf, setBillPdf] = useState([]);
-  const [billLoi, setBillLoi] = useState("");
-  const [dangBao, setDangBao] = useState(false);
 
   const tai = useCallback(async () => {
     if (!ycxlsc_ma) return;
@@ -239,8 +42,6 @@ const ChiTietSuCoPage = ({ vaiTro, basePath }) => {
   useEffect(() => {
     tai();
     const id = setInterval(tai, 8000);
-    // Quay lại tab (vd. sau khi chuyển khoản xong) thì cập nhật ngay,
-    // tránh bấm "Tôi đã chuyển khoản" trên khoản mà webhook đã xác nhận.
     const khiHienLai = () => {
       if (document.visibilityState === "visible") tai();
     };
@@ -252,71 +53,6 @@ const ChiTietSuCoPage = ({ vaiTro, basePath }) => {
       document.removeEventListener("visibilitychange", khiHienLai);
     };
   }, [tai]);
-
-  // Đang mở form báo chuyển mà khoản vừa được xác nhận (webhook) -> đóng form.
-  useEffect(() => {
-    if (!bill) return;
-    const moi = (data?.hoan_tien || []).find((h) => h.ht_ma === bill.ht_ma);
-    if (moi && !["CHO_CHI", "QUA_HAN"].includes(moi.ht_trang_thai)) {
-      setBill(null);
-      setThongBao(
-        "Khoản này vừa được xác nhận thanh toán nên không cần báo chuyển nữa.",
-      );
-    }
-  }, [data, bill]);
-
-  const moBaoChuyen = (khoan) => {
-    setBill(khoan);
-    setBillGhiChu("");
-    setBillAnh([]);
-    setBillPdf([]);
-    setBillLoi("");
-    setLoiThaoTac("");
-    setThongBao("");
-  };
-
-  const guiBaoChuyen = async () => {
-    if (!bill) return;
-    const fd = new FormData();
-    fd.append("ct_ma", ct_ma);
-    fd.append("ma", ma);
-    if (billGhiChu.trim()) fd.append("ghi_chu", billGhiChu.trim());
-    ganTep(fd, billAnh, billPdf);
-
-    try {
-      setDangBao(true);
-      setBillLoi("");
-      setLoi("");
-      setLoiThaoTac("");
-      const res = await suCoService.baoDaChuyen(ycxlsc_ma, bill.ht_ma, fd);
-      setBill(null);
-      if (res?.data?.da_thanh_toan) {
-        setThongBao(
-          "Khoản này đã được xác nhận thanh toán trước đó. Chứng từ bạn gửi (nếu có) đã được lưu để Sàn đối chiếu.",
-        );
-      } else {
-        setThongBao(
-          "Đã gửi báo chuyển tới Sàn. Khoản chỉ được đóng khi tiền thực sự vào tài khoản bên nhận.",
-        );
-      }
-      await tai();
-    } catch (error) {
-      const status = error?.response?.status;
-      const msg =
-        error?.response?.data?.message ||
-        "Gửi báo chuyển khoản thất bại, vui lòng thử lại.";
-      if (status === 409) {
-        // Khoản vừa được xác nhận/huỷ ở nơi khác -> đóng form, tải lại dữ liệu.
-        setBill(null);
-        await tai();
-        setLoiThaoTac(msg);
-      } else {
-        setBillLoi(msg);
-      }
-    } finally {
-      setDangBao(false);
-    }
-  };
 
   const laNguoiGui =
     data?.phieu?.ct_ma_denghi === ct_ma &&
@@ -383,7 +119,7 @@ const ChiTietSuCoPage = ({ vaiTro, basePath }) => {
   if (!data)
     return <div className="p-6 text-sm text-gray-500">Đang tải...</div>;
 
-  const { phieu, don, minh_chung, lich_su, trach_nhiem, hoan_tien } = data;
+  const { phieu, don, minh_chung, lich_su, trach_nhiem } = data;
 
   return (
     <div className="p-4 sm:p-6 space-y-4">
@@ -408,18 +144,6 @@ const ChiTietSuCoPage = ({ vaiTro, basePath }) => {
       {loi && (
         <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
           {loi}
-        </p>
-      )}
-
-      {loiThaoTac && (
-        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-          {loiThaoTac}
-        </p>
-      )}
-
-      {thongBao && (
-        <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
-          {thongBao}
         </p>
       )}
 
@@ -548,8 +272,6 @@ const ChiTietSuCoPage = ({ vaiTro, basePath }) => {
                   <tr className="text-left text-gray-500 border-b border-gray-100">
                     <th className="py-1.5">Bên</th>
                     <th className="py-1.5">Vai trò</th>
-                    <th className="py-1.5 text-right">%</th>
-                    <th className="py-1.5 text-right">Số tiền</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -560,60 +282,12 @@ const ChiTietSuCoPage = ({ vaiTro, basePath }) => {
                     >
                       <td className="py-1.5">{t.ct_ten}</td>
                       <td className="py-1.5">{VAI_TRO_TN[t.cttn_vai_tro]}</td>
-                      <td className="py-1.5 text-right">
-                        {Number(t.cttn_phan_tram)}%
-                      </td>
-                      <td className="py-1.5 text-right font-semibold">
-                        {tien(t.cttn_so_tien)}
-                      </td>
                     </tr>
                   ))}
                 </tbody>
               </table>
             </div>
           )}
-
-          {!!hoan_tien.length && (
-            <div className="mt-3 space-y-1.5 text-sm">
-              <p className="font-semibold text-gray-700">Khoản chi</p>
-              {hoan_tien.map((h) => (
-                <p key={h.ht_ma} className="text-gray-700">
-                  {h.ht_ma}: <b>{tien(h.ht_tongtienhoan)}</b> ·{" "}
-                  {h.ct_tratien_ten || h.ct_tratien} →{" "}
-                  {h.ct_nhantien_ten || h.ct_nhantien} ·{" "}
-                  <span
-                    className={
-                      h.ht_trang_thai === "DA_CHI"
-                        ? "text-emerald-600"
-                        : "text-amber-600"
-                    }
-                  >
-                    {h.ht_trang_thai === "DA_CHI"
-                      ? "Đã chi"
-                      : h.ht_trang_thai === "HUY"
-                        ? "Đã hủy"
-                        : "Chờ chi"}
-                  </span>
-                </p>
-              ))}
-            </div>
-          )}
-        </Khoi>
-      )}
-
-      {hoan_tien.some((h) => h.thanh_toan) && (
-        <Khoi title="Thanh toán khoản bồi thường">
-          <div className="space-y-3">
-            {hoan_tien.map((h) => (
-              <TheThanhToan
-                key={h.ht_ma}
-                khoan={h}
-                ct_ma={ct_ma}
-                onBaoChuyen={moBaoChuyen}
-                dangGui={dangBao}
-              />
-            ))}
-          </div>
         </Khoi>
       )}
 
@@ -653,80 +327,6 @@ const ChiTietSuCoPage = ({ vaiTro, basePath }) => {
             </button>
           </div>
         )}
-
-      {bill && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-5 space-y-3 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="text-lg font-bold text-gray-800">
-                  Báo đã chuyển khoản
-                </h3>
-                <p className="text-sm text-gray-600">
-                  Khoản {bill.ht_ma} ·{" "}
-                  {tien(bill.thanh_toan?.so_tien || bill.ht_tongtienhoan)} cho{" "}
-                  {bill.ct_nhantien_ten || bill.ct_nhantien}
-                </p>
-              </div>
-              <button
-                onClick={() => setBill(null)}
-                className="text-gray-400 hover:text-gray-700 text-xl leading-none"
-                aria-label="Đóng"
-              >
-                ✕
-              </button>
-            </div>
-
-            <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2">
-              Sàn sẽ đối soát sao kê của bên nhận. Khoản chỉ được đóng khi tiền
-              thực sự vào tài khoản — báo chuyển không tự động xác nhận.
-            </p>
-
-            <textarea
-              value={billGhiChu}
-              onChange={(e) => setBillGhiChu(e.target.value)}
-              rows={3}
-              placeholder="Ghi chú cho Sàn (mã giao dịch, thời điểm chuyển...)"
-              className="w-full rounded-xl border border-gray-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-200"
-            />
-
-            <div>
-              <p className="text-sm font-semibold text-gray-700 mb-2">
-                Ảnh chụp chuyển khoản (không bắt buộc)
-              </p>
-              <ChonTep
-                anh={billAnh}
-                setAnh={setBillAnh}
-                pdf={billPdf}
-                setPdf={setBillPdf}
-              />
-            </div>
-
-            {billLoi && (
-              <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
-                {billLoi}
-              </p>
-            )}
-
-            <div className="flex justify-end gap-2 pt-1">
-              <button
-                onClick={() => setBill(null)}
-                disabled={dangBao}
-                className="px-4 py-2 rounded-xl border border-gray-200 text-gray-700 text-sm font-semibold"
-              >
-                Hủy
-              </button>
-              <button
-                onClick={guiBaoChuyen}
-                disabled={dangBao}
-                className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 disabled:opacity-60 text-white text-sm font-bold"
-              >
-                {dangBao ? "Đang gửi..." : "Gửi báo chuyển"}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

@@ -110,33 +110,6 @@ const giaiToa = async (client, ycxlsc_ma) => {
   );
 };
 
-const demHoanTienCho = async (client, ycxlsc_ma) => {
-  const r = await client.query(
-    `SELECT COUNT(*)::int AS so
-       FROM hoantien
-      WHERE ycxlsc_ma = $1
-        AND ht_trang_thai IN ('CHO_CHI','QUA_HAN')`,
-    [ycxlsc_ma]
-  );
-  return r.rows[0]?.so || 0;
-};
-
-const dongPhieu = async (client, ycxlsc_ma, nguoi, ghichu) => {
-  await client.query(
-    `UPDATE yeucauxulysuco
-        SET ycxlsc_trang_thai = 'TTXLSC05'
-      WHERE ycxlsc_ma = $1`,
-    [ycxlsc_ma]
-  );
-  await giaiToa(client, ycxlsc_ma);
-  await ghiLichSu(client, ycxlsc_ma, 'TTXLSC05', {
-    ct_ma: 'CT01',
-    nguoi,
-    ghichu,
-  });
-  return true;
-};
-
 // ---------- Danh mục ----------
 const layLoaiSuCo = async (ct_ma, client = pool) => {
   const r = await client.query(
@@ -401,10 +374,7 @@ const layDanhSach = async (boLoc = {}) => {
        t.ttxlsc_ten,
        ${DON_SELECT},
        (SELECT COUNT(*)::int FROM minhchungsuco m
-         WHERE m.ycxlsc_ma = y.ycxlsc_ma) AS so_minh_chung,
-       (SELECT COUNT(*)::int FROM hoantien h
-         WHERE h.ycxlsc_ma = y.ycxlsc_ma
-           AND h.ht_trang_thai IN ('CHO_CHI','QUA_HAN')) AS so_hoan_tien_cho
+         WHERE m.ycxlsc_ma = y.ycxlsc_ma) AS so_minh_chung
      ${fromSql}
      ${whereSql}
      ORDER BY y.ycxlsc_thoidiem DESC
@@ -433,7 +403,7 @@ const layChiTiet = async (ycxlsc_ma) => {
   if (!phieuRes.rows.length) return null;
   const phieu = phieuRes.rows[0];
 
-  const [don, mc, ls, tn, ht, gt] = await Promise.all([
+  const [don, mc, ls, tn, gt] = await Promise.all([
     layDonHang(phieu.dts_ma),
     pool.query(
       `SELECT mcsc_ma, mcsc_ten, mcsc_mota, mcsc_video, mcsc_duongdan,
@@ -456,29 +426,11 @@ const layChiTiet = async (ycxlsc_ma) => {
     ),
     pool.query(
       `SELECT ct.ct_ma_chiutrachnhiem AS ct_ma, ch.ct_ten,
-              ct.cttn_vai_tro, ct.cttn_phan_tram, ct.cttn_so_tien
+              ct.cttn_vai_tro
          FROM chiutrachnhiemsuco ct
          JOIN chuthe ch ON ch.ct_ma = ct.ct_ma_chiutrachnhiem
         WHERE ct.ycxlsc_ma = $1
         ORDER BY ct.cttn_vai_tro, ct.ct_ma_chiutrachnhiem`,
-      [ycxlsc_ma]
-    ),
-    pool.query(
-      `SELECT h.ht_ma, h.ht_sotiengoc, h.ht_sotienphatsinh, h.ht_tongtienhoan,
-              h.ht_thoidiem, h.ct_tratien, h.ct_nhantien, h.ht_trang_thai,
-              h.ht_phuong_thuc, h.ht_ly_do, h.ht_nguoi_xac_nhan, h.ht_thoi_diem_chi,
-              h.ht_ma_giao_dich, h.ht_han_chi, h.ht_nguon_xac_nhan,
-              h.ht_baochuyen_luc, h.ht_baochuyen_ghichu,
-              ct1.ct_ten AS ct_tratien_ten, ct2.ct_ten AS ct_nhantien_ten,
-              q.qr_ma, q.qr_trang_thai, q.qr_thoi_diem_tt,
-              (h.ht_han_chi < now()
-                AND h.ht_trang_thai IN ('CHO_CHI','QUA_HAN')) AS qua_han
-         FROM hoantien h
-         LEFT JOIN chuthe ct1 ON ct1.ct_ma = h.ct_tratien
-         LEFT JOIN chuthe ct2 ON ct2.ct_ma = h.ct_nhantien
-         LEFT JOIN qr_hoan_tien q ON q.ht_ma = h.ht_ma
-        WHERE h.ycxlsc_ma = $1
-        ORDER BY h.ht_thoidiem`,
       [ycxlsc_ma]
     ),
     pool.query(
@@ -496,7 +448,6 @@ const layChiTiet = async (ycxlsc_ma) => {
     minh_chung: mc.rows,
     lich_su: ls.rows,
     trach_nhiem: tn.rows,
-    hoan_tien: ht.rows,
     giu_tien: gt.rows[0] || null,
   };
 };
@@ -556,21 +507,18 @@ const ketLuan = async (duLieu) => {
       ket_luan,
       huong_xu_ly,
       trach_nhiem = [],
-      hoan_tien = [],
     } = duLieu;
-
-    const canChi = hoan_tien.length > 0;
 
     await client.query(
       `UPDATE yeucauxulysuco
           SET ycxlsc_trang_thai = 'TTXLSC04',
               ycxlsc_ket_luan = $2,
               ycxlsc_huong_xu_ly = $3,
-              ycxlsc_can_chi_tien = $4,
-              ycxlsc_nguoi_duyet = $5,
+              ycxlsc_can_chi_tien = false,
+              ycxlsc_nguoi_duyet = $4,
               ycxlsc_thoidiem_duyet = now()
         WHERE ycxlsc_ma = $1`,
-      [ycxlsc_ma, ket_luan, huong_xu_ly, canChi, nguoi_duyet]
+      [ycxlsc_ma, ket_luan, huong_xu_ly, nguoi_duyet]
     );
 
     await client.query(
@@ -583,38 +531,11 @@ const ketLuan = async (duLieu) => {
         `INSERT INTO chiutrachnhiemsuco
            (ct_ma_chiutrachnhiem, ycxlsc_ma, cttn_vai_tro,
             cttn_phan_tram, cttn_so_tien)
-         VALUES ($1, $2, $3, $4, $5)
+         VALUES ($1, $2, $3, 0, 0)
          ON CONFLICT (ct_ma_chiutrachnhiem, ycxlsc_ma) DO UPDATE
-           SET cttn_vai_tro   = EXCLUDED.cttn_vai_tro,
-               cttn_phan_tram = EXCLUDED.cttn_phan_tram,
-               cttn_so_tien   = EXCLUDED.cttn_so_tien`,
-        [tn.ct_ma, ycxlsc_ma, tn.vai_tro, tn.phan_tram, tn.so_tien]
+           SET cttn_vai_tro = EXCLUDED.cttn_vai_tro`,
+        [tn.ct_ma, ycxlsc_ma, tn.vai_tro]
       );
-    }
-
-    const dsHt = [];
-    for (const ht of hoan_tien) {
-      const ht_ma = await sinhMa(client, 'hoantien', 'ht_ma', 'HT');
-      await client.query(
-        `INSERT INTO hoantien
-           (ht_ma, ht_sotienphatsinh, ht_sotiengoc, ht_thoidiem,
-            ht_tongtienhoan, ycxlsc_ma, ct_tratien, ct_nhantien,
-            ht_trang_thai, ht_phuong_thuc, ht_ly_do, ht_han_chi)
-         VALUES ($1, $2, $3, now(), $4, $5, $6, $7,
-                 'CHO_CHI', 'CHUYEN_KHOAN', $8,
-                 now() + interval '24 hours')`,
-        [
-          ht_ma,
-          ht.so_tienphatsinh,
-          ht.so_tiengoc,
-          ht.tong_tienhoan,
-          ycxlsc_ma,
-          ht.ct_tratien,
-          ht.ct_nhantien,
-          ht.ly_do || null,
-        ]
-      );
-      dsHt.push(ht_ma);
     }
 
     await ghiLichSu(client, ycxlsc_ma, 'TTXLSC04', {
@@ -628,132 +549,7 @@ const ketLuan = async (duLieu) => {
     return {
       ycxlsc_ma,
       ycxlsc_trang_thai: 'TTXLSC04',
-      ds_hoan_tien: dsHt,
     };
-  } catch (error) {
-    await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    client.release();
-  }
-};
-
-// ---------- Hoàn tiền ----------
-// client: nếu được truyền vào thì dùng lại transaction của bên gọi,
-// không tự BEGIN/COMMIT/ROLLBACK/release.
-const xacNhanChi = async ({
-  ht_ma,
-  nguoi = null,
-  ma_giao_dich,
-  nguon = 'THU_CONG',
-  client: clientNgoai = null,
-}) => {
-  const client = clientNgoai || (await pool.connect());
-  const tuMoGiaoDich = !clientNgoai;
-  try {
-    if (tuMoGiaoDich) await client.query('BEGIN');
-
-    const r = await client.query(
-      `UPDATE hoantien
-          SET ht_trang_thai = 'DA_CHI',
-              ht_thoi_diem_chi = now(),
-              ht_nguoi_xac_nhan = $2,
-              ht_ma_giao_dich = $3,
-              ht_nguon_xac_nhan = $4
-        WHERE ht_ma = $1
-          AND ht_trang_thai IN ('CHO_CHI','QUA_HAN')
-        RETURNING ycxlsc_ma`,
-      [ht_ma, nguoi, ma_giao_dich || null, nguon]
-    );
-
-    if (!r.rows.length) {
-      throw Object.assign(
-        new Error('Khoản hoàn tiền không tồn tại hoặc đã xử lý.'),
-        { status: 404 }
-      );
-    }
-
-    // Đóng QR đang mở (nếu có) để webhook lặp không khớp lại.
-    await client.query(
-      `UPDATE qr_hoan_tien
-          SET qr_trang_thai = 'DA_THANH_TOAN',
-              qr_ma_giao_dich = COALESCE($2, qr_ma_giao_dich),
-              qr_thoi_diem_tt = now()
-        WHERE ht_ma = $1
-          AND qr_trang_thai = 'CHUA_THANH_TOAN'`,
-      [ht_ma, ma_giao_dich || null]
-    );
-
-    const ycxlsc_ma = r.rows[0].ycxlsc_ma;
-    const conLai = await demHoanTienCho(client, ycxlsc_ma);
-
-    let daHoanTat = false;
-    if (conLai === 0) {
-      daHoanTat = await dongPhieu(
-        client,
-        ycxlsc_ma,
-        nguoi,
-        nguon === 'WEBHOOK'
-          ? 'Ngân hàng báo đã nhận đủ tiền, đóng phiếu'
-          : 'Đã chi xong toàn bộ nghĩa vụ'
-      );
-    }
-
-    if (tuMoGiaoDich) await client.query('COMMIT');
-    return { ycxlsc_ma, da_hoan_tat: daHoanTat };
-  } catch (error) {
-    if (tuMoGiaoDich) await client.query('ROLLBACK');
-    throw error;
-  } finally {
-    if (tuMoGiaoDich) client.release();
-  }
-};
-
-const huyHoanTien = async ({ ht_ma, nguoi, ly_do }) => {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-
-    const r = await client.query(
-      `UPDATE hoantien
-          SET ht_trang_thai = 'HUY',
-              ht_ly_do = COALESCE($2, ht_ly_do)
-        WHERE ht_ma = $1
-          AND ht_trang_thai IN ('CHO_CHI','QUA_HAN')
-        RETURNING ycxlsc_ma`,
-      [ht_ma, ly_do || null]
-    );
-
-    if (!r.rows.length) {
-      throw Object.assign(
-        new Error('Khoản hoàn tiền không tồn tại hoặc đã xử lý.'),
-        { status: 404 }
-      );
-    }
-
-    await client.query(
-      `UPDATE qr_hoan_tien
-          SET qr_trang_thai = 'HUY'
-        WHERE ht_ma = $1
-          AND qr_trang_thai = 'CHUA_THANH_TOAN'`,
-      [ht_ma]
-    );
-
-    const ycxlsc_ma = r.rows[0].ycxlsc_ma;
-    const conLai = await demHoanTienCho(client, ycxlsc_ma);
-
-    let daHoanTat = false;
-    if (conLai === 0) {
-      daHoanTat = await dongPhieu(
-        client,
-        ycxlsc_ma,
-        nguoi,
-        'Đã miễn/ huỷ toàn bộ nghĩa vụ còn lại'
-      );
-    }
-
-    await client.query('COMMIT');
-    return { ycxlsc_ma, da_hoan_tat: daHoanTat };
   } catch (error) {
     await client.query('ROLLBACK');
     throw error;
@@ -782,22 +578,7 @@ const getKpi = async () => {
      FROM yeucauxulysuco`
   );
 
-  const ht = await pool.query(
-    `SELECT
-       COUNT(*) FILTER (
-         WHERE ht_trang_thai IN ('CHO_CHI','QUA_HAN')
-           AND ht_han_chi < now()
-       )::int AS qua_han_hoan_tien,
-       COALESCE(SUM(ht_tongtienhoan) FILTER (
-         WHERE ht_trang_thai IN ('CHO_CHI','QUA_HAN')
-       ), 0) AS tong_tien_cho_chi
-     FROM hoantien`
-  );
-
-  return {
-    ...r.rows[0],
-    ...ht.rows[0],
-  };
+  return r.rows[0];
 };
 
 // ---------- Quét SLA ----------
@@ -829,46 +610,6 @@ const danhDauNhacKetLuan = async (ycxlsc_ma) => {
   );
 };
 
-const chuyenHoanTienQuaHan = async () => {
-  const r = await pool.query(
-    `UPDATE hoantien
-        SET ht_trang_thai = 'QUA_HAN'
-      WHERE ht_trang_thai = 'CHO_CHI'
-        AND ht_han_chi < now()
-      RETURNING ht_ma, ycxlsc_ma, ct_tratien, ct_nhantien,
-                ht_tongtienhoan, ht_han_chi`
-  );
-  return r.rows;
-};
-
-const layHoanTienQuaHanNhac = async (gioiHan = 50) => {
-  const r = await pool.query(
-    `SELECT h.ht_ma, h.ycxlsc_ma, h.ct_tratien, h.ct_nhantien,
-            h.ht_tongtienhoan, h.ht_han_chi, h.ht_nhac_lan,
-            y.ycxlsc_ten, y.dts_ma
-       FROM hoantien h
-       JOIN yeucauxulysuco y ON y.ycxlsc_ma = h.ycxlsc_ma
-      WHERE h.ht_trang_thai = 'QUA_HAN'
-        AND h.ht_nhac_lan < 3
-        AND (h.ht_nhac_luc IS NULL
-             OR h.ht_nhac_luc < now() - interval '12 hours')
-      ORDER BY h.ht_han_chi
-      LIMIT $1`,
-    [gioiHan]
-  );
-  return r.rows;
-};
-
-const danhDauNhacHoanTien = async (ht_ma) => {
-  await pool.query(
-    `UPDATE hoantien
-        SET ht_nhac_lan = ht_nhac_lan + 1,
-            ht_nhac_luc = now()
-      WHERE ht_ma = $1`,
-    [ht_ma]
-  );
-};
-
 module.exports = {
   layLoaiSuCo,
   layTrangThai,
@@ -881,12 +622,7 @@ module.exports = {
   layChiTiet,
   chuyenTrangThai,
   ketLuan,
-  xacNhanChi,
-  huyHoanTien,
   getKpi,
   layPhieuQuaHanKetLuan,
   danhDauNhacKetLuan,
-  chuyenHoanTienQuaHan,
-  layHoanTienQuaHanNhac,
-  danhDauNhacHoanTien,
 };

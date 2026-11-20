@@ -1,6 +1,5 @@
 // backend/src/services/suco/suCoService.js
 const SuCoModel = require('../../models/suco/suCoModel');
-const SuCoThanhToanModel = require('../../models/suco/suCoThanhToanModel');
 
 const loi = (message, status = 400) => {
   const error = new Error(message);
@@ -17,7 +16,6 @@ const so = (v, macDinh = 0) => {
 const CT_HOP_LE = new Set(['CT02', 'CT03', 'CT04', 'CT05']);
 const CHU_THE_HOP_LE = new Set(['CT01', 'CT02', 'CT03', 'CT04', 'CT05']);
 const HUONG_XU_LY = new Set(['KHONG_DEN', 'HOAN_TIEN', 'BOI_THUONG', 'KHAC']);
-const HUONG_CAN_CHI = new Set(['HOAN_TIEN', 'BOI_THUONG']);
 const VAI_TRO = new Set(['CHIU_TRACH_NHIEM', 'BI_ANH_HUONG']);
 const DANG_MO = new Set(['TTXLSC01', 'TTXLSC02', 'TTXLSC03']);
 const DA_DONG = new Set(['TTXLSC05', 'TTXLSC06', 'TTXLSC07']);
@@ -199,27 +197,6 @@ const layChiTiet = async (ycxlsc_ma, nguoiDung = {}) => {
     batBuocLienQuan(chiTiet.don, ct_ma, ma_nguoi);
   }
 
-  // Gắn thông tin thanh toán (STK bên nhận, QR, hạn chót) cho các khoản
-  // mà người xem là bên trả, bên nhận hoặc admin.
-  await Promise.all(
-    (chiTiet.hoan_tien || []).map(async (khoan) => {
-      const laBenTra = khoan.ct_tratien === ct_ma;
-      const laBenNhan = khoan.ct_nhantien === ct_ma;
-      if (!laBenTra && !laBenNhan && ct_ma !== 'CT01') return;
-
-      khoan.vai_tro_thanh_toan = laBenTra
-        ? 'TRA'
-        : laBenNhan
-          ? 'NHAN'
-          : 'QUAN_TRI';
-      try {
-        khoan.thanh_toan = await SuCoThanhToanModel.layThongTin(khoan.ht_ma);
-      } catch (error) {
-        khoan.thanh_toan = null;
-      }
-    })
-  );
-
   return chiTiet;
 };
 
@@ -350,140 +327,13 @@ const ketLuan = async (ycxlsc_ma, duLieu = {}, nguoiDuyet) => {
     if (!VAI_TRO.has(vai_tro)) throw loi('Vai trò trách nhiệm không hợp lệ.');
     if (!CHU_THE_HOP_LE.has(ct_ma)) throw loi('Chủ thể trách nhiệm không hợp lệ.');
 
-    const phan_tram = so(t.phan_tram);
-    const so_tien = so(t.so_tien);
-
-    if (phan_tram < 0 || phan_tram > 100) {
-      throw loi('Tỷ lệ trách nhiệm phải trong khoảng 0 - 100%.');
-    }
-    if (so_tien < 0) throw loi('Số tiền trách nhiệm không hợp lệ.');
-
-    return {
-      ct_ma,
-      vai_tro,
-      phan_tram,
-      so_tien,
-    };
+    return { ct_ma, vai_tro };
   });
 
-  let dsHoanTien = (Array.isArray(duLieu.hoan_tien)
-    ? duLieu.hoan_tien
-    : []
-  ).map((h) => {
-    const ct_tratien = chuoi(h.ct_tratien).toUpperCase();
-    const ct_nhantien = chuoi(h.ct_nhantien).toUpperCase();
-    if (!CHU_THE_HOP_LE.has(ct_tratien) || !CHU_THE_HOP_LE.has(ct_nhantien)) {
-      throw loi('Bên trả hoặc bên nhận tiền không hợp lệ.');
-    }
-
-    const so_tiengoc = so(h.so_tiengoc);
-    const so_tienphatsinh = so(h.so_tienphatsinh);
-    const tong_tienhoan = so(h.tong_tienhoan);
-
-    if (so_tiengoc < 0 || so_tienphatsinh < 0 || tong_tienhoan < 0) {
-      throw loi('Số tiền hoàn không hợp lệ.');
-    }
-
-    return {
-      ct_tratien,
-      ct_nhantien,
-      so_tiengoc,
-      so_tienphatsinh,
-      tong_tienhoan,
-      ly_do: chuoi(h.ly_do),
-    };
-  });
-
-  // Tự tạo khoản chi khi có đúng 1 bên chịu trách nhiệm (có tiền)
-  // và đúng 1 bên bị ảnh hưởng. Giúp API vẫn dùng được khi client
-  // chỉ gửi trách nhiệm mà quên gửi khoản chi.
-  if (!dsHoanTien.length && HUONG_CAN_CHI.has(huong_xu_ly)) {
-    const benTra = dsTrachNhiem.filter(
-      (x) => x.vai_tro === 'CHIU_TRACH_NHIEM' && x.so_tien > 0
-    );
-    const benNhan = dsTrachNhiem.filter(
-      (x) => x.vai_tro === 'BI_ANH_HUONG'
-    );
-
-    if (benTra.length === 1 && benNhan.length === 1) {
-      dsHoanTien = [
-        {
-          ct_tratien: benTra[0].ct_ma,
-          ct_nhantien: benNhan[0].ct_ma,
-          so_tiengoc: benTra[0].so_tien,
-          so_tienphatsinh: 0,
-          tong_tienhoan: benTra[0].so_tien,
-          ly_do: ket_luan,
-        },
-      ];
-    }
-  }
-
-  const canChi = dsHoanTien.length > 0;
-
-  if (huong_xu_ly === 'KHONG_DEN' && canChi) {
-    throw loi('Hướng "không đền" không được tạo khoản hoàn tiền.');
-  }
-  if (HUONG_CAN_CHI.has(huong_xu_ly) && !canChi) {
-    throw loi('Hướng xử lý này bắt buộc phải có khoản hoàn tiền.');
-  }
-
-  const benTra = new Set(
-    dsTrachNhiem
-      .filter((x) => x.vai_tro === 'CHIU_TRACH_NHIEM')
-      .map((x) => x.ct_ma)
-  );
-  const benNhan = new Set(
-    dsTrachNhiem
-      .filter((x) => x.vai_tro === 'BI_ANH_HUONG')
-      .map((x) => x.ct_ma)
-  );
-
-  for (const ht of dsHoanTien) {
-    if (!benTra.has(ht.ct_tratien)) {
-      throw loi('Bên trả tiền chưa được gán trách nhiệm.');
-    }
-    if (!benNhan.has(ht.ct_nhantien)) {
-      throw loi('Bên nhận tiền chưa được gán là bên bị ảnh hưởng.');
-    }
-    if (ht.ct_tratien === ht.ct_nhantien) {
-      throw loi('Bên trả và bên nhận phải khác nhau.');
-    }
-    if (ht.tong_tienhoan < 0) throw loi('Số tiền hoàn không hợp lệ.');
-    if (ht.tong_tienhoan > ht.so_tiengoc + ht.so_tienphatsinh) {
-      throw loi('Số hoàn vượt quá gốc cộng phát sinh.');
-    }
-  }
-
-  if (canChi) {
-    if (benTra.size === 0) {
-      throw loi('Phải gán ít nhất một bên chịu trách nhiệm.');
-    }
-
-    if (benTra.size > 1) {
-      const tongPhanTram = dsTrachNhiem
-        .filter((x) => x.vai_tro === 'CHIU_TRACH_NHIEM')
-        .reduce((s, x) => s + x.phan_tram, 0);
-      if (Math.round(tongPhanTram) !== 100) {
-        throw loi('Tổng % trách nhiệm phải bằng 100.');
-      }
-    }
-
-    const tongTrachNhiem = dsTrachNhiem
-      .filter((x) => x.vai_tro === 'CHIU_TRACH_NHIEM')
-      .reduce((s, x) => s + x.so_tien, 0);
-    const tongHoan = dsHoanTien.reduce((s, x) => s + x.tong_tienhoan, 0);
-
-    if (Math.abs(tongTrachNhiem - tongHoan) > 0.01) {
-      throw loi('Tổng số tiền trách nhiệm phải bằng tổng tiền hoàn.');
-    }
-
-    // Không cho hoàn vượt giá trị đơn hàng.
-    const don = await SuCoModel.layDonHang(phieu.dts_ma);
-    const giaTriDon = so(don?.dts_tongtienkhachhangthanhtoan);
-    if (giaTriDon > 0 && tongHoan > giaTriDon + 0.01) {
-      throw loi('Tổng tiền hoàn không được vượt quá giá trị đơn hàng.');
-    }
+  const benTra = dsTrachNhiem.filter((x) => x.vai_tro === 'CHIU_TRACH_NHIEM');
+  const benNhan = dsTrachNhiem.filter((x) => x.vai_tro === 'BI_ANH_HUONG');
+  if (benNhan.length && !benTra.length) {
+    throw loi('Phải gán ít nhất một bên chịu trách nhiệm.');
   }
 
   const ketQua = await SuCoModel.ketLuan({
@@ -492,35 +342,15 @@ const ketLuan = async (ycxlsc_ma, duLieu = {}, nguoiDuyet) => {
     ket_luan,
     huong_xu_ly,
     trach_nhiem: dsTrachNhiem,
-    hoan_tien: dsHoanTien,
   });
-
-  // Tự tạo QR nhận tiền ngay khi kết luận để bên trả thấy trên portal.
-  // Bỏ qua khoản mà bên nhận chưa có tài khoản (sẽ xác nhận tay).
-  const dsQr = [];
-  for (const ht_ma of ketQua.ds_hoan_tien || []) {
-    try {
-      dsQr.push(await SuCoThanhToanModel.taoQr(ht_ma));
-    } catch (error) {
-      dsQr.push({ ht_ma, loi: error.message });
-    }
-  }
-
-  // Gắn mã khoản vào từng dòng để thông báo hiển thị đúng nội dung CK.
-  const dsChi = dsHoanTien.map((c, i) => ({
-    ...c,
-    ht_ma: (ketQua.ds_hoan_tien || [])[i] || null,
-  }));
 
   bao({
     kieu: 'KET_LUAN',
     phieu: ketQua,
     huong_xu_ly,
     ket_luan,
-    ds_chi: dsChi,
-    ds_qr: dsQr,
   });
-  return { ...ketQua, ds_qr: dsQr };
+  return ketQua;
 };
 
 // ---------- Admin: từ chối ----------
@@ -549,14 +379,6 @@ const hoanTat = async (ycxlsc_ma, nguoiDuyet, ghichu = '') => {
 
   kiemTraChuyen(phieu.ycxlsc_trang_thai, 'TTXLSC05');
 
-  const chiTiet = await SuCoModel.layChiTiet(phieu.ycxlsc_ma);
-  const conCho = (chiTiet.hoan_tien || []).filter((h) =>
-    ['CHO_CHI', 'QUA_HAN'].includes(h.ht_trang_thai)
-  );
-  if (conCho.length > 0) {
-    throw loi('Còn khoản hoàn tiền chưa xử lý, không thể hoàn tất.');
-  }
-
   const ketQua = await SuCoModel.chuyenTrangThai({
     ycxlsc_ma: phieu.ycxlsc_ma,
     trang_thai: 'TTXLSC05',
@@ -566,159 +388,6 @@ const hoanTat = async (ycxlsc_ma, nguoiDuyet, ghichu = '') => {
   });
 
   bao({ kieu: 'DOI_TRANG_THAI', phieu: ketQua });
-  return ketQua;
-};
-
-// ---------- Admin: xác nhận đã chi ----------
-const xacNhanChi = async (ycxlsc_ma, ht_ma, nguoiDuyet, ma_giao_dich = '') => {
-  const chiTiet = await SuCoModel.layChiTiet(chuoi(ycxlsc_ma));
-  if (!chiTiet) throw loi('Không tìm thấy phiếu sự cố.', 404);
-
-  const khoan = (chiTiet.hoan_tien || []).find(
-    (h) => h.ht_ma === chuoi(ht_ma)
-  );
-  if (!khoan) throw loi('Khoản hoàn tiền không thuộc phiếu này.', 404);
-
-  const ketQua = await SuCoModel.xacNhanChi({
-    ht_ma: khoan.ht_ma,
-    nguoi: nguoiDuyet,
-    ma_giao_dich: chuoi(ma_giao_dich),
-  });
-
-  bao({ kieu: 'XAC_NHAN_CHI', phieu: ketQua, hoan_tien: khoan });
-  return ketQua;
-};
-
-// ---------- Admin: huỷ khoản hoàn tiền ----------
-const huyHoanTien = async (ycxlsc_ma, ht_ma, nguoiDuyet, ly_do = '') => {
-  const chiTiet = await SuCoModel.layChiTiet(chuoi(ycxlsc_ma));
-  if (!chiTiet) throw loi('Không tìm thấy phiếu sự cố.', 404);
-
-  const khoan = (chiTiet.hoan_tien || []).find(
-    (h) => h.ht_ma === chuoi(ht_ma)
-  );
-  if (!khoan) throw loi('Khoản hoàn tiền không thuộc phiếu này.', 404);
-
-  const ketQua = await SuCoModel.huyHoanTien({
-    ht_ma: khoan.ht_ma,
-    nguoi: nguoiDuyet,
-    ly_do: chuoi(ly_do),
-  });
-
-  bao({ kieu: 'HUY_HOAN_TIEN', phieu: ketQua, hoan_tien: khoan });
-  return ketQua;
-};
-
-// ---------- Admin: QR nhận tiền cho khoản hoàn tiền ----------
-const timKhoanTrongPhieu = async (ycxlsc_ma, ht_ma) => {
-  const chiTiet = await SuCoModel.layChiTiet(chuoi(ycxlsc_ma));
-  if (!chiTiet) throw loi('Không tìm thấy phiếu sự cố.', 404);
-
-  const khoan = (chiTiet.hoan_tien || []).find(
-    (h) => h.ht_ma === chuoi(ht_ma)
-  );
-  if (!khoan) throw loi('Khoản hoàn tiền không thuộc phiếu này.', 404);
-
-  return { chiTiet, khoan };
-};
-
-const taoQrHoanTien = async (ycxlsc_ma, ht_ma) => {
-  const { chiTiet, khoan } = await timKhoanTrongPhieu(ycxlsc_ma, ht_ma);
-
-  if (chiTiet.phieu.ycxlsc_trang_thai !== 'TTXLSC04') {
-    throw loi('Chỉ tạo QR nhận tiền khi phiếu đã kết luận.', 409);
-  }
-
-  return SuCoThanhToanModel.taoQr(khoan.ht_ma);
-};
-
-const layQrHoanTien = async (ycxlsc_ma, ht_ma) => {
-  const { khoan } = await timKhoanTrongPhieu(ycxlsc_ma, ht_ma);
-  return SuCoThanhToanModel.layTrangThai(khoan.ht_ma);
-};
-
-// ---------- Bên trả báo đã chuyển khoản (kèm chứng từ) ----------
-// Chỉ ghi nhận để admin đối soát, KHÔNG tự đóng khoản chi.
-const baoDaChuyen = async (
-  ycxlsc_ma,
-  ht_ma,
-  nguoiDung = {},
-  ghi_chu = '',
-  dsTep = []
-) => {
-  const { chiTiet, khoan } = await timKhoanTrongPhieu(ycxlsc_ma, ht_ma);
-
-  const ct_ma = chuoi(nguoiDung.ct_ma).toUpperCase();
-  const ma_nguoi = chuoi(nguoiDung.ma);
-  if (!ct_ma || !ma_nguoi) throw loi('Thiếu thông tin người dùng.');
-
-  batBuocLienQuan(chiTiet.don, ct_ma, ma_nguoi);
-
-  if (khoan.ct_tratien !== ct_ma) {
-    throw loi('Chỉ bên chịu trách nhiệm mới báo đã chuyển khoản.', 403);
-  }
-
-  const ketQua = await SuCoThanhToanModel.danhDauDaChuyen(
-    khoan.ht_ma,
-    chuoi(ghi_chu)
-  );
-
-  const tep = chuanHoaTep(dsTep).map((t) => ({
-    ...t,
-    ten: t.ten === 'Minh chứng' ? 'Minh chứng chuyển khoản' : t.ten,
-    ct_ma,
-    ma_nguoi_gui: ma_nguoi,
-  }));
-  if (tep.length) {
-    await SuCoModel.themMinhChung(chiTiet.phieu.ycxlsc_ma, tep);
-  }
-
-  // Chỉ báo admin lần đầu hoặc khi có thêm chứng từ (tránh spam).
-  // Khoản đã được ngân hàng/Sàn xác nhận trước đó thì chỉ lưu chứng từ,
-  // không bắn thêm thông báo "bên trả báo đã chuyển".
-  if (!ketQua.da_thanh_toan && (!khoan.ht_baochuyen_luc || tep.length)) {
-    bao({
-      kieu: 'BAO_CHUYEN',
-      phieu: { ycxlsc_ma: chiTiet.phieu.ycxlsc_ma },
-      hoan_tien: { ...khoan, ht_baochuyen_ghichu: ketQua.ht_baochuyen_ghichu },
-      ct_ma,
-      chi_admin: true,
-    });
-  }
-
-  return { ...ketQua, so_tep: tep.length };
-};
-
-const layThongTinThanhToan = async (ycxlsc_ma, ht_ma, nguoiDung = {}) => {
-  const { chiTiet, khoan } = await timKhoanTrongPhieu(ycxlsc_ma, ht_ma);
-  const ct_ma = chuoi(nguoiDung.ct_ma).toUpperCase();
-  const ma_nguoi = chuoi(nguoiDung.ma);
-
-  if (ct_ma && ct_ma !== 'CT01') {
-    batBuocLienQuan(chiTiet.don, ct_ma, ma_nguoi);
-  }
-
-  const thongTin = await SuCoThanhToanModel.layThongTin(khoan.ht_ma);
-  return {
-    ...thongTin,
-    vai_tro_thanh_toan:
-      khoan.ct_tratien === ct_ma
-        ? 'TRA'
-        : khoan.ct_nhantien === ct_ma
-          ? 'NHAN'
-          : 'QUAN_TRI',
-  };
-};
-
-const huyQrHoanTien = async (ycxlsc_ma, ht_ma) => {
-  const { chiTiet, khoan } = await timKhoanTrongPhieu(ycxlsc_ma, ht_ma);
-
-  const ketQua = await SuCoThanhToanModel.huyQr(khoan.ht_ma);
-  bao({
-    kieu: 'HUY_QR',
-    phieu: { ycxlsc_ma: chiTiet.phieu.ycxlsc_ma },
-    hoan_tien: khoan,
-  });
   return ketQua;
 };
 
@@ -739,12 +408,5 @@ module.exports = {
   ketLuan,
   tuChoi,
   hoanTat,
-  xacNhanChi,
-  huyHoanTien,
-  taoQrHoanTien,
-  layQrHoanTien,
-  huyQrHoanTien,
-  layThongTinThanhToan,
-  baoDaChuyen,
   getKpi,
 };

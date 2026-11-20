@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import suCoAdminService from "../../services/san/suCoAdminService";
 import axiosClient from "../../config/axiosClient";
-import { Badge, NhanSla, ngay, tien } from "../../components/suco/SuCoUI";
+import { Badge, NhanSla, ngay } from "../../components/suco/SuCoUI";
 
 const TRANG_THAI_LOC = [
   { value: "", label: "Tất cả trạng thái" },
@@ -93,7 +93,7 @@ const SuCoAdmin = () => {
       <div>
         <h1 className="text-2xl font-bold text-gray-800">Xử lý sự cố</h1>
         <p className="text-sm text-gray-500">
-          SLA: kết luận trong 24 giờ, hoàn thành nghĩa vụ trong 24 giờ.
+          SLA: kết luận trong 24 giờ.
         </p>
       </div>
 
@@ -133,18 +133,6 @@ const SuCoAdmin = () => {
           icon="timer_off"
           mau="text-red-600"
           giaTri={kpi?.qua_han_ket_luan ?? 0}
-        />
-        <TheKpi
-          nhan="Quá hạn chi tiền"
-          icon="money_off"
-          mau="text-red-600"
-          giaTri={kpi?.qua_han_hoan_tien ?? 0}
-        />
-        <TheKpi
-          nhan="Tiền chờ chi"
-          icon="payments"
-          mau="text-gray-800"
-          giaTri={tien(kpi?.tong_tien_cho_chi)}
         />
       </div>
 

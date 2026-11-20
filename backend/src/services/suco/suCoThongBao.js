@@ -35,7 +35,6 @@ const LINK = {
 };
 
 const cat = (s, n) => (String(s || '').length > n ? `${String(s).slice(0, n - 1)}…` : String(s || ''));
-const tien = (v) => `${Number(v || 0).toLocaleString('vi-VN')} đ`;
 const luc = (v) =>
   v
     ? new Date(v).toLocaleString('vi-VN', { timeZone: 'Asia/Ho_Chi_Minh' })
@@ -92,88 +91,14 @@ const taoNoiDung = (kieu, ctx, payload = {}) => {
       };
 
     case 'KET_LUAN': {
-      const dsChi = payload.ds_chi || [];
-      const qrTheoMa = new Map(
-        (payload.ds_qr || [])
-          .filter((q) => q && q.qr_ma)
-          .map((q) => [q.ht_ma, q])
-      );
-
-      const dongChi = dsChi.map((c) => {
-        const qr = qrTheoMa.get(c.ht_ma);
-        const nhan = qr?.ben_nhan;
-        const den =
-          nhan && !nhan.thieu_tk
-            ? `${nhan.ten} — ${nhan.nganhang_ten} ${nhan.so_tai_khoan} (${nhan.ten_tai_khoan})`
-            : `${TEN_CHU_THE[c.ct_nhantien] || c.ct_nhantien}`;
-        return (
-          `• ${TEN_CHU_THE[c.ct_tratien] || c.ct_tratien} chuyển ` +
-          `${tien(c.tong_tienhoan)} cho ${den}, nội dung "${c.ht_ma}"`
-        );
-      });
-
       return {
         tieu_de: cat(`Kết luận sự cố ${ma}`, 200),
         noi_dung:
           `Phiếu ${ma} (đơn ${don}) đã có kết luận của Sàn.\n` +
           `Hướng xử lý: ${TEN_HUONG[ctx.ycxlsc_huong_xu_ly] || 'Khác'}.\n` +
-          `Kết luận: ${ctx.ycxlsc_ket_luan || ''}\n` +
-          (dsChi.length
-            ? `Các khoản phải thanh toán (hạn 24 giờ):\n${dongChi.join('\n')}`
-            : 'Không phát sinh khoản chi.'),
+          `Kết luận: ${ctx.ycxlsc_ket_luan || ''}`,
       };
     }
-
-    case 'XAC_NHAN_CHI': {
-      const tuDong = payload.nguon === 'WEBHOOK';
-      return {
-        tieu_de: cat(`Đã thanh toán khoản sự cố ${ma}`, 200),
-        noi_dung: tuDong
-          ? `Hệ thống ghi nhận ${tien(payload.hoan_tien?.ht_tongtienhoan)} ` +
-            `đã vào tài khoản bên nhận cho phiếu ${ma} (đơn ${don}).`
-          : `Sàn xác nhận khoản ${tien(payload.hoan_tien?.ht_tongtienhoan)} ` +
-            `của phiếu ${ma} (đơn ${don}) đã được thanh toán.`,
-      };
-    }
-
-    case 'THIEU_TIEN': {
-      return {
-        tieu_de: cat(`Chuyển thiếu tiền sự cố ${ma}`, 200),
-        noi_dung:
-          `Khoản chi ${payload.hoan_tien?.ht_ma || ''} của phiếu ${ma} (đơn ${don}) ` +
-          `cần ${tien(payload.so_tien_can)} nhưng mới nhận ${tien(payload.so_tien_nhan)}.\n` +
-          `QR vẫn đang mở. Vui lòng đối soát với bên chuyển tiền.`,
-      };
-    }
-
-    case 'TIEN_KHONG_KHOP': {
-      return {
-        tieu_de: cat(`Tiền vào không khớp QR sự cố ${ma}`, 200),
-        noi_dung:
-          `Có giao dịch ${tien(payload.so_tien_nhan)} với nội dung "${cat(payload.noi_dung_chuyen, 120)}" ` +
-          `nhưng không khớp QR nào đang mở của phiếu ${ma} (đơn ${don}).\n` +
-          `Khoản chi ${payload.hoan_tien?.ht_ma || ''}: ${tien(payload.hoan_tien?.ht_tongtienhoan)}.\n` +
-          `Vui lòng kiểm tra: QR có thể đã bị huỷ hoặc khoản đã được chi cách khác.`,
-      };
-    }
-
-    case 'HUY_QR': {
-      return {
-        tieu_de: cat(`Huỷ QR khoản chi sự cố ${ma}`, 200),
-        noi_dung:
-          `Mã QR nhận tiền của khoản chi ${tien(payload.hoan_tien?.ht_tongtienhoan)} ` +
-          `(phiếu ${ma}, đơn ${don}) đã bị huỷ.\n` +
-          `Vui lòng không chuyển khoản theo mã QR cũ.`,
-      };
-    }
-
-    case 'HUY_HOAN_TIEN':
-      return {
-        tieu_de: cat(`Hủy khoản chi sự cố ${ma}`, 200),
-        noi_dung:
-          `Khoản chi ${tien(payload.hoan_tien?.ht_tongtienhoan)} của phiếu ${ma} ` +
-          `(đơn ${don}) đã bị hủy.`,
-      };
 
     case 'NHAC_KET_LUAN':
       return {
@@ -181,32 +106,6 @@ const taoNoiDung = (kieu, ctx, payload = {}) => {
         noi_dung:
           `Phiếu ${ma} (đơn ${don}) đã quá hạn kết luận từ ${han}.\n` +
           `Vui lòng vào xử lý và quy trách nhiệm cho các bên.`,
-      };
-
-    case 'NHAC_HOAN_TIEN':
-      return {
-        tieu_de: cat(`Quá hạn chuyển tiền sự cố ${ma}`, 200),
-        noi_dung:
-          `Phiếu ${ma} (đơn ${don}): khoản ${tien(payload.hoan_tien?.ht_tongtienhoan)} ` +
-          `từ ${TEN_CHU_THE[payload.hoan_tien?.ct_tratien] || 'bên chịu trách nhiệm'} ` +
-          `cho ${TEN_CHU_THE[payload.hoan_tien?.ct_nhantien] || 'bên bị ảnh hưởng'} ` +
-          `đã quá hạn từ ${luc(payload.hoan_tien?.ht_han_chi)}.\n` +
-          `Vui lòng chuyển khoản theo nội dung "${payload.hoan_tien?.ht_ma || ''}" ` +
-          `hoặc liên hệ Sàn nếu đã chuyển.`,
-      };
-
-    case 'BAO_CHUYEN':
-      return {
-        tieu_de: cat(`Bên trả báo đã chuyển tiền sự cố ${ma}`, 200),
-        noi_dung:
-          `${TEN_CHU_THE[payload.hoan_tien?.ct_tratien] || 'Bên chịu trách nhiệm'} ` +
-          `báo đã chuyển ${tien(payload.hoan_tien?.ht_tongtienhoan)} ` +
-          `cho ${TEN_CHU_THE[payload.hoan_tien?.ct_nhantien] || 'bên nhận'} ` +
-          `(phiếu ${ma}, đơn ${don}).\n` +
-          (payload.hoan_tien?.ht_baochuyen_ghichu
-            ? `Ghi chú: ${payload.hoan_tien.ht_baochuyen_ghichu}\n`
-            : '') +
-          `Vui lòng kiểm tra sao kê và xác nhận đã chi nếu tiền đã vào tài khoản.`,
       };
 
     default:
@@ -243,21 +142,6 @@ const gomNguoiNhan = (ctx, payload = {}) => {
         (ma) => ma !== String(payload.ma_nguoi_gui)
       );
     }
-  }
-
-  // Quá hạn chuyển tiền: chỉ nhắc bên chịu trách nhiệm (bên trả) + admin.
-  if (payload.kieu === 'NHAC_HOAN_TIEN') {
-    const ctTra = payload.hoan_tien?.ct_tratien;
-    const loaiTra = LOAI_NGUOI[ctTra];
-    const maTheoChuThe = {
-      CT02: ctx.gh_ma,
-      CT03: ctx.dvvc_ma,
-      CT04: ctx.kh_ma,
-      CT05: ctx.shipper_ma,
-    };
-
-    for (const loai of ['SHOP', 'DVVC', 'KHACHHANG', 'SHIPPER']) nhom[loai] = [];
-    if (loaiTra && maTheoChuThe[ctTra]) them(loaiTra, maTheoChuThe[ctTra]);
   }
 
   return nhom;
