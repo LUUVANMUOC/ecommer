@@ -4,6 +4,7 @@ import adminDonHangService from "../../services/san/adminDonHangService";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
 import LoTrinhVanChuyen from "../../components/common/LoTrinhVanChuyen";
+import SanPhamLink from "../../components/common/SanPhamLink";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
@@ -404,9 +405,11 @@ const QuanLyDonHangAdmin = () => {
                       </h4>
                       <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                         {orderDetail.items?.map((item) => (
-                          <div
+                          <SanPhamLink
                             key={item.Ctsp_Ma}
-                            className="flex gap-3 text-sm border-b border-gray-100 pb-2 last:border-0"
+                            spMa={item.Sp_Ma}
+                            ctspMa={item.Ctsp_Ma}
+                            className="group -mx-2 flex gap-3 rounded-xl border-b border-gray-100 px-2 py-1.5 text-sm transition-colors last:border-0 hover:bg-[#F8FAFC]"
                           >
                             <img
                               src={
@@ -417,7 +420,7 @@ const QuanLyDonHangAdmin = () => {
                               className="w-12 h-12 rounded object-cover border"
                             />
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-[#0F172A] truncate">
+                              <p className="font-semibold text-[#0F172A] truncate group-hover:text-[#2563EB]">
                                 {item.TenSanPham}
                               </p>
                               <p className="text-xs text-gray-500">
@@ -427,7 +430,7 @@ const QuanLyDonHangAdmin = () => {
                             <p className="font-bold text-[#DC2626]">
                               {formatVND(item.ThanhTien)}
                             </p>
-                          </div>
+                          </SanPhamLink>
                         ))}
                       </div>
                     </div>

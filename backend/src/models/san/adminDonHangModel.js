@@ -81,7 +81,7 @@ const AdminDonHangModel = {
         mgg_s.mgg_shop_ten AS "TenVoucherShop", mgg_s.mgg_shop_phantramgiam AS "PhanTramGiamShop", mgg_s.mgg_shop_sotiengiamtoidamoilan AS "GiamToiDaShop",
         mgg_vc.mgg_vc_ten AS "TenVoucherVC", mgg_vc.mgg_vc_phantramgiam AS "PhanTramGiamVC", mgg_vc.mgg_vc_sotiengiamtoidamoilan AS "GiamToiDaVC",
         (SELECT json_agg(json_build_object(
-          'Ctsp_Ma', ctdh.ctsp_ma, 'TenSanPham', sp.sp_ten, 'TenPhanLoai', ctsp.ctsp_ten, 'SoLuong', ctdh.ctdh_soluong, 'DonGia', ctdh.ctdh_dongia, 'ThanhTien', ctdh.ctdh_thanhtien,
+          'Sp_Ma', sp.sp_ma, 'Ctsp_Ma', ctdh.ctsp_ma, 'TenSanPham', sp.sp_ten, 'TenPhanLoai', ctsp.ctsp_ten, 'SoLuong', ctdh.ctdh_soluong, 'DonGia', ctdh.ctdh_dongia, 'ThanhTien', ctdh.ctdh_thanhtien,
           'Image', (SELECT hasp_link FROM hinhanhsanpham WHERE ctsp_ma = ctsp.ctsp_ma ORDER BY hasp_laanhchinh DESC LIMIT 1)
         )) FROM chitietdonhang ctdh JOIN chitietsanpham ctsp ON ctdh.ctsp_ma = ctsp.ctsp_ma JOIN sanpham sp ON ctsp.sp_ma = sp.sp_ma WHERE ctdh.dts_ma = dts.dts_ma) AS items,
         

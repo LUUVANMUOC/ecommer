@@ -33,7 +33,7 @@ const DonHangModel = {
       
       for (let shop of shopRes.rows) {
         const itemQuery = `
-          SELECT ctsp.ctsp_ma AS "Ctsp_Ma", sp.sp_ten AS "TenSanPham", ctsp.ctsp_ten AS "TenPhanLoai", ctsp.ctsp_gianban AS "GiaBan", ctdh.ctdh_soluong AS "SoLuong",
+          SELECT sp.sp_ma AS "Sp_Ma", ctsp.ctsp_ma AS "Ctsp_Ma", sp.sp_ten AS "TenSanPham", ctsp.ctsp_ten AS "TenPhanLoai", ctsp.ctsp_gianban AS "GiaBan", ctdh.ctdh_soluong AS "SoLuong",
             (SELECT hasp_link FROM hinhanhsanpham WHERE ctsp_ma = ctsp.ctsp_ma ORDER BY hasp_laanhchinh DESC LIMIT 1) AS "Image",
             (SELECT row_to_json(dg) FROM danhgiasanpham dg WHERE dg.dts_ma = $1 AND dg.ctsp_ma = ctsp.ctsp_ma AND dg.kh_ma = $2) AS "DanhGia"
           FROM chitietdonhang ctdh JOIN chitietsanpham ctsp ON ctdh.ctsp_ma = ctsp.ctsp_ma JOIN sanpham sp ON ctsp.sp_ma = sp.sp_ma

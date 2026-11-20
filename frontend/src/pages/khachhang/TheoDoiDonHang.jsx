@@ -5,6 +5,7 @@ import { AuthContext } from "../../contexts/AuthContext";
 import donHangService from "../../services/khachhang/donHangService";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import SanPhamLink from "../../components/common/SanPhamLink";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
@@ -338,9 +339,11 @@ const TheoDoiDonHang = () => {
                     {/* Sản phẩm */}
                     <div className="space-y-4 mb-4">
                       {shop.items.map((item) => (
-                        <div
+                        <SanPhamLink
                           key={item.Ctsp_Ma}
-                          className="flex gap-4 items-center text-sm"
+                          spMa={item.Sp_Ma}
+                          ctspMa={item.Ctsp_Ma}
+                          className="group -mx-2 flex items-center gap-4 rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-[#F8FAFC]"
                         >
                           <img
                             src={
@@ -352,7 +355,7 @@ const TheoDoiDonHang = () => {
                             alt=""
                           />
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-[#0F172A] truncate">
+                            <p className="font-semibold text-[#0F172A] truncate group-hover:text-[#2563EB]">
                               {item.TenSanPham}
                             </p>
                             <p className="text-[#64748B] text-xs mt-0.5">
@@ -365,7 +368,7 @@ const TheoDoiDonHang = () => {
                           <p className="font-bold text-[#DC2626]">
                             {formatVND(item.GiaBan * item.SoLuong)}
                           </p>
-                        </div>
+                        </SanPhamLink>
                       ))}
                     </div>
                   </div>
@@ -398,23 +401,29 @@ const TheoDoiDonHang = () => {
                   className="border border-gray-200 rounded-xl p-4"
                 >
                   <div className="flex gap-4 items-center mb-3">
-                    <img
-                      src={
-                        item.Image
-                          ? `${BACKEND_URL}${item.Image}`
-                          : "https://placehold.co/100x100"
-                      }
-                      className="w-12 h-12 rounded object-cover border"
-                      alt=""
-                    />
-                    <div>
-                      <p className="font-semibold text-sm text-[#0F172A]">
-                        {item.TenSanPham}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {item.TenPhanLoai}
-                      </p>
-                    </div>
+                    <SanPhamLink
+                      spMa={item.Sp_Ma}
+                      ctspMa={item.Ctsp_Ma}
+                      className="group -mx-2 flex items-center gap-4 rounded-xl px-2 py-1.5 transition-colors hover:bg-[#F8FAFC]"
+                    >
+                      <img
+                        src={
+                          item.Image
+                            ? `${BACKEND_URL}${item.Image}`
+                            : "https://placehold.co/100x100"
+                        }
+                        className="w-12 h-12 rounded object-cover border"
+                        alt=""
+                      />
+                      <div>
+                        <p className="font-semibold text-sm text-[#0F172A] group-hover:text-[#2563EB]">
+                          {item.TenSanPham}
+                        </p>
+                        <p className="text-xs text-gray-500">
+                          {item.TenPhanLoai}
+                        </p>
+                      </div>
+                    </SanPhamLink>
                   </div>
 
                   <div className="flex items-center gap-2 mb-3">

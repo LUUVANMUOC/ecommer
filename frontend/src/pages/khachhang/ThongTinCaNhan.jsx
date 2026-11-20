@@ -17,6 +17,7 @@ import {
 import { DiaChiNhanHangSection } from "../../components/account/DiaChiNhanHangSection";
 import { toAssetUrl } from "../../utils/accountUtils";
 import { formatVND } from "../../components/shop/SanPhamShared";
+import SanPhamLink from "../../components/common/SanPhamLink";
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
 const EMPTY_BANK_FORM = {
@@ -811,9 +812,11 @@ const ThongTinCaNhan = () => {
                             )}
                             <div className="space-y-3">
                               {shop.items.map((item) => (
-                                <div
+                                <SanPhamLink
                                   key={item.Ctsp_Ma}
-                                  className="flex gap-4 items-center text-sm"
+                                  spMa={item.Sp_Ma}
+                                  ctspMa={item.Ctsp_Ma}
+                                  className="group -mx-2 flex items-center gap-4 rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-[#F8FAFC]"
                                 >
                                   <img
                                     src={
@@ -825,7 +828,7 @@ const ThongTinCaNhan = () => {
                                     alt=""
                                   />
                                   <div className="flex-1 min-w-0">
-                                    <p className="font-semibold text-[#0F172A] truncate">
+                                    <p className="font-semibold text-[#0F172A] truncate group-hover:text-[#2563EB]">
                                       {item.TenSanPham}
                                     </p>
                                     <p className="text-[#64748B] text-xs mt-0.5">
@@ -839,7 +842,7 @@ const ThongTinCaNhan = () => {
                                   <p className="font-bold text-[#DC2626] shrink-0">
                                     {formatVND(item.GiaBan * item.SoLuong)}
                                   </p>
-                                </div>
+                                </SanPhamLink>
                               ))}
                             </div>
                           </div>
@@ -1031,7 +1034,11 @@ const ThongTinCaNhan = () => {
                             className={`bg-white border rounded-xl p-5 shadow-sm transition-colors ${isItemReviewed ? "border-green-300" : "border-gray-200"}`}
                           >
                             <div className="flex justify-between items-start mb-4">
-                              <div className="flex gap-4 items-center">
+                              <SanPhamLink
+                                spMa={item.Sp_Ma}
+                                ctspMa={item.Ctsp_Ma}
+                                className="group -mx-2 flex items-center gap-4 rounded-xl px-2 py-1.5 transition-colors hover:bg-[#F8FAFC]"
+                              >
                                 <img
                                   src={
                                     item.Image
@@ -1042,14 +1049,14 @@ const ThongTinCaNhan = () => {
                                   alt=""
                                 />
                                 <div>
-                                  <p className="font-bold text-[#0F172A]">
+                                  <p className="font-bold text-[#0F172A] group-hover:text-[#2563EB]">
                                     {item.TenSanPham}
                                   </p>
                                   <p className="text-sm text-gray-500">
                                     {item.TenPhanLoai}
                                   </p>
                                 </div>
-                              </div>
+                              </SanPhamLink>
                               {isItemReviewed && (
                                 <span className="bg-green-100 text-green-700 text-xs font-bold px-2 py-1 rounded-md flex items-center gap-1">
                                   <span className="material-symbols-outlined text-[14px]">
@@ -1317,16 +1324,22 @@ const ThongTinCaNhan = () => {
                               </div>
                               <div className="flex gap-2 mb-2 overflow-x-auto">
                                 {shop.items.map((item, idx) => (
-                                  <img
+                                  <SanPhamLink
                                     key={idx}
-                                    src={
-                                      item.Image
-                                        ? `${BACKEND_URL}${item.Image}`
-                                        : "https://placehold.co/100x100"
-                                    }
-                                    className="w-12 h-12 rounded object-cover border"
-                                    alt=""
-                                  />
+                                    spMa={item.Sp_Ma}
+                                    ctspMa={item.Ctsp_Ma}
+                                    className="shrink-0 overflow-hidden rounded border border-[#E2E8F0] transition-shadow hover:ring-2 hover:ring-[#2563EB]"
+                                  >
+                                    <img
+                                      src={
+                                        item.Image
+                                          ? `${BACKEND_URL}${item.Image}`
+                                          : "https://placehold.co/100x100"
+                                      }
+                                      className="w-12 h-12 object-cover"
+                                      alt=""
+                                    />
+                                  </SanPhamLink>
                                 ))}
                               </div>
                               <p className="text-xs text-gray-500">

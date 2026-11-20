@@ -5,6 +5,7 @@ import donHangShopService from "../../services/gianhang/donHangShopService";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
 import LoTrinhVanChuyen from "../../components/common/LoTrinhVanChuyen";
+import SanPhamLink from "../../components/common/SanPhamLink";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
@@ -384,9 +385,14 @@ const QuanLyDonHang = () => {
                           ) : (
                             <div className="space-y-2">
                               {items.map((item) => (
-                                <div
+                                <SanPhamLink
                                   key={item.Ctsp_Ma}
-                                  className="flex items-center gap-3"
+                                  to={
+                                    item.Sp_Ma
+                                      ? `/nguoi-ban/quan-ly-san-pham/${item.Sp_Ma}`
+                                      : undefined
+                                  }
+                                  className="group -mx-2 flex items-center gap-3 rounded-xl px-2 py-1.5 transition-colors hover:bg-white"
                                 >
                                   <img
                                     src={
@@ -398,7 +404,7 @@ const QuanLyDonHang = () => {
                                     className="w-11 h-11 rounded-lg object-cover border border-[#E2E8F0] bg-white shrink-0"
                                   />
                                   <div className="flex-1 min-w-0">
-                                    <p className="text-sm font-semibold text-[#0F172A] truncate">
+                                    <p className="text-sm font-semibold text-[#0F172A] truncate group-hover:text-[#2563EB]">
                                       {item.TenSanPham}
                                     </p>
                                     <p className="text-xs text-[#64748B] truncate">
@@ -414,7 +420,7 @@ const QuanLyDonHang = () => {
                                       {formatVND(item.ThanhTien)}
                                     </p>
                                   </div>
-                                </div>
+                                </SanPhamLink>
                               ))}
                             </div>
                           )}
@@ -526,9 +532,14 @@ const QuanLyDonHang = () => {
                       </h4>
                       <div className="space-y-3 max-h-60 overflow-y-auto pr-2 custom-scrollbar">
                         {orderDetail.items?.map((item) => (
-                          <div
+                          <SanPhamLink
                             key={item.Ctsp_Ma}
-                            className="flex gap-3 text-sm border-b border-gray-100 pb-2 last:border-0"
+                            to={
+                              item.Sp_Ma
+                                ? `/nguoi-ban/quan-ly-san-pham/${item.Sp_Ma}`
+                                : undefined
+                            }
+                            className="group -mx-2 flex gap-3 rounded-xl border-b border-gray-100 px-2 py-1.5 text-sm transition-colors last:border-0 hover:bg-[#F8FAFC]"
                           >
                             <img
                               src={
@@ -539,7 +550,7 @@ const QuanLyDonHang = () => {
                               className="w-12 h-12 rounded object-cover border"
                             />
                             <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-[#0F172A] truncate">
+                              <p className="font-semibold text-[#0F172A] truncate group-hover:text-[#2563EB]">
                                 {item.TenSanPham}
                               </p>
                               <p className="text-xs text-gray-500">
@@ -549,7 +560,7 @@ const QuanLyDonHang = () => {
                             <p className="font-bold text-[#DC2626]">
                               {formatVND(item.ThanhTien)}
                             </p>
-                          </div>
+                          </SanPhamLink>
                         ))}
                       </div>
                     </div>

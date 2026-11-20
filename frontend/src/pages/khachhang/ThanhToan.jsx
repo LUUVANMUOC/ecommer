@@ -9,6 +9,7 @@ import maGiamGiaVanChuyenService from "../../services/khachhang/maGiamGiaVanChuy
 import maGiamGiaShopService from "../../services/khachhang/maGiamGiaShopService";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import SanPhamLink from "../../components/common/SanPhamLink";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
@@ -440,9 +441,11 @@ const ThanhToan = () => {
 
                     <div className="p-5 space-y-4">
                       {order.items.map((item) => (
-                        <div
+                        <SanPhamLink
                           key={item.ctsp_ma}
-                          className="flex gap-4 items-center text-sm"
+                          spMa={item.sp_ma}
+                          ctspMa={item.ctsp_ma}
+                          className="group -mx-2 flex items-center gap-4 rounded-xl px-2 py-1.5 text-sm transition-colors hover:bg-[#F8FAFC]"
                         >
                           <img
                             src={`${BACKEND_URL}${item.image}`}
@@ -450,7 +453,7 @@ const ThanhToan = () => {
                             alt=""
                           />
                           <div className="flex-1 min-w-0">
-                            <p className="font-semibold text-[#0F172A] text-base line-clamp-1">
+                            <p className="font-semibold text-[#0F172A] text-base line-clamp-1 group-hover:text-[#2563EB]">
                               {item.sp_ten}
                             </p>
                             <p className="text-[#64748B] text-sm mt-1">
@@ -463,7 +466,7 @@ const ThanhToan = () => {
                           <p className="font-bold text-[#DC2626] text-lg">
                             {formatVND(item.ctsp_gianban * item.ctgh_soluong)}
                           </p>
-                        </div>
+                        </SanPhamLink>
                       ))}
                     </div>
 

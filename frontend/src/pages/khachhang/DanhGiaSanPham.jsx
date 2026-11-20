@@ -4,6 +4,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import { AuthContext } from "../../contexts/AuthContext";
 import donHangService from "../../services/khachhang/donHangService";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import SanPhamLink from "../../components/common/SanPhamLink";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
@@ -177,23 +178,29 @@ const DanhGiaSanPham = () => {
                 className="border border-[#E2E8F0] rounded-2xl p-5 shadow-sm"
               >
                 <div className="flex gap-4 items-center mb-4 border-b border-[#F1F5F9] pb-4">
-                  <img
-                    src={
-                      item.Image
-                        ? `${BACKEND_URL}${item.Image}`
-                        : "https://placehold.co/100x100"
-                    }
-                    className="w-16 h-16 rounded-xl object-cover border"
-                    alt=""
-                  />
-                  <div>
-                    <p className="font-bold text-[#0F172A]">
-                      {item.TenSanPham}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Phân loại: {item.TenPhanLoai}
-                    </p>
-                  </div>
+                  <SanPhamLink
+                    spMa={item.Sp_Ma}
+                    ctspMa={item.Ctsp_Ma}
+                    className="group -mx-2 flex items-center gap-4 rounded-xl px-2 py-1.5 transition-colors hover:bg-[#F8FAFC]"
+                  >
+                    <img
+                      src={
+                        item.Image
+                          ? `${BACKEND_URL}${item.Image}`
+                          : "https://placehold.co/100x100"
+                      }
+                      className="w-16 h-16 rounded-xl object-cover border"
+                      alt=""
+                    />
+                    <div>
+                      <p className="font-bold text-[#0F172A] group-hover:text-[#2563EB]">
+                        {item.TenSanPham}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        Phân loại: {item.TenPhanLoai}
+                      </p>
+                    </div>
+                  </SanPhamLink>
                 </div>
 
                 <div className="flex items-center gap-2 mb-4">
