@@ -104,7 +104,6 @@ const trangThaiDonHangRoutes = require('./src/routes/san/trangThaiDonHangRoutes'
 const phiVanChuyenController = require('./src/controllers/khachhang/phiVanChuyenController');
 
 // Bổ sung Import cho Cron & Xử lý
-const TatToanModel = require('./src/models/quanlykho/tatToanModel');
 const quanLyDongTienRoutes = require('./src/routes/san/quanLyDongTienRoutes');
 const suCoRoutes = require('./src/routes/suco/suCoRoutes');
 const adminSuCoRoutes = require('./src/routes/suco/adminSuCoRoutes');
@@ -318,16 +317,7 @@ app.use('/api/trang-thai-don-hang', trangThaiDonHangRoutes);
 // 6. CRONJOB
 // ==========================================
 
-// 6.1. Cron tự động dọn dẹp phiếu tất toán quá hạn 2 phút (chạy mỗi phút)
-cron.schedule('* * * * *', async () => {
-  try {
-    await TatToanModel.donDepPhieuQuaHan();
-  } catch (error) {
-    console.error("❌ [CRONJOB] Lỗi dọn dẹp phiếu tất toán:", error.message);
-  }
-});
-
-// 6.2. Cron tự động cập nhật trạng thái Voucher (1 phút/lần)
+// 6.1. Cron tự động cập nhật trạng thái Voucher (1 phút/lần)
 cron.schedule('* * * * *', async () => {
     try {
         const querySan = `

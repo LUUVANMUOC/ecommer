@@ -27,7 +27,13 @@ const DON_SELECT = `
   ttgh.ttgh_da_nop_tien,
   st.ttdh_ma AS trang_thai_don,
   ttdh.ttdh_ten AS trang_thai_don_ten,
-  EXISTS (SELECT 1 FROM chitiet_tat_toan c WHERE c.dts_ma = dts.dts_ma) AS da_tat_toan
+  EXISTS (
+    SELECT 1
+    FROM chitiet_tat_toan c
+    JOIN phieu_tat_toan p ON p.ptt_ma = c.ptt_ma
+    WHERE c.dts_ma = dts.dts_ma
+      AND p.ptt_trang_thai_thanh_toan <> 'HUY'
+  ) AS da_tat_toan
 `;
 
 const DON_JOIN = `
@@ -241,7 +247,11 @@ const taoPhieu = async (duLieu, dsTep = []) => {
          (dts_ma, ycxlsc_ma, gtsc_so_tien, gtsc_ly_do)
        SELECT $1::varchar(10), $2::varchar(10), $3::numeric, $4::text
         WHERE NOT EXISTS (
-          SELECT 1 FROM chitiet_tat_toan WHERE dts_ma = $1::varchar(10)
+          SELECT 1
+          FROM chitiet_tat_toan c
+          JOIN phieu_tat_toan p ON p.ptt_ma = c.ptt_ma
+          WHERE c.dts_ma = $1::varchar(10)
+            AND p.ptt_trang_thai_thanh_toan <> 'HUY'
         )
        ON CONFLICT (dts_ma, ycxlsc_ma) DO NOTHING`,
       [

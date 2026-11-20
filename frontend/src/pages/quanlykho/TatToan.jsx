@@ -5,8 +5,20 @@ import { formatVND } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
 import { buildVietQrUrl } from "../../utils/accountUtils";
 
-const DU_LIEU_TAT_TOAN_RONG = { thongTinSan: null, thongTinDVVC: null, orders: [] };
+const DU_LIEU_TAT_TOAN_RONG = {
+  thongTinSan: null,
+  thongTinDVVC: null,
+  orders: [],
+  phieuDangMo: [],
+};
 const DU_LIEU_CUOC_TON_RONG = { thongTinDVVC: null, orders: [] };
+
+const QR_TIME_LIMIT = 120;
+
+const MO_TA_LOAI = {
+  DAY_DU: "Tất toán đơn hàng",
+  CUOC_TON: "Tất toán cước tồn",
+};
 
 const TatToan = () => {
   const { user } = useContext(AuthContext);
@@ -17,11 +29,9 @@ const TatToan = () => {
   const [loading, setLoading] = useState(true);
 
   const [showQR, setShowQR] = useState(false);
-  const [pttMa, setPttMa] = useState(null);
-  const [qrMode, setQrMode] = useState("DAY_DU"); // DAY_DU | CUOC_TON
-  const [qrAmounts, setQrAmounts] = useState({ san: 0, shops: {}, dvvc: 0 });
+  const [activeDot, setActiveDot] = useState(null); // { ptt_ma, ptt_loai, ds_qr }
   const [qrStatuses, setQrStatuses] = useState({});
-  const [timeLeft, setTimeLeft] = useState(120);
+  const [timeLeft, setTimeLeft] = useState(QR_TIME_LIMIT);
 
   const [selectedDtsMa, setSelectedDtsMa] = useState([]);
   const [selectedCuocTon, setSelectedCuocTon] = useState([]);
@@ -88,9 +98,13 @@ const TatToan = () => {
   useEffect(() => {
     if (!showQR) return;
     if (timeLeft <= 0) {
+      // Hết 2 phút chỉ đóng bảng QR. Đợt và các QR chưa quét vẫn còn hiệu lực.
       stopPolling();
       setShowQR(false);
-      showToast("Mã QR đã hết hạn do quá 2 phút. Vui lòng tạo lại.", "error");
+      showToast(
+        "Đã hết 2 phút hiển thị mã QR. Đợt tất toán vẫn được giữ — mở mục \"Đợt tất toán đang mở\" để quét tiếp.",
+        "error",
+      );
       fetchData();
       return;
     }
@@ -98,45 +112,26 @@ const TatToan = () => {
     return () => clearInterval(timerId);
   }, [showQR, timeLeft]);
 
-  // Tính toán tiền tất toán mới (Shop + Sàn + ĐVVC)
-  const { tongSanHienTai, tongShopHienTai, tongDVVCHienTai, danhSachShopQR } =
-    useMemo(() => {
-      let san = 0;
-      let dvvc = 0;
-      const shopMap = {};
+  // Tính toán tiền còn phải thu của các đơn đang chọn (Shop + Sàn + ĐVVC)
+  const { tongSanHienTai, tongShopHienTai, tongDVVCHienTai } = useMemo(() => {
+    let san = 0;
+    let shop = 0;
+    let dvvc = 0;
 
-      (data.orders || []).forEach((o) => {
-        if (!selectedDtsMa.includes(o.DTS_Ma)) return;
+    (data.orders || []).forEach((o) => {
+      if (!selectedDtsMa.includes(o.DTS_Ma)) return;
 
-        san += Number(o.PhiSan);
-        dvvc += Number(o.TienDVVC || 0);
+      san += Number(o.PhiSan || 0);
+      shop += Number(o.TienShop || 0);
+      dvvc += Number(o.TienDVVC || 0);
+    });
 
-        if (!shopMap[o.GH_Ma]) {
-          shopMap[o.GH_Ma] = {
-            tong_tien: 0,
-            gh_ma: o.GH_Ma,
-            ten_shop: o.TenShop,
-            nganhang_ma: o.NganHang_Ma,
-            nganhang_ten: o.NganHang_Ten,
-            so_taikhoan: o.SoTaiKhoan,
-            ten_taikhoan: o.TenTaiKhoan,
-          };
-        }
-        shopMap[o.GH_Ma].tong_tien += Number(o.TienShop);
-      });
-
-      const shopTotal = Object.values(shopMap).reduce(
-        (sum, s) => sum + s.tong_tien,
-        0,
-      );
-
-      return {
-        tongSanHienTai: san,
-        tongShopHienTai: shopTotal,
-        tongDVVCHienTai: dvvc,
-        danhSachShopQR: shopMap,
-      };
-    }, [data, selectedDtsMa]);
+    return {
+      tongSanHienTai: san,
+      tongShopHienTai: shop,
+      tongDVVCHienTai: dvvc,
+    };
+  }, [data, selectedDtsMa]);
 
   // Tính toán tiền cước tồn đang chọn
   const tongCuocTonHienTai = useMemo(
@@ -148,7 +143,8 @@ const TatToan = () => {
   );
 
   const handleSelectAll = (e) => {
-    if (e.target.checked) setSelectedDtsMa((data.orders || []).map((o) => o.DTS_Ma));
+    if (e.target.checked)
+      setSelectedDtsMa((data.orders || []).map((o) => o.DTS_Ma));
     else setSelectedDtsMa([]);
   };
 
@@ -183,7 +179,7 @@ const TatToan = () => {
         if (res.data.trang_thai === "KHONG_TIM_THAY") {
           stopPolling();
           setShowQR(false);
-          showToast("Phiếu tất toán đã hết hạn. Vui lòng tạo lại.", "error");
+          showToast("Không tìm thấy đợt tất toán. Vui lòng tải lại trang.");
           fetchData();
           return;
         }
@@ -204,6 +200,26 @@ const TatToan = () => {
         console.error("Lỗi kiểm tra trạng thái:", e);
       }
     }, 3000);
+  };
+
+  // Mở bảng QR cho một đợt (vừa tạo hoặc đợt đang mở)
+  const moDot = (dot) => {
+    const dsQr = dot?.ds_qr || [];
+    const statuses = {};
+    dsQr.forEach((qr) => {
+      statuses[qr.qr_ma] = qr.qr_trang_thai;
+    });
+
+    setActiveDot({
+      ptt_ma: dot.ptt_ma,
+      ptt_loai: dot.ptt_loai,
+      ds_qr: dsQr,
+    });
+    setQrStatuses(statuses);
+    setTimeLeft(QR_TIME_LIMIT);
+    setShowQR(true);
+
+    if (dot.ptt_ma) startPolling(dot.ptt_ma);
   };
 
   const handleTaoQr = async () => {
@@ -229,17 +245,11 @@ const TatToan = () => {
         selectedOrders: selectedOrdersData,
       });
 
-      setPttMa(res.data.ptt_ma);
-      setQrMode("DAY_DU");
-      setQrAmounts({
-        san: tongSanHienTai,
-        shops: danhSachShopQR,
-        dvvc: Number(res.data.tong_dvvc ?? tongDVVCHienTai),
+      moDot({
+        ptt_ma: res.data.ptt_ma,
+        ptt_loai: "DAY_DU",
+        ds_qr: res.data.ds_qr || [],
       });
-      setQrStatuses({});
-      setTimeLeft(120);
-      setShowQR(true);
-      startPolling(res.data.ptt_ma);
     } catch (err) {
       showToast(err.response?.data?.message || "Lỗi tạo mã QR", "error");
     }
@@ -262,42 +272,44 @@ const TatToan = () => {
         ds_dts_ma: selectedCuocTon,
       });
 
-      setPttMa(res.data.ptt_ma);
-      setQrMode("CUOC_TON");
-      setQrAmounts({
-        san: 0,
-        shops: {},
-        dvvc: Number(res.data.tong_dvvc ?? tongCuocTonHienTai),
+      moDot({
+        ptt_ma: res.data.ptt_ma,
+        ptt_loai: "CUOC_TON",
+        ds_qr: res.data.ds_qr || [],
       });
-      setQrStatuses({});
-      setTimeLeft(120);
-      setShowQR(true);
-      startPolling(res.data.ptt_ma);
     } catch (err) {
       showToast(err.response?.data?.message || "Lỗi tạo mã QR", "error");
     }
   };
 
-  const handleCloseQR = async () => {
-    if (
-      window.confirm(
-        "Bạn chưa thanh toán. Nếu đóng bảng này, phiếu tất toán sẽ bị hủy. Đồng ý?",
-      )
-    ) {
-      try {
-        await qlkTaiChinhService.huyPhieuTatToan(pttMa);
-        stopPolling();
-        setShowQR(false);
-        setPttMa(null);
-        fetchData();
-      } catch (err) {
-        showToast("Lỗi hủy phiếu", "error");
-      }
+  // Nút X: chỉ đóng bảng, KHÔNG huỷ đợt.
+  const handleCloseQR = () => {
+    stopPolling();
+    setShowQR(false);
+    setActiveDot(null);
+    fetchData();
+  };
+
+  const handleHuyDot = async (ma) => {
+    const dongY = window.confirm(
+      "Huỷ đợt tất toán này?\n\n- Các mã QR chưa quét sẽ bị huỷ.\n- Các khoản đã thu vẫn được giữ lại, không thể hoàn tác.\n- Phần chưa thu sẽ quay lại danh sách để tất toán sau.",
+    );
+    if (!dongY) return;
+
+    try {
+      await qlkTaiChinhService.huyPhieuTatToan(ma);
+      stopPolling();
+      setShowQR(false);
+      setActiveDot(null);
+      showToast("Đã huỷ đợt tất toán. Các khoản đã thu vẫn được giữ.");
+      fetchData();
+    } catch (err) {
+      showToast(err.response?.data?.message || "Lỗi huỷ đợt", "error");
     }
   };
 
-  const isQrPaid = (qrCodeString) =>
-    qrStatuses[qrCodeString] === "DA_THANH_TOAN";
+  const qrStatusOf = (qr) =>
+    qrStatuses[qr.qr_ma] || qr.qr_trang_thai || "CHUA_THANH_TOAN";
 
   const formatTime = (seconds) => {
     const m = Math.floor(seconds / 60)
@@ -317,10 +329,22 @@ const TatToan = () => {
       </div>
     );
 
-  const thongTinDVVC =
-    qrMode === "CUOC_TON" ? cuocTon.thongTinDVVC : data.thongTinDVVC;
   const coDuLieuTatToan = (data.orders || []).length > 0;
   const coDuLieuCuocTon = (cuocTon.orders || []).length > 0;
+  const dsDotDangMo = data.phieuDangMo || [];
+
+  // Thống kê của đợt đang mở trong modal
+  const dsQrModal = activeDot?.ds_qr || [];
+  const soQrModal = dsQrModal.filter((qr) => qrStatusOf(qr) !== "HUY").length;
+  const soQrDaTraModal = dsQrModal.filter(
+    (qr) => qrStatusOf(qr) === "DA_THANH_TOAN",
+  ).length;
+  const tongTienModal = dsQrModal
+    .filter((qr) => qrStatusOf(qr) !== "HUY")
+    .reduce((sum, qr) => sum + Number(qr.qr_so_tien || 0), 0);
+  const daThuModal = dsQrModal
+    .filter((qr) => qrStatusOf(qr) === "DA_THANH_TOAN")
+    .reduce((sum, qr) => sum + Number(qr.qr_so_tien || 0), 0);
 
   return (
     <div className="p-6 bg-[#F8FAFC] min-h-screen">
@@ -428,13 +452,28 @@ const TatToan = () => {
                   <td className="p-3 font-medium text-gray-800">{o.DTS_Ma}</td>
                   <td className="p-3 text-gray-600">{o.TenShop}</td>
                   <td className="p-3 text-right text-red-600">
-                    {formatVND(o.PhiSan)}
+                    <div>{formatVND(o.PhiSan)}</div>
+                    {o.DaThuSan && (
+                      <span className="text-[11px] font-semibold text-emerald-600">
+                        đã thu
+                      </span>
+                    )}
                   </td>
                   <td className="p-3 text-right font-bold text-green-600">
-                    {formatVND(o.TienShop)}
+                    <div>{formatVND(o.TienShop)}</div>
+                    {o.DaThuShop && (
+                      <span className="text-[11px] font-semibold text-emerald-600">
+                        đã thu
+                      </span>
+                    )}
                   </td>
                   <td className="p-3 text-right font-bold text-blue-600">
-                    {formatVND(o.TienDVVC || 0)}
+                    <div>{formatVND(o.TienDVVC || 0)}</div>
+                    {o.DaThuDVVC && (
+                      <span className="text-[11px] font-semibold text-emerald-600">
+                        đã thu
+                      </span>
+                    )}
                   </td>
                 </tr>
               ))}
@@ -453,6 +492,84 @@ const TatToan = () => {
           </button>
         </div>
       </div>
+
+      {/* ===== ĐỢT ĐANG MỞ ===== */}
+      {dsDotDangMo.length > 0 && (
+        <div className="bg-white rounded-2xl shadow-sm border border-amber-200 p-6 mb-6">
+          <div className="flex items-start gap-2 mb-4">
+            <span className="material-symbols-outlined text-amber-500">
+              pending_actions
+            </span>
+            <div>
+              <h2 className="text-lg font-bold text-[#0F172A]">
+                Đợt tất toán đang mở
+              </h2>
+              <p className="text-sm text-[#64748B] mt-1">
+                Các đợt này đã tạo mã QR nhưng chưa thu đủ. Bạn có thể mở lại để
+                quét tiếp các mã còn lại.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {dsDotDangMo.map((dot) => {
+              const soQr = Number(dot.so_qr || 0);
+              const soDaTra = Number(dot.so_qr_da_tra || 0);
+              const phanTram = soQr > 0 ? (soDaTra / soQr) * 100 : 0;
+
+              return (
+                <div
+                  key={dot.ptt_ma}
+                  className="border rounded-xl p-4 flex flex-col lg:flex-row lg:items-center gap-4"
+                >
+                  <div className="flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <p className="font-bold text-gray-800">{dot.ptt_ma}</p>
+                      <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                        {MO_TA_LOAI[dot.ptt_loai] || dot.ptt_loai}
+                      </span>
+                      <span className="text-xs text-gray-500">
+                        {formatDate(dot.ptt_ngay_tat_toan)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">
+                      Đã thu{" "}
+                      <span className="font-semibold text-emerald-600">
+                        {formatVND(dot.da_thu)}
+                      </span>{" "}
+                      / {formatVND(dot.tong_tien)} · {soDaTra}/{soQr} mã QR
+                    </p>
+                    <div className="mt-2 h-2 w-full max-w-sm bg-gray-100 rounded-full overflow-hidden">
+                      <div
+                        className="h-full bg-emerald-500 transition-all"
+                        style={{ width: `${phanTram}%` }}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => moDot(dot)}
+                      className="px-4 py-2 bg-indigo-600 text-white text-sm font-semibold rounded-lg hover:bg-indigo-700 flex items-center gap-1"
+                    >
+                      <span className="material-symbols-outlined text-lg">
+                        qr_code_scanner
+                      </span>
+                      Tiếp tục thanh toán
+                    </button>
+                    <button
+                      onClick={() => handleHuyDot(dot.ptt_ma)}
+                      className="px-4 py-2 bg-white border border-red-200 text-red-600 text-sm font-semibold rounded-lg hover:bg-red-50"
+                    >
+                      Huỷ đợt
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* ===== TẤT TOÁN CƯỚC TỒN ===== */}
       <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] p-6">
@@ -556,7 +673,7 @@ const TatToan = () => {
                   <td className="p-3 text-right font-bold text-blue-600">
                     {formatVND(o.TienDVVC)}
                   </td>
-                  <td className="p-3 text-gray-600">{o.PTT_Goc}</td>
+                  <td className="p-3 text-gray-600">{o.PTT_Goc || "—"}</td>
                   <td className="p-3 text-gray-500">
                     {formatDate(o.NgayTatToan)}
                   </td>
@@ -569,9 +686,7 @@ const TatToan = () => {
         <div className="text-center">
           <button
             onClick={handleTaoQrCuocTon}
-            disabled={
-              selectedCuocTon.length === 0 || !cuocTon.thongTinDVVC
-            }
+            disabled={selectedCuocTon.length === 0 || !cuocTon.thongTinDVVC}
             className="px-8 py-3 bg-blue-600 text-white font-bold rounded-xl hover:bg-blue-700 shadow-lg text-lg flex items-center justify-center gap-2 mx-auto disabled:bg-gray-400 disabled:cursor-not-allowed"
           >
             <span className="material-symbols-outlined">qr_code_scanner</span>
@@ -581,16 +696,17 @@ const TatToan = () => {
       </div>
 
       {/* ===== MODAL QR ===== */}
-      {showQR && pttMa && (
+      {showQR && activeDot && (
         <div className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4 backdrop-blur-sm overflow-y-auto">
           <div className="bg-white rounded-3xl w-full max-w-5xl shadow-2xl p-6 my-8">
-            <div className="flex justify-between items-center border-b pb-4 mb-6">
+            <div className="flex justify-between items-center border-b pb-4 mb-6 gap-4">
               <div>
                 <h3 className="text-2xl font-bold text-[#0F172A]">
                   Quét Mã Thanh Toán
                 </h3>
                 <p className="text-sm text-gray-500 mt-1">
-                  Vui lòng thanh toán trước khi hết thời gian
+                  Mỗi mã QR là một khoản thu độc lập. Mã nào đã nhận tiền sẽ
+                  được ghi nhận ngay, không cần chờ đủ cả đợt.
                 </p>
               </div>
               <div className="flex items-center gap-4">
@@ -602,6 +718,7 @@ const TatToan = () => {
                 </div>
                 <button
                   onClick={handleCloseQR}
+                  title="Đóng bảng (không huỷ đợt)"
                   className="text-gray-500 hover:text-red-500"
                 >
                   <span className="material-symbols-outlined text-2xl">
@@ -611,127 +728,107 @@ const TatToan = () => {
               </div>
             </div>
 
+            <div className="mb-5 flex flex-wrap items-center gap-3 text-sm">
+              <span className="px-3 py-1 rounded-full bg-indigo-50 text-indigo-700 font-semibold">
+                {activeDot.ptt_ma}
+              </span>
+              <span className="px-3 py-1 rounded-full bg-gray-100 text-gray-600 font-semibold">
+                {MO_TA_LOAI[activeDot.ptt_loai] || activeDot.ptt_loai}
+              </span>
+              <span className="text-gray-600">
+                Đã thu{" "}
+                <span className="font-bold text-emerald-600">
+                  {formatVND(daThuModal)}
+                </span>{" "}
+                / {formatVND(tongTienModal)} · {soQrDaTraModal}/{soQrModal} mã QR
+              </span>
+            </div>
+
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-              {qrMode === "DAY_DU" && (
-                <>
-                  {/* Thẻ Sàn */}
+              {dsQrModal.length === 0 && (
+                <div className="col-span-full text-center text-gray-500 py-10">
+                  Đợt này không có mã QR nào.
+                </div>
+              )}
+
+              {dsQrModal.map((qr) => {
+                const status = qrStatusOf(qr);
+                const daTra = status === "DA_THANH_TOAN";
+                const daHuy = status === "HUY";
+
+                const mauTieuDe =
+                  qr.qr_loai === "SAN"
+                    ? "text-red-600"
+                    : qr.qr_loai === "SHOP"
+                      ? "text-green-600"
+                      : "text-blue-600";
+
+                return (
                   <div
-                    className={`border rounded-2xl p-4 flex flex-col items-center text-center relative overflow-hidden transition-all ${isQrPaid(`TT${pttMa}S`) ? "bg-green-50 border-green-300" : "bg-gray-50"}`}
+                    key={qr.qr_ma}
+                    className={`border rounded-2xl p-4 flex flex-col items-center text-center relative overflow-hidden transition-all ${
+                      daTra
+                        ? "bg-green-50 border-green-300"
+                        : daHuy
+                          ? "bg-gray-100 border-gray-300"
+                          : "bg-gray-50"
+                    }`}
                   >
-                    {isQrPaid(`TT${pttMa}S`) && (
+                    {daTra && (
                       <div className="absolute inset-0 bg-white/80 flex flex-col items-center justify-center rounded-2xl z-10 backdrop-blur-sm">
                         <span className="material-symbols-outlined text-6xl text-green-500 mb-2">
                           check_circle
                         </span>
-                        <p className="font-bold text-green-600">
-                          Sàn đã nhận tiền
-                        </p>
+                        <p className="font-bold text-green-600">Đã nhận tiền</p>
                       </div>
                     )}
-                    <h4 className="font-bold text-lg text-red-600 mb-2">
-                      Chuyển cho Sàn
+
+                    {daHuy && (
+                      <div className="absolute inset-0 bg-white/70 flex flex-col items-center justify-center rounded-2xl z-10">
+                        <span className="material-symbols-outlined text-6xl text-gray-400 mb-2">
+                          cancel
+                        </span>
+                        <p className="font-bold text-gray-500">Đã huỷ</p>
+                      </div>
+                    )}
+
+                    <h4
+                      className={`font-bold text-lg mb-2 truncate w-full ${mauTieuDe}`}
+                    >
+                      {qr.qr_loai === "SAN"
+                        ? "Chuyển cho Sàn"
+                        : qr.qr_loai === "SHOP"
+                          ? qr.ten
+                          : "Chuyển cho ĐVVC"}
                     </h4>
                     <img
-                      src={buildVietQrUrl(
-                        data.thongTinSan,
-                        qrAmounts.san,
-                        `TT${pttMa}S`,
-                      )}
-                      alt="QR San"
+                      src={buildVietQrUrl(qr.ngan_hang, qr.qr_so_tien, qr.qr_ma)}
+                      alt={`QR ${qr.qr_ma}`}
                       className="w-48 h-48 border rounded-xl mb-2 object-contain bg-white"
                     />
                     <p className="font-bold text-gray-800">
-                      {formatVND(qrAmounts.san)}
+                      {formatVND(qr.qr_so_tien)}
                     </p>
                     <p className="text-xs text-gray-500 mt-1">
                       Nội dung:{" "}
-                      <span className="font-bold text-red-600">TT{pttMa}S</span>
+                      <span
+                        className={`font-bold ${
+                          qr.qr_loai === "SAN"
+                            ? "text-red-600"
+                            : qr.qr_loai === "SHOP"
+                              ? "text-green-600"
+                              : "text-blue-600"
+                        }`}
+                      >
+                        {qr.qr_ma}
+                      </span>
                     </p>
                   </div>
-
-                  {/* Thẻ các Shop */}
-                  {Object.entries(qrAmounts.shops).map(([gh_ma, shopData]) => (
-                    <div
-                      key={gh_ma}
-                      className={`border rounded-2xl p-4 flex flex-col items-center text-center relative overflow-hidden transition-all ${isQrPaid(`TT${pttMa}SH${gh_ma}`) ? "bg-green-50 border-green-300" : "bg-gray-50"}`}
-                    >
-                      {isQrPaid(`TT${pttMa}SH${gh_ma}`) && (
-                        <div className="absolute inset-0 bg-white/80 flex flex-col items-center justify-center rounded-2xl z-10 backdrop-blur-sm">
-                          <span className="material-symbols-outlined text-6xl text-green-500 mb-2">
-                            check_circle
-                          </span>
-                          <p className="font-bold text-green-600">
-                            Shop đã nhận tiền
-                          </p>
-                        </div>
-                      )}
-                      <h4 className="font-bold text-lg text-green-600 mb-2 truncate w-full">
-                        {shopData.ten_shop}
-                      </h4>
-                      <img
-                        src={buildVietQrUrl(
-                          shopData,
-                          shopData.tong_tien,
-                          `TT${pttMa}SH${gh_ma}`,
-                        )}
-                        alt={`QR ${shopData.ten_shop}`}
-                        className="w-48 h-48 border rounded-xl mb-2 object-contain bg-white"
-                      />
-                      <p className="font-bold text-gray-800">
-                        {formatVND(shopData.tong_tien)}
-                      </p>
-                      <p className="text-xs text-gray-500 mt-1">
-                        Nội dung:{" "}
-                        <span className="font-bold text-green-600">
-                          TT{pttMa}SH{gh_ma}
-                        </span>
-                      </p>
-                    </div>
-                  ))}
-                </>
-              )}
-
-              {/* Thẻ ĐVVC */}
-              {qrAmounts.dvvc > 0 && thongTinDVVC && (
-                <div
-                  className={`border rounded-2xl p-4 flex flex-col items-center text-center relative overflow-hidden transition-all ${isQrPaid(`TT${pttMa}DV`) ? "bg-green-50 border-green-300" : "bg-blue-50/40 border-blue-100"}`}
-                >
-                  {isQrPaid(`TT${pttMa}DV`) && (
-                    <div className="absolute inset-0 bg-white/80 flex flex-col items-center justify-center rounded-2xl z-10 backdrop-blur-sm">
-                      <span className="material-symbols-outlined text-6xl text-green-500 mb-2">
-                        check_circle
-                      </span>
-                      <p className="font-bold text-green-600">
-                        ĐVVC đã nhận tiền
-                      </p>
-                    </div>
-                  )}
-                  <h4 className="font-bold text-lg text-blue-600 mb-2 truncate w-full">
-                    Chuyển cho ĐVVC
-                  </h4>
-                  <img
-                    src={buildVietQrUrl(
-                      thongTinDVVC,
-                      qrAmounts.dvvc,
-                      `TT${pttMa}DV`,
-                    )}
-                    alt="QR ĐVVC"
-                    className="w-48 h-48 border rounded-xl mb-2 object-contain bg-white"
-                  />
-                  <p className="font-bold text-gray-800">
-                    {formatVND(qrAmounts.dvvc)}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Nội dung:{" "}
-                    <span className="font-bold text-blue-600">
-                      TT{pttMa}DV
-                    </span>
-                  </p>
-                </div>
-              )}
+                );
+              })}
             </div>
 
-            <div className="mt-8 pt-4 border-t text-center">
+            <div className="mt-8 pt-4 border-t flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="inline-flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-700 rounded-lg">
                 <span className="animate-spin material-symbols-outlined">
                   sync
@@ -740,6 +837,12 @@ const TatToan = () => {
                   Hệ thống đang tự động kiểm tra tiền về...
                 </p>
               </div>
+              <button
+                onClick={() => handleHuyDot(activeDot.ptt_ma)}
+                className="px-4 py-2 bg-white border border-red-200 text-red-600 text-sm font-semibold rounded-lg hover:bg-red-50"
+              >
+                Huỷ đợt này
+              </button>
             </div>
           </div>
         </div>
