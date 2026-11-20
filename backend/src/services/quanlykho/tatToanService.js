@@ -8,6 +8,10 @@ const TatToanService = {
   // Tất toán cước vận chuyển còn tồn (đơn đã trả Shop/Sàn nhưng chưa trả ĐVVC)
   getDuLieuCuocTon: async (kho_ma) => await TatToanModel.getDuLieuCuocTon(kho_ma),
   taoPhieuCuocTon: async (kho_ma, data) => await TatToanModel.taoPhieuCuocTon(kho_ma, data),
+
+  // Lịch sử tất toán của kho
+  getLichSuTatToan: async (kho_ma, filters) => await TatToanModel.getLichSuTatToan(kho_ma, filters),
+  getChiTietPhieuTatToan: async (ptt_ma) => await TatToanModel.getChiTietPhieuTatToan(ptt_ma),
 };
 
 module.exports = TatToanService;

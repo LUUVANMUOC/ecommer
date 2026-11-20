@@ -75,7 +75,11 @@ router.delete('/huy/:ptt_ma', async (req, res) => {
 // 3. Các route chính
 router.post('/tao-qr', TatToanController.taoPhieuVaQr);
 
-// 4. Tất toán cước vận chuyển còn tồn (đặt trước '/:kho_ma' để không bị bắt nhầm)
+// 4. Lịch sử và chi tiết tất toán (đặt trước '/:kho_ma' để không bị bắt nhầm)
+router.get('/lich-su/:kho_ma', TatToanController.getLichSuTatToan);
+router.get('/chi-tiet/:ptt_ma', TatToanController.getChiTietPhieuTatToan);
+
+// 5. Tất toán cước vận chuyển còn tồn (đặt trước '/:kho_ma' để không bị bắt nhầm)
 router.get('/cuoc-ton/:kho_ma', TatToanController.getDuLieuCuocTon);
 router.post('/cuoc-ton/tao-qr', TatToanController.taoPhieuCuocTon);
 

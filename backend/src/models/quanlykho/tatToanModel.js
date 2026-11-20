@@ -235,7 +235,7 @@ const TatToanModel = {
                  ttgh.ttgh_thoidiem_nop DESC NULLS LAST,
                  ttgh.ttgh_thoidiem DESC NULLS LAST
       ) x
-      WHERE ("PhiSan" > 0 OR "TienShop" > 0)
+      WHERE ("PhiSan" > 0 OR "TienShop" > 0 OR "TienDVVC" > 0)
     `;
 
     const [sanRes, dvvcRes, ordersRes, phieuDangMo] = await Promise.all([
@@ -344,12 +344,7 @@ const TatToanModel = {
           : Number(don.tien_hang) - Number(don.giam_gia_shop);
         const tienDVVC = don.da_thu_dvvc ? 0 : Number(don.tien_dvvc);
 
-        if (tienSan + tienShop === 0) {
-          if (tienDVVC > 0) {
-            throw new Error(
-              `Đơn ${don.dts_ma} chỉ còn cước ĐVVC. Vui lòng dùng mục "Tất toán cước tồn".`
-            );
-          }
+        if (tienSan + tienShop + tienDVVC <= 0) {
           throw new Error(`Đơn ${don.dts_ma} không còn khoản nào cần thu.`);
         }
 
@@ -949,6 +944,241 @@ const TatToanModel = {
     } finally {
       client.release();
     }
+  },
+
+  // 7. Lấy lịch sử tất toán của kho (kèm bộ lọc & phân trang)
+  getLichSuTatToan: async (kho_ma, filters = {}) => {
+    const { tu_ngay, den_ngay, trang_thai, search, page = 1, limit = 15 } = filters;
+    const offset = (Math.max(1, parseInt(page, 10)) - 1) * Math.max(1, parseInt(limit, 10));
+    const pageSize = Math.max(1, parseInt(limit, 10));
+
+    const whereClauses = ['p.kho_ma = $1'];
+    const params = [kho_ma];
+    let paramIndex = 2;
+
+    if (tu_ngay) {
+      whereClauses.push(`p.ptt_ngay_tat_toan >= $${paramIndex}::date`);
+      params.push(tu_ngay);
+      paramIndex++;
+    }
+
+    if (den_ngay) {
+      whereClauses.push(`p.ptt_ngay_tat_toan <= ($${paramIndex}::date + INTERVAL '1 day')`);
+      params.push(den_ngay);
+      paramIndex++;
+    }
+
+    if (trang_thai && trang_thai !== 'ALL') {
+      whereClauses.push(`p.ptt_trang_thai_thanh_toan = $${paramIndex}`);
+      params.push(trang_thai);
+      paramIndex++;
+    }
+
+    if (search && search.trim()) {
+      const term = `%${search.trim()}%`;
+      whereClauses.push(`(
+        p.ptt_ma ILIKE $${paramIndex}
+        OR EXISTS (
+          SELECT 1 FROM chitiet_tat_toan ct
+          WHERE ct.ptt_ma = p.ptt_ma AND ct.dts_ma ILIKE $${paramIndex}
+        )
+      )`);
+      params.push(term);
+      paramIndex++;
+    }
+
+    const whereSQL = whereClauses.join(' AND ');
+
+    // Đếm tổng số bản ghi
+    const countRes = await pool.query(
+      `SELECT COUNT(*)::int AS total
+       FROM phieu_tat_toan p
+       WHERE ${whereSQL}`,
+      params
+    );
+    const total = countRes.rows[0]?.total || 0;
+
+    // Lấy dữ liệu phân trang
+    const querySQL = `
+      SELECT 
+        p.ptt_ma,
+        p.kho_ma,
+        p.ptt_ngay_tat_toan,
+        p.ptt_thoi_diem_hoan_tat,
+        p.ptt_loai,
+        p.ptt_trang_thai_thanh_toan,
+        COALESCE(p.ptt_tong_tien_san, 0) AS ptt_tong_tien_san,
+        COALESCE(p.ptt_tong_tien_shop, 0) AS ptt_tong_tien_shop,
+        COALESCE(p.ptt_tong_tien_dvvc, 0) AS ptt_tong_tien_dvvc,
+        (COALESCE(p.ptt_tong_tien_san, 0) + COALESCE(p.ptt_tong_tien_shop, 0) + COALESCE(p.ptt_tong_tien_dvvc, 0)) AS tong_tien,
+        COALESCE(qr_stats.da_thu, 0) AS da_thu,
+        COALESCE(qr_stats.so_qr, 0) AS so_qr,
+        COALESCE(qr_stats.so_qr_da_tra, 0) AS so_qr_da_tra,
+        COALESCE(ct_stats.so_don, 0) AS so_don
+      FROM phieu_tat_toan p
+      LEFT JOIN LATERAL (
+        SELECT 
+          COUNT(*)::int AS so_qr,
+          COUNT(*) FILTER (WHERE qr_trang_thai = 'DA_THANH_TOAN')::int AS so_qr_da_tra,
+          COALESCE(SUM(qr_so_tien) FILTER (WHERE qr_trang_thai = 'DA_THANH_TOAN'), 0) AS da_thu
+        FROM qr_thanh_toan q
+        WHERE q.ptt_ma = p.ptt_ma
+      ) qr_stats ON true
+      LEFT JOIN LATERAL (
+        SELECT COUNT(DISTINCT dts_ma)::int AS so_don
+        FROM chitiet_tat_toan c
+        WHERE c.ptt_ma = p.ptt_ma
+      ) ct_stats ON true
+      WHERE ${whereSQL}
+      ORDER BY p.ptt_ngay_tat_toan DESC
+      LIMIT $${paramIndex} OFFSET $${paramIndex + 1}
+    `;
+
+    params.push(pageSize, offset);
+
+    const listRes = await pool.query(querySQL, params);
+
+    return {
+      data: listRes.rows.map((row) => ({
+        ...row,
+        ptt_tong_tien_san: Number(row.ptt_tong_tien_san),
+        ptt_tong_tien_shop: Number(row.ptt_tong_tien_shop),
+        ptt_tong_tien_dvvc: Number(row.ptt_tong_tien_dvvc),
+        tong_tien: Number(row.tong_tien),
+        da_thu: Number(row.da_thu),
+        so_qr: Number(row.so_qr),
+        so_qr_da_tra: Number(row.so_qr_da_tra),
+        so_don: Number(row.so_don),
+      })),
+      pagination: {
+        total,
+        page: parseInt(page, 10),
+        limit: pageSize,
+        totalPages: Math.ceil(total / pageSize) || 1,
+      },
+    };
+  },
+
+  // 8. Lấy chi tiết 1 phiếu tất toán (gồm danh sách QR và danh sách đơn hàng)
+  getChiTietPhieuTatToan: async (ptt_ma) => {
+    const [phieuRes, qrRes, donRes] = await Promise.all([
+      pool.query(
+        `SELECT p.*,
+                (COALESCE(p.ptt_tong_tien_san, 0) + COALESCE(p.ptt_tong_tien_shop, 0) + COALESCE(p.ptt_tong_tien_dvvc, 0)) AS tong_tien,
+                k.kho_ten
+         FROM phieu_tat_toan p
+         LEFT JOIN kho k ON k.kho_ma = p.kho_ma
+         WHERE p.ptt_ma = $1`,
+        [ptt_ma]
+      ),
+      pool.query(
+        `SELECT q.qr_ma,
+                q.qr_loai,
+                q.qr_so_tien,
+                q.qr_trang_thai,
+                q.qr_ma_giao_dich,
+                q.qr_thoi_diem_tt,
+                q.gh_ma,
+                q.dvvc_ma,
+                gh.gh_ten,
+                dvvc.dvvc_ten,
+                ts.nganhang_ten AS san_nganhang_ten,
+                ts.so_tai_khoan AS san_so_tai_khoan,
+                ts.ten_tai_khoan AS san_ten_tai_khoan,
+                nhg.nhg_ten AS shop_nganhang_ten,
+                tg.ttnt_gianhang_sotaikhoan AS shop_so_tai_khoan,
+                tg.ttnt_gianhang_tentaikhoan AS shop_ten_tai_khoan,
+                nhd.nhg_ten AS dvvc_nganhang_ten,
+                td.ttnt_dvvc_sotaikhoan AS dvvc_so_tai_khoan,
+                td.ttnt_dvvc_tentaikhoan AS dvvc_ten_tai_khoan
+         FROM qr_thanh_toan q
+         LEFT JOIN gianhang gh ON gh.gh_ma = q.gh_ma
+         LEFT JOIN donvivanchuyen dvvc ON dvvc.dvvc_ma = q.dvvc_ma
+         LEFT JOIN thongtinnhantien_gianhang tg ON tg.gh_ma = q.gh_ma
+         LEFT JOIN nganhang nhg ON nhg.nhg_ma = tg.nh_ma
+         LEFT JOIN thongtinnhantien_dvvc td ON td.dvvc_ma = q.dvvc_ma
+         LEFT JOIN nganhang nhd ON nhd.nhg_ma = td.nganhang_ma
+         LEFT JOIN LATERAL (
+           SELECT t.ttnt_stmdt_sotaikhoan AS so_tai_khoan,
+                  t.ttnt_stmdt_tentaikhoan AS ten_tai_khoan,
+                  nh.nhg_ten AS nganhang_ten
+           FROM thongtinnhantien_stmdt t
+           LEFT JOIN nganhang nh ON nh.nhg_ma = t.nganhang_ma
+           LIMIT 1
+         ) ts ON true
+         WHERE q.ptt_ma = $1
+         ORDER BY q.qr_loai, q.qr_ma`,
+        [ptt_ma]
+      ),
+      pool.query(
+        `SELECT c.dts_ma,
+                COALESCE(c.ctt_tien_san, 0) AS ctt_tien_san,
+                COALESCE(c.ctt_tien_shop, 0) AS ctt_tien_shop,
+                COALESCE(c.ctt_tien_dvvc, 0) AS ctt_tien_dvvc,
+                (COALESCE(c.ctt_tien_san, 0) + COALESCE(c.ctt_tien_shop, 0) + COALESCE(c.ctt_tien_dvvc, 0)) AS tong_tien_don,
+                gh.gh_ten,
+                dts.gh_ma
+         FROM chitiet_tat_toan c
+         JOIN donhangtheoshop dts ON dts.dts_ma = c.dts_ma
+         LEFT JOIN gianhang gh ON gh.gh_ma = dts.gh_ma
+         WHERE c.ptt_ma = $1
+         ORDER BY c.dts_ma`,
+        [ptt_ma]
+      ),
+    ]);
+
+    if (phieuRes.rows.length === 0) {
+      return null;
+    }
+
+    const phieu = phieuRes.rows[0];
+    const ds_qr = qrRes.rows.map((q) => ({
+      ...q,
+      qr_so_tien: Number(q.qr_so_tien),
+      ngan_hang:
+        q.qr_loai === 'SAN'
+          ? {
+              nganhang_ten: q.san_nganhang_ten,
+              so_tai_khoan: q.san_so_tai_khoan,
+              ten_tai_khoan: q.san_ten_tai_khoan,
+            }
+          : q.qr_loai === 'SHOP'
+            ? {
+                nganhang_ten: q.shop_nganhang_ten,
+                so_tai_khoan: q.shop_so_tai_khoan,
+                ten_tai_khoan: q.shop_ten_tai_khoan,
+              }
+            : {
+                nganhang_ten: q.dvvc_nganhang_ten,
+                so_tai_khoan: q.dvvc_so_tai_khoan,
+                ten_tai_khoan: q.dvvc_ten_tai_khoan,
+              },
+    }));
+
+    const ds_don = donRes.rows.map((d) => ({
+      ...d,
+      ctt_tien_san: Number(d.ctt_tien_san),
+      ctt_tien_shop: Number(d.ctt_tien_shop),
+      ctt_tien_dvvc: Number(d.ctt_tien_dvvc),
+      tong_tien_don: Number(d.tong_tien_don),
+    }));
+
+    const da_thu = ds_qr
+      .filter((q) => q.qr_trang_thai === 'DA_THANH_TOAN')
+      .reduce((sum, q) => sum + q.qr_so_tien, 0);
+
+    return {
+      phieu: {
+        ...phieu,
+        ptt_tong_tien_san: Number(phieu.ptt_tong_tien_san || 0),
+        ptt_tong_tien_shop: Number(phieu.ptt_tong_tien_shop || 0),
+        ptt_tong_tien_dvvc: Number(phieu.ptt_tong_tien_dvvc || 0),
+        tong_tien: Number(phieu.tong_tien || 0),
+        da_thu,
+      },
+      ds_qr,
+      ds_don,
+    };
   }
 };
 

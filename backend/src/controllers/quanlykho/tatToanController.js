@@ -46,6 +46,27 @@ const TatToanController = {
       res.status(400).json({ message: error.message });
     }
   },
+  getLichSuTatToan: async (req, res) => {
+    try {
+      const data = await TatToanService.getLichSuTatToan(req.params.kho_ma, req.query);
+      res.status(200).json(data);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  },
+
+  getChiTietPhieuTatToan: async (req, res) => {
+    try {
+      const data = await TatToanService.getChiTietPhieuTatToan(req.params.ptt_ma);
+      if (!data) {
+        return res.status(404).json({ message: 'Không tìm thấy đợt tất toán' });
+      }
+      res.status(200).json(data);
+    } catch (error) {
+      res.status(500).json({ message: error.message });
+    }
+  },
+
   chiTienHangLoat: async (req, res) => {
   try {
     const ketQua = await SepayPayoutService.payoutChoShop();
