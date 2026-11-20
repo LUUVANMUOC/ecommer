@@ -674,7 +674,9 @@ const baoDaChuyen = async (
   }
 
   // Chỉ báo admin lần đầu hoặc khi có thêm chứng từ (tránh spam).
-  if (!khoan.ht_baochuyen_luc || tep.length) {
+  // Khoản đã được ngân hàng/Sàn xác nhận trước đó thì chỉ lưu chứng từ,
+  // không bắn thêm thông báo "bên trả báo đã chuyển".
+  if (!ketQua.da_thanh_toan && (!khoan.ht_baochuyen_luc || tep.length)) {
     bao({
       kieu: 'BAO_CHUYEN',
       phieu: { ycxlsc_ma: chiTiet.phieu.ycxlsc_ma },

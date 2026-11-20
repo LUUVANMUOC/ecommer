@@ -300,6 +300,10 @@ const layThongTin = async (ht_ma) => {
 };
 
 // Bên trả báo đã chuyển khoản. Chỉ ghi nhận để admin đối soát.
+//
+// Trường hợp hay gặp: webhook ngân hàng đã tự xác nhận khoản trước khi bên trả
+// kịp bấm nút (vd. QR hiện trên portal). Khi đó KHÔNG coi là lỗi: trả về
+// da_thanh_toan = true để portal báo "đã thanh toán rồi", tránh chuyển 2 lần.
 const danhDauDaChuyen = async (ht_ma, ghi_chu = '') => {
   const ma = String(ht_ma || '').trim().toUpperCase();
   if (!ma) throw loiCoTrangThai('Thiếu mã khoản hoàn tiền.');
@@ -314,11 +318,33 @@ const danhDauDaChuyen = async (ht_ma, ghi_chu = '') => {
     [ma, String(ghi_chu || '').trim()]
   );
 
-  if (!r.rows.length) {
-    throw loiCoTrangThai('Khoản này đã được xử lý, không thể báo chuyển.', 409);
+  if (r.rows.length) return { ...r.rows[0], da_thanh_toan: false };
+
+  // Không cập nhật được -> xem khoản đang ở trạng thái nào để phản hồi đúng.
+  const hienTai = await pool.query(
+    `SELECT ht_ma, ht_trang_thai, ht_baochuyen_luc, ht_baochuyen_ghichu
+       FROM hoantien
+      WHERE ht_ma = $1`,
+    [ma]
+  );
+  const khoan = hienTai.rows[0];
+  if (!khoan) throw loiCoTrangThai('Không tìm thấy khoản hoàn tiền.', 404);
+
+  if (khoan.ht_trang_thai === 'DA_CHI') {
+    return {
+      ht_ma: ma,
+      ht_baochuyen_luc: khoan.ht_baochuyen_luc,
+      ht_baochuyen_ghichu: khoan.ht_baochuyen_ghichu,
+      da_thanh_toan: true,
+    };
   }
 
-  return r.rows[0];
+  throw loiCoTrangThai(
+    khoan.ht_trang_thai === 'HUY'
+      ? 'Khoản này đã bị huỷ, không thể báo chuyển khoản.'
+      : 'Khoản này đã được xử lý, không thể báo chuyển.',
+    409
+  );
 };
 
 // Admin huỷ QR đang mở (khoản chi vẫn giữ nguyên để chi bằng cách khác).

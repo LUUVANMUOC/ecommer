@@ -115,7 +115,7 @@ const TheThanhToan = ({ khoan, ct_ma, onBaoChuyen, dangGui }) => {
         </div>
       </div>
 
-      {coBank ? (
+      {conMo && coBank ? (
         <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-start">
           <div className="text-sm space-y-0.5">
             <p>
@@ -171,6 +171,12 @@ const TheThanhToan = ({ khoan, ct_ma, onBaoChuyen, dangGui }) => {
         </p>
       )}
 
+      {daChi && vaiTro === "TRA" && (
+        <p className="mt-2 text-xs text-emerald-700">
+          Khoản này đã được xác nhận thanh toán — bạn không cần chuyển thêm.
+        </p>
+      )}
+
       {khoan.ht_baochuyen_luc && !daChi && !daHuy && (
         <p className="mt-2 text-xs text-blue-700 bg-blue-50 border border-blue-100 rounded-lg px-2 py-1">
           Bạn đã báo chuyển lúc {ngay(khoan.ht_baochuyen_luc)} · chờ Sàn đối
@@ -205,6 +211,8 @@ const ChiTietSuCoPage = ({ vaiTro, basePath }) => {
 
   const [data, setData] = useState(null);
   const [loi, setLoi] = useState("");
+  const [loiThaoTac, setLoiThaoTac] = useState("");
+  const [thongBao, setThongBao] = useState("");
   const [anh, setAnh] = useState([]);
   const [pdf, setPdf] = useState([]);
   const [dangGui, setDangGui] = useState(false);
@@ -212,6 +220,7 @@ const ChiTietSuCoPage = ({ vaiTro, basePath }) => {
   const [billGhiChu, setBillGhiChu] = useState("");
   const [billAnh, setBillAnh] = useState([]);
   const [billPdf, setBillPdf] = useState([]);
+  const [billLoi, setBillLoi] = useState("");
   const [dangBao, setDangBao] = useState(false);
 
   const tai = useCallback(async () => {
@@ -229,15 +238,41 @@ const ChiTietSuCoPage = ({ vaiTro, basePath }) => {
 
   useEffect(() => {
     tai();
-    const id = setInterval(tai, 15000);
-    return () => clearInterval(id);
+    const id = setInterval(tai, 8000);
+    // Quay lại tab (vd. sau khi chuyển khoản xong) thì cập nhật ngay,
+    // tránh bấm "Tôi đã chuyển khoản" trên khoản mà webhook đã xác nhận.
+    const khiHienLai = () => {
+      if (document.visibilityState === "visible") tai();
+    };
+    window.addEventListener("focus", tai);
+    document.addEventListener("visibilitychange", khiHienLai);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("focus", tai);
+      document.removeEventListener("visibilitychange", khiHienLai);
+    };
   }, [tai]);
+
+  // Đang mở form báo chuyển mà khoản vừa được xác nhận (webhook) -> đóng form.
+  useEffect(() => {
+    if (!bill) return;
+    const moi = (data?.hoan_tien || []).find((h) => h.ht_ma === bill.ht_ma);
+    if (moi && !["CHO_CHI", "QUA_HAN"].includes(moi.ht_trang_thai)) {
+      setBill(null);
+      setThongBao(
+        "Khoản này vừa được xác nhận thanh toán nên không cần báo chuyển nữa.",
+      );
+    }
+  }, [data, bill]);
 
   const moBaoChuyen = (khoan) => {
     setBill(khoan);
     setBillGhiChu("");
     setBillAnh([]);
     setBillPdf([]);
+    setBillLoi("");
+    setLoiThaoTac("");
+    setThongBao("");
   };
 
   const guiBaoChuyen = async () => {
@@ -250,14 +285,34 @@ const ChiTietSuCoPage = ({ vaiTro, basePath }) => {
 
     try {
       setDangBao(true);
+      setBillLoi("");
       setLoi("");
-      await suCoService.baoDaChuyen(ycxlsc_ma, bill.ht_ma, fd);
+      setLoiThaoTac("");
+      const res = await suCoService.baoDaChuyen(ycxlsc_ma, bill.ht_ma, fd);
       setBill(null);
+      if (res?.data?.da_thanh_toan) {
+        setThongBao(
+          "Khoản này đã được xác nhận thanh toán trước đó. Chứng từ bạn gửi (nếu có) đã được lưu để Sàn đối chiếu.",
+        );
+      } else {
+        setThongBao(
+          "Đã gửi báo chuyển tới Sàn. Khoản chỉ được đóng khi tiền thực sự vào tài khoản bên nhận.",
+        );
+      }
       await tai();
     } catch (error) {
-      setLoi(
-        error?.response?.data?.message || "Gửi báo chuyển khoản thất bại.",
-      );
+      const status = error?.response?.status;
+      const msg =
+        error?.response?.data?.message ||
+        "Gửi báo chuyển khoản thất bại, vui lòng thử lại.";
+      if (status === 409) {
+        // Khoản vừa được xác nhận/huỷ ở nơi khác -> đóng form, tải lại dữ liệu.
+        setBill(null);
+        await tai();
+        setLoiThaoTac(msg);
+      } else {
+        setBillLoi(msg);
+      }
     } finally {
       setDangBao(false);
     }
@@ -353,6 +408,18 @@ const ChiTietSuCoPage = ({ vaiTro, basePath }) => {
       {loi && (
         <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
           {loi}
+        </p>
+      )}
+
+      {loiThaoTac && (
+        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+          {loiThaoTac}
+        </p>
+      )}
+
+      {thongBao && (
+        <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">
+          {thongBao}
         </p>
       )}
 
@@ -634,6 +701,12 @@ const ChiTietSuCoPage = ({ vaiTro, basePath }) => {
                 setPdf={setBillPdf}
               />
             </div>
+
+            {billLoi && (
+              <p className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">
+                {billLoi}
+              </p>
+            )}
 
             <div className="flex justify-end gap-2 pt-1">
               <button
