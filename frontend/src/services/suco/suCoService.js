@@ -41,6 +41,19 @@ const suCoService = {
       headers: { "Content-Type": "multipart/form-data" },
     }),
 
+  getThanhToan: (ycxlsc_ma, ht_ma, ct_ma, maNguoi) =>
+    axiosClient.get(
+      `${BASE}/${ma(ycxlsc_ma)}/hoan-tien/${ma(ht_ma)}/thanh-toan`,
+      { params: { ct_ma, ma: maNguoi } },
+    ),
+
+  baoDaChuyen: (ycxlsc_ma, ht_ma, data) =>
+    axiosClient.post(
+      `${BASE}/${ma(ycxlsc_ma)}/hoan-tien/${ma(ht_ma)}/bao-chuyen`,
+      data,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    ),
+
   huy: (ycxlsc_ma, data) =>
     axiosClient.post(`${BASE}/${ma(ycxlsc_ma)}/huy`, data),
 };

@@ -199,6 +199,27 @@ const layChiTiet = async (ycxlsc_ma, nguoiDung = {}) => {
     batBuocLienQuan(chiTiet.don, ct_ma, ma_nguoi);
   }
 
+  // Gắn thông tin thanh toán (STK bên nhận, QR, hạn chót) cho các khoản
+  // mà người xem là bên trả, bên nhận hoặc admin.
+  await Promise.all(
+    (chiTiet.hoan_tien || []).map(async (khoan) => {
+      const laBenTra = khoan.ct_tratien === ct_ma;
+      const laBenNhan = khoan.ct_nhantien === ct_ma;
+      if (!laBenTra && !laBenNhan && ct_ma !== 'CT01') return;
+
+      khoan.vai_tro_thanh_toan = laBenTra
+        ? 'TRA'
+        : laBenNhan
+          ? 'NHAN'
+          : 'QUAN_TRI';
+      try {
+        khoan.thanh_toan = await SuCoThanhToanModel.layThongTin(khoan.ht_ma);
+      } catch (error) {
+        khoan.thanh_toan = null;
+      }
+    })
+  );
+
   return chiTiet;
 };
 
@@ -474,8 +495,32 @@ const ketLuan = async (ycxlsc_ma, duLieu = {}, nguoiDuyet) => {
     hoan_tien: dsHoanTien,
   });
 
-  bao({ kieu: 'KET_LUAN', phieu: ketQua, huong_xu_ly, ket_luan });
-  return ketQua;
+  // Tự tạo QR nhận tiền ngay khi kết luận để bên trả thấy trên portal.
+  // Bỏ qua khoản mà bên nhận chưa có tài khoản (sẽ xác nhận tay).
+  const dsQr = [];
+  for (const ht_ma of ketQua.ds_hoan_tien || []) {
+    try {
+      dsQr.push(await SuCoThanhToanModel.taoQr(ht_ma));
+    } catch (error) {
+      dsQr.push({ ht_ma, loi: error.message });
+    }
+  }
+
+  // Gắn mã khoản vào từng dòng để thông báo hiển thị đúng nội dung CK.
+  const dsChi = dsHoanTien.map((c, i) => ({
+    ...c,
+    ht_ma: (ketQua.ds_hoan_tien || [])[i] || null,
+  }));
+
+  bao({
+    kieu: 'KET_LUAN',
+    phieu: ketQua,
+    huong_xu_ly,
+    ket_luan,
+    ds_chi: dsChi,
+    ds_qr: dsQr,
+  });
+  return { ...ketQua, ds_qr: dsQr };
 };
 
 // ---------- Admin: từ chối ----------
@@ -592,6 +637,77 @@ const layQrHoanTien = async (ycxlsc_ma, ht_ma) => {
   return SuCoThanhToanModel.layTrangThai(khoan.ht_ma);
 };
 
+// ---------- Bên trả báo đã chuyển khoản (kèm chứng từ) ----------
+// Chỉ ghi nhận để admin đối soát, KHÔNG tự đóng khoản chi.
+const baoDaChuyen = async (
+  ycxlsc_ma,
+  ht_ma,
+  nguoiDung = {},
+  ghi_chu = '',
+  dsTep = []
+) => {
+  const { chiTiet, khoan } = await timKhoanTrongPhieu(ycxlsc_ma, ht_ma);
+
+  const ct_ma = chuoi(nguoiDung.ct_ma).toUpperCase();
+  const ma_nguoi = chuoi(nguoiDung.ma);
+  if (!ct_ma || !ma_nguoi) throw loi('Thiếu thông tin người dùng.');
+
+  batBuocLienQuan(chiTiet.don, ct_ma, ma_nguoi);
+
+  if (khoan.ct_tratien !== ct_ma) {
+    throw loi('Chỉ bên chịu trách nhiệm mới báo đã chuyển khoản.', 403);
+  }
+
+  const ketQua = await SuCoThanhToanModel.danhDauDaChuyen(
+    khoan.ht_ma,
+    chuoi(ghi_chu)
+  );
+
+  const tep = chuanHoaTep(dsTep).map((t) => ({
+    ...t,
+    ten: t.ten === 'Minh chứng' ? 'Minh chứng chuyển khoản' : t.ten,
+    ct_ma,
+    ma_nguoi_gui: ma_nguoi,
+  }));
+  if (tep.length) {
+    await SuCoModel.themMinhChung(chiTiet.phieu.ycxlsc_ma, tep);
+  }
+
+  // Chỉ báo admin lần đầu hoặc khi có thêm chứng từ (tránh spam).
+  if (!khoan.ht_baochuyen_luc || tep.length) {
+    bao({
+      kieu: 'BAO_CHUYEN',
+      phieu: { ycxlsc_ma: chiTiet.phieu.ycxlsc_ma },
+      hoan_tien: { ...khoan, ht_baochuyen_ghichu: ketQua.ht_baochuyen_ghichu },
+      ct_ma,
+      chi_admin: true,
+    });
+  }
+
+  return { ...ketQua, so_tep: tep.length };
+};
+
+const layThongTinThanhToan = async (ycxlsc_ma, ht_ma, nguoiDung = {}) => {
+  const { chiTiet, khoan } = await timKhoanTrongPhieu(ycxlsc_ma, ht_ma);
+  const ct_ma = chuoi(nguoiDung.ct_ma).toUpperCase();
+  const ma_nguoi = chuoi(nguoiDung.ma);
+
+  if (ct_ma && ct_ma !== 'CT01') {
+    batBuocLienQuan(chiTiet.don, ct_ma, ma_nguoi);
+  }
+
+  const thongTin = await SuCoThanhToanModel.layThongTin(khoan.ht_ma);
+  return {
+    ...thongTin,
+    vai_tro_thanh_toan:
+      khoan.ct_tratien === ct_ma
+        ? 'TRA'
+        : khoan.ct_nhantien === ct_ma
+          ? 'NHAN'
+          : 'QUAN_TRI',
+  };
+};
+
 const huyQrHoanTien = async (ycxlsc_ma, ht_ma) => {
   const { chiTiet, khoan } = await timKhoanTrongPhieu(ycxlsc_ma, ht_ma);
 
@@ -626,5 +742,7 @@ module.exports = {
   taoQrHoanTien,
   layQrHoanTien,
   huyQrHoanTien,
+  layThongTinThanhToan,
+  baoDaChuyen,
   getKpi,
 };

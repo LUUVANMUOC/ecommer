@@ -944,7 +944,8 @@ const ChiTietSuCoAdmin = () => {
                       {h.ht_ma} · {tien(h.ht_tongtienhoan)}
                     </p>
                     <p className="text-xs text-gray-500">
-                      {h.ct_tratien} → {h.ct_nhantien} · hạn{" "}
+                      {h.ct_tratien_ten || h.ct_tratien} →{" "}
+                      {h.ct_nhantien_ten || h.ct_nhantien} · hạn{" "}
                       {ngay(h.ht_han_chi)} ·{" "}
                       {h.ht_trang_thai === "DA_CHI"
                         ? h.ht_nguon_xac_nhan === "WEBHOOK"
@@ -966,6 +967,21 @@ const ChiTietSuCoAdmin = () => {
                         <span className="ml-1">· GD {h.ht_ma_giao_dich}</span>
                       )}
                     </p>
+                    {h.thanh_toan?.ben_nhan?.so_tai_khoan && (
+                      <p className="text-xs text-gray-500">
+                        Nhận về: {h.thanh_toan.ben_nhan.nganhang_ten}{" "}
+                        {h.thanh_toan.ben_nhan.so_tai_khoan} ·{" "}
+                        {h.thanh_toan.ben_nhan.ten_tai_khoan}
+                      </p>
+                    )}
+                    {cho && h.ht_baochuyen_luc && (
+                      <p className="text-xs text-blue-700">
+                        Bên trả báo đã chuyển lúc {ngay(h.ht_baochuyen_luc)}
+                        {h.ht_baochuyen_ghichu
+                          ? ` · ${h.ht_baochuyen_ghichu}`
+                          : ""}
+                      </p>
+                    )}
                   </div>
 
                   {cho && (

@@ -201,6 +201,27 @@ const SuCoController = {
     );
     return res.status(200).json(data);
   }),
+
+  // ---------- Bên trả: xem thông tin & báo đã chuyển khoản ----------
+  getThongTinThanhToan: xuLy(async (req, res) => {
+    const data = await SuCoService.layThongTinThanhToan(
+      req.params.ycxlsc_ma,
+      req.params.ht_ma,
+      nguoiDung(req)
+    );
+    return res.status(200).json(data);
+  }),
+
+  baoDaChuyen: xuLy(async (req, res) => {
+    const data = await SuCoService.baoDaChuyen(
+      req.params.ycxlsc_ma,
+      req.params.ht_ma,
+      nguoiDung(req),
+      req.body?.ghi_chu,
+      gomTepSuCo(req.files || {})
+    );
+    return res.status(200).json(data);
+  }),
 };
 
 module.exports = SuCoController;

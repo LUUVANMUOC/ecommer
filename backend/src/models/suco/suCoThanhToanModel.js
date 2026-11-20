@@ -242,6 +242,85 @@ const layTrangThai = async (ht_ma) => {
   };
 };
 
+// Thông tin thanh toán cho bên trả/bên nhận xem (chỉ đọc).
+const layThongTin = async (ht_ma) => {
+  const ma = String(ht_ma || '').trim().toUpperCase();
+  if (!ma) throw loiCoTrangThai('Thiếu mã khoản hoàn tiền.');
+
+  const khoan = await layKhoan(ma);
+  if (!khoan) throw loiCoTrangThai('Không tìm thấy khoản hoàn tiền.', 404);
+
+  const [tenChuThe, taiKhoan, qrRes] = await Promise.all([
+    layTenChuThe(),
+    layTaiKhoanNhan(khoan),
+    pool.query(
+      `SELECT qr_ma, qr_so_tien, qr_trang_thai, qr_ma_giao_dich, qr_thoi_diem_tt
+         FROM qr_hoan_tien
+        WHERE ht_ma = $1`,
+      [ma]
+    ),
+  ]);
+
+  const qr = qrRes.rows[0] || null;
+
+  return {
+    ht_ma: ma,
+    ycxlsc_ma: khoan.ycxlsc_ma,
+    co_qr: Boolean(qr),
+    qr: qr
+      ? {
+          ...qr,
+          qr_so_tien: Number(qr.qr_so_tien),
+        }
+      : null,
+    so_tien: Number(khoan.ht_tongtienhoan),
+    noi_dung: ma,
+    het_han: khoan.ht_han_chi,
+    trang_thai_hoan_tien: khoan.ht_trang_thai,
+    baochuyen_luc: khoan.ht_baochuyen_luc,
+    baochuyen_ghichu: khoan.ht_baochuyen_ghichu,
+    ben_tra: chupAnhChuThe({
+      ct_ma: khoan.ct_tratien,
+      ten: tenChuThe.get(khoan.ct_tratien) || khoan.ct_tratien,
+    }),
+    ben_nhan: {
+      ...chupAnhChuThe({
+        ct_ma: khoan.ct_nhantien,
+        ten: tenChuThe.get(khoan.ct_nhantien) || khoan.ct_nhantien,
+      }),
+      thieu_tk: Boolean(taiKhoan.thieu_tk),
+      ly_do: taiKhoan.ly_do || '',
+      so_tai_khoan: taiKhoan.so_tai_khoan || '',
+      ten_tai_khoan: taiKhoan.ten_tai_khoan || '',
+      nganhang_ma: taiKhoan.nganhang_ma || '',
+      nganhang_ten: taiKhoan.nganhang_ten || '',
+      ten_chu_the: taiKhoan.ten_chu_the || '',
+    },
+  };
+};
+
+// Bên trả báo đã chuyển khoản. Chỉ ghi nhận để admin đối soát.
+const danhDauDaChuyen = async (ht_ma, ghi_chu = '') => {
+  const ma = String(ht_ma || '').trim().toUpperCase();
+  if (!ma) throw loiCoTrangThai('Thiếu mã khoản hoàn tiền.');
+
+  const r = await pool.query(
+    `UPDATE hoantien
+        SET ht_baochuyen_luc = now(),
+            ht_baochuyen_ghichu = COALESCE(NULLIF($2, ''), ht_baochuyen_ghichu)
+      WHERE ht_ma = $1
+        AND ht_trang_thai IN ('CHO_CHI', 'QUA_HAN')
+      RETURNING ht_ma, ht_baochuyen_luc, ht_baochuyen_ghichu`,
+    [ma, String(ghi_chu || '').trim()]
+  );
+
+  if (!r.rows.length) {
+    throw loiCoTrangThai('Khoản này đã được xử lý, không thể báo chuyển.', 409);
+  }
+
+  return r.rows[0];
+};
+
 // Admin huỷ QR đang mở (khoản chi vẫn giữ nguyên để chi bằng cách khác).
 const huyQr = async (ht_ma) => {
   const ma = String(ht_ma || '').trim().toUpperCase();
@@ -432,5 +511,7 @@ module.exports = {
   taoQr,
   huyQr,
   layTrangThai,
+  layThongTin,
+  danhDauDaChuyen,
   xuLyWebhook,
 };

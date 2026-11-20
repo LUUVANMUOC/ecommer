@@ -468,10 +468,14 @@ const layChiTiet = async (ycxlsc_ma) => {
               h.ht_thoidiem, h.ct_tratien, h.ct_nhantien, h.ht_trang_thai,
               h.ht_phuong_thuc, h.ht_ly_do, h.ht_nguoi_xac_nhan, h.ht_thoi_diem_chi,
               h.ht_ma_giao_dich, h.ht_han_chi, h.ht_nguon_xac_nhan,
+              h.ht_baochuyen_luc, h.ht_baochuyen_ghichu,
+              ct1.ct_ten AS ct_tratien_ten, ct2.ct_ten AS ct_nhantien_ten,
               q.qr_ma, q.qr_trang_thai, q.qr_thoi_diem_tt,
               (h.ht_han_chi < now()
                 AND h.ht_trang_thai IN ('CHO_CHI','QUA_HAN')) AS qua_han
          FROM hoantien h
+         LEFT JOIN chuthe ct1 ON ct1.ct_ma = h.ct_tratien
+         LEFT JOIN chuthe ct2 ON ct2.ct_ma = h.ct_nhantien
          LEFT JOIN qr_hoan_tien q ON q.ht_ma = h.ht_ma
         WHERE h.ycxlsc_ma = $1
         ORDER BY h.ht_thoidiem`,

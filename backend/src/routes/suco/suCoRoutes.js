@@ -30,6 +30,15 @@ router.get('/', Controller.getDanhSach);
 router.post('/', chayUpload, Controller.taoPhieu);
 
 router.get('/:ycxlsc_ma', Controller.getChiTiet);
+router.get(
+  '/:ycxlsc_ma/hoan-tien/:ht_ma/thanh-toan',
+  Controller.getThongTinThanhToan
+);
+router.post(
+  '/:ycxlsc_ma/hoan-tien/:ht_ma/bao-chuyen',
+  chayUpload,
+  Controller.baoDaChuyen
+);
 router.post('/:ycxlsc_ma/minh-chung', chayUpload, Controller.themMinhChung);
 router.post('/:ycxlsc_ma/huy', Controller.huy);
 

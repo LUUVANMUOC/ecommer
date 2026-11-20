@@ -45,3 +45,10 @@ ALTER TABLE hoantien DROP CONSTRAINT IF EXISTS ht_phuong_thuc_check;
 ALTER TABLE hoantien
     ADD CONSTRAINT ht_phuong_thuc_check
     CHECK (ht_phuong_thuc IN ('CHUYEN_KHOAN', 'VI_NOI_BO', 'QR', 'PAYOUT'));
+
+-- 4. Bên chịu trách nhiệm bấm "Tôi đã chuyển khoản" (kèm minh chứng).
+--    Chỉ ghi nhận để admin đối soát, KHÔNG tự đóng khoản chi.
+ALTER TABLE hoantien
+    ADD COLUMN IF NOT EXISTS ht_baochuyen_luc timestamptz;
+ALTER TABLE hoantien
+    ADD COLUMN IF NOT EXISTS ht_baochuyen_ghichu text;
