@@ -8,7 +8,7 @@ import {
   useContext,
   memo,
 } from "react";
-import { Link, useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import publicSanPhamService from "../../services/san/publicSanPhamService";
 import thuongHieuService from "../../services/san/thuongHieuService";
 import gioHangService from "../../services/khachhang/gioHangService";
@@ -22,6 +22,7 @@ const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 const ITEMS_PER_PAGE = 20;
 const TOP_LIMIT = 10;
 const SEARCH_DEBOUNCE = 350; // ms
+const SORT_VALUES = ["newest", "popular", "price_asc", "price_desc"];
 
 const imgUrl = (link) => (link ? `${BACKEND_URL}${link}` : "");
 
@@ -304,16 +305,70 @@ const GridSkeleton = () => (
 const DanhSachSanPham = () => {
   const { user, logout } = useContext(AuthContext);
   const navigate = useNavigate();
+  const location = useLocation();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   /* ================= STATE ================= */
-  // 1 state duy nhất cho truy vấn -> tránh 4 effect chạy lệch nhau
-  const [query, setQuery] = useState({
-    page: 1,
-    search: "",
-    brand: "",
-    sort: "newest",
+  /* Truy vấn: URL là nguồn sự thật.
+   * page / search / brand / sort nằm trên query string để Back, Forward, F5
+   * và chia sẻ link đều giữ đúng trạng thái danh sách.
+   */
+  const query = useMemo(() => {
+    const page = Math.floor(Number(searchParams.get("page")));
+    const sort = searchParams.get("sort");
+    return {
+      page: page > 0 ? page : 1,
+      search: (searchParams.get("search") || "").trim(),
+      brand: searchParams.get("brand") || "",
+      sort: SORT_VALUES.includes(sort) ? sort : "newest",
+    };
+  }, [searchParams]);
+
+  // Mọi thay đổi trong cùng trang danh sách đều dùng replace → history chỉ có
+  // 1 entry /san-pham, nên Back sẽ thoát về trang trước thay vì lùi từng bộ lọc.
+  const writeQuery = useCallback(
+    (patch) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          const page = patch.page ?? (Number(prev.get("page")) || 1);
+          const search = (patch.search ?? prev.get("search") ?? "").trim();
+          const brand = patch.brand ?? prev.get("brand") ?? "";
+          const sort = patch.sort ?? prev.get("sort") ?? "newest";
+
+          if (page > 1) next.set("page", String(page));
+          else next.delete("page");
+
+          if (search) next.set("search", search);
+          else next.delete("search");
+
+          if (brand) next.set("brand", brand);
+          else next.delete("brand");
+
+          if (sort !== "newest" && SORT_VALUES.includes(sort)) {
+            next.set("sort", sort);
+          } else {
+            next.delete("sort");
+          }
+
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  // Ô tìm kiếm: giữ bản nháp khi đang gõ, nhưng bỏ ngay khi URL đổi
+  // (Back/Forward, đổi bộ lọc, chuyển trang). Không cần effect đồng bộ.
+  const [searchDraft, setSearchDraft] = useState({
+    key: location.key,
+    value: query.search,
   });
-  const [searchInput, setSearchInput] = useState("");
+  const searchInput =
+    searchDraft.key === location.key ? searchDraft.value : query.search;
+  const handleSearchInput = (value) =>
+    setSearchDraft({ key: location.key, value });
 
   const [products, setProducts] = useState([]);
   const [total, setTotal] = useState(0);
@@ -409,6 +464,12 @@ const DanhSachSanPham = () => {
     };
   }, [cacheKey, query.page, query.search, query.brand, query.sort]);
 
+  // URL có ?page vượt quá tổng số trang → đưa về trang cuối.
+  useEffect(() => {
+    if (loading || totalPages < 1 || query.page <= totalPages) return;
+    writeQuery({ page: totalPages });
+  }, [loading, totalPages, query.page, writeQuery]);
+
   /* ================= PREFETCH TRANG KẾ ================= */
   useEffect(() => {
     if (query.page >= totalPages) return;
@@ -447,13 +508,11 @@ const DanhSachSanPham = () => {
     if (term === query.search) return;
 
     const timer = window.setTimeout(() => {
-      setQuery((prev) =>
-        prev.search === term ? prev : { ...prev, search: term, page: 1 },
-      );
+      writeQuery({ search: term, page: 1 });
     }, SEARCH_DEBOUNCE);
 
     return () => window.clearTimeout(timer);
-  }, [searchInput, query.search]);
+  }, [searchInput, query.search, writeQuery]);
 
   /* ================= 3 KHỐI NỔI BẬT ================= */
   useEffect(() => {
@@ -541,22 +600,21 @@ const DanhSachSanPham = () => {
 
   /* ================= HANDLERS ================= */
   const handleSubmitSearch = useCallback(() => {
-    const term = searchInput.trim();
-    setQuery((prev) => ({ ...prev, search: term, page: 1 }));
-  }, [searchInput]);
+    writeQuery({ search: searchInput.trim(), page: 1 });
+  }, [searchInput, writeQuery]);
 
   const handleClearSearch = useCallback(() => {
-    setSearchInput("");
-    setQuery((prev) => ({ ...prev, search: "", page: 1 }));
-  }, []);
+    setSearchDraft({ key: location.key, value: "" });
+    writeQuery({ search: "", page: 1 });
+  }, [location.key, writeQuery]);
 
   const handleClearFilters = () => {
-    setSearchInput("");
-    setQuery({ page: 1, search: "", brand: "", sort: "newest" });
+    setSearchDraft({ key: location.key, value: "" });
+    writeQuery({ search: "", brand: "", sort: "newest", page: 1 });
   };
 
   const handlePickBrand = (th_ma) => {
-    setQuery((prev) => ({ ...prev, brand: th_ma, page: 1 }));
+    writeQuery({ brand: th_ma, page: 1 });
     window.setTimeout(() => {
       gridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
     }, 60);
@@ -573,8 +631,11 @@ const DanhSachSanPham = () => {
 
   const handlePageChange = (newPage) => {
     if (newPage < 1 || newPage > totalPages || newPage === query.page) return;
-    setQuery((prev) => ({ ...prev, page: newPage }));
-    gridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    writeQuery({ page: newPage });
+    // Chờ effect cuộn lên đầu của ScrollRestoration chạy xong rồi mới cuộn tới lưới.
+    window.setTimeout(() => {
+      gridRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 60);
   };
 
   /* ================= PHÂN TRANG ================= */
@@ -648,7 +709,7 @@ const DanhSachSanPham = () => {
         onLogout={handleLogout}
         search={{
           value: searchInput,
-          onChange: setSearchInput,
+          onChange: handleSearchInput,
           onSubmit: handleSubmitSearch,
           onClear: handleClearSearch,
           loading: loading && query.page === 1,
@@ -716,13 +777,7 @@ const DanhSachSanPham = () => {
                 value={query.brand}
                 onFocus={ensureBrands}
                 onMouseDown={ensureBrands}
-                onChange={(e) =>
-                  setQuery((prev) => ({
-                    ...prev,
-                    brand: e.target.value,
-                    page: 1,
-                  }))
-                }
+                onChange={(e) => writeQuery({ brand: e.target.value, page: 1 })}
                 className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-2 text-sm text-[#0F172A] outline-none focus:border-[#2563EB] focus:bg-white"
               >
                 <option value="">
@@ -737,13 +792,7 @@ const DanhSachSanPham = () => {
 
               <select
                 value={query.sort}
-                onChange={(e) =>
-                  setQuery((prev) => ({
-                    ...prev,
-                    sort: e.target.value,
-                    page: 1,
-                  }))
-                }
+                onChange={(e) => writeQuery({ sort: e.target.value, page: 1 })}
                 className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-2 text-sm text-[#0F172A] outline-none focus:border-[#2563EB] focus:bg-white"
               >
                 <option value="newest">Mới nhất</option>

@@ -488,9 +488,11 @@ const ChiTietSanPhamKhachHang = () => {
   const navigate = useNavigate();
   const { user } = useContext(AuthContext);
 
+  // Phân loại đang chọn lấy thẳng từ URL → Back/Forward luôn cập nhật UI.
+  const variantFromUrl = searchParams.get("ctsp_ma");
+
   const [product, setProduct] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeVariantId, setActiveVariantId] = useState(null);
   const [activeImageIdx, setActiveImageIdx] = useState(0);
   const [isFollowing, setIsFollowing] = useState(false);
 
@@ -517,18 +519,8 @@ const ChiTietSanPhamKhachHang = () => {
       try {
         const res = await publicSanPhamService.getDetail(sp_ma);
         setProduct(res.data);
-        const variantFromUrl = searchParams.get("ctsp_ma");
-        if (res.data.variants.length > 0) {
-          const isValid = res.data.variants.some(
-            (v) => v.ctsp_ma === variantFromUrl,
-          );
-          if (variantFromUrl && isValid) setActiveVariantId(variantFromUrl);
-          else {
-            const firstVariantId = res.data.variants[0].ctsp_ma;
-            setActiveVariantId(firstVariantId);
-            setSearchParams({ ctsp_ma: firstVariantId }, { replace: true });
-          }
-        }
+        // Đổi sản phẩm (kể cả bằng Back/Forward) thì quay về ảnh đầu tiên.
+        setActiveImageIdx(0);
       } catch (error) {
         setProduct(null);
       } finally {
@@ -537,6 +529,20 @@ const ChiTietSanPhamKhachHang = () => {
     };
     fetchDetail();
   }, [sp_ma]);
+
+  // URL thiếu hoặc sai ctsp_ma → thay thế entry hiện tại bằng phân loại đầu
+  // tiên (replace → không sinh thêm history).
+  useEffect(() => {
+    if (!product?.variants?.length) return;
+    const isValidVariant = product.variants.some(
+      (v) => v.ctsp_ma === variantFromUrl,
+    );
+    if (!isValidVariant) {
+      const firstVariantId = product.variants[0]?.ctsp_ma;
+      if (!firstVariantId) return;
+      setSearchParams({ ctsp_ma: firstVariantId }, { replace: true });
+    }
+  }, [product, variantFromUrl, setSearchParams]);
 
   useEffect(() => {
     if (user && user.kh_ma) {
@@ -553,13 +559,13 @@ const ChiTietSanPhamKhachHang = () => {
   }, [user, product]);
 
   const activeVariant =
-    product?.variants.find((v) => v.ctsp_ma === activeVariantId) ||
+    product?.variants.find((v) => v.ctsp_ma === variantFromUrl) ||
     product?.variants[0];
 
   // 🟢 Reset số lượng về 1 khi đổi phân loại
   useEffect(() => {
     setQuantity(1);
-  }, [activeVariantId]);
+  }, [activeVariant?.ctsp_ma]);
 
   // 🟢 LOGIC ĐẾM 30 GIÂY ĐỂ TÍNH LƯỢT XEM
   useEffect(() => {
@@ -578,9 +584,10 @@ const ChiTietSanPhamKhachHang = () => {
   }, [activeVariant?.ctsp_ma, user?.kh_ma]);
 
   const handleSelectVariant = (variant) => {
-    setActiveVariantId(variant.ctsp_ma);
     setActiveImageIdx(0);
-    setSearchParams({ ctsp_ma: variant.ctsp_ma });
+    // replace: đổi phân loại không tạo history entry, để nút Back thoát khỏi
+    // trang chi tiết thay vì "kẹt" lại ở đây.
+    setSearchParams({ ctsp_ma: variant.ctsp_ma }, { replace: true });
   };
 
   // 🟢 Hàm xử lý tăng/giảm số lượng

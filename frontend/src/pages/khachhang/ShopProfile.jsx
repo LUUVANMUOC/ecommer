@@ -8,7 +8,13 @@ import {
   useContext,
   memo,
 } from "react";
-import { useParams, Link, useNavigate } from "react-router-dom";
+import {
+  useParams,
+  Link,
+  useLocation,
+  useNavigate,
+  useSearchParams,
+} from "react-router-dom";
 import publicSanPhamService from "../../services/san/publicSanPhamService";
 import thuongHieuService from "../../services/san/thuongHieuService";
 import theoDoiShopService from "../../services/khachhang/theoDoiShopService";
@@ -23,6 +29,7 @@ import CustomerVoucherCard from "../../components/common/Voucher/CustomerVoucher
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 const ITEMS_PER_PAGE = 20;
 const SEARCH_DEBOUNCE = 350; // ms
+const SORT_VALUES = ["newest", "popular", "price_asc", "price_desc"];
 
 const imgUrl = (link) => (link ? `${BACKEND_URL}${link}` : "");
 
@@ -117,7 +124,9 @@ const GridSkeleton = () => (
 const ShopProfile = () => {
   const { gh_ma } = useParams();
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useContext(AuthContext);
+  const [searchParams, setSearchParams] = useSearchParams();
 
   /* ================= STATE ================= */
   const [shopInfo, setShopInfo] = useState(null);
@@ -125,15 +134,72 @@ const ShopProfile = () => {
   const [categories, setCategories] = useState([]);
   const [vouchers, setVouchers] = useState([]);
 
-  // 1 state duy nhất cho truy vấn sản phẩm
-  const [query, setQuery] = useState({
-    page: 1,
-    search: "",
-    brand: "",
-    sort: "newest",
+  /* Truy vấn: URL là nguồn sự thật.
+   * dmsp (danh mục) / page / search / brand / sort nằm trên query string để
+   * Back, Forward, F5 và chia sẻ link đều giữ đúng trạng thái danh sách.
+   */
+  const query = useMemo(() => {
+    const page = Math.floor(Number(searchParams.get("page")));
+    const sort = searchParams.get("sort");
+    return {
+      page: page > 0 ? page : 1,
+      search: (searchParams.get("search") || "").trim(),
+      brand: searchParams.get("brand") || "",
+      sort: SORT_VALUES.includes(sort) ? sort : "newest",
+    };
+  }, [searchParams]);
+
+  const activeTab = searchParams.get("dmsp") || "ALL";
+
+  // Mọi thay đổi trong cùng trang shop đều dùng replace → history chỉ có
+  // 1 entry, nên Back sẽ thoát về trang trước thay vì lùi từng bộ lọc.
+  const writeQuery = useCallback(
+    (patch) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          const page = patch.page ?? (Number(prev.get("page")) || 1);
+          const search = (patch.search ?? prev.get("search") ?? "").trim();
+          const brand = patch.brand ?? prev.get("brand") ?? "";
+          const sort = patch.sort ?? prev.get("sort") ?? "newest";
+          const dmsp = patch.dmsp ?? prev.get("dmsp") ?? "ALL";
+
+          if (page > 1) next.set("page", String(page));
+          else next.delete("page");
+
+          if (search) next.set("search", search);
+          else next.delete("search");
+
+          if (brand) next.set("brand", brand);
+          else next.delete("brand");
+
+          if (sort !== "newest" && SORT_VALUES.includes(sort)) {
+            next.set("sort", sort);
+          } else {
+            next.delete("sort");
+          }
+
+          if (dmsp && dmsp !== "ALL") next.set("dmsp", dmsp);
+          else next.delete("dmsp");
+
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  // Ô tìm kiếm: giữ bản nháp khi đang gõ, nhưng bỏ ngay khi URL đổi
+  // (Back/Forward, đổi bộ lọc, chuyển shop). Không cần effect đồng bộ.
+  const [searchDraft, setSearchDraft] = useState({
+    key: location.key,
+    value: query.search,
   });
-  const [searchInput, setSearchInput] = useState("");
-  const [activeTab, setActiveTab] = useState("ALL");
+  const searchInput =
+    searchDraft.key === location.key ? searchDraft.value : query.search;
+  const handleSearchInput = (value) =>
+    setSearchDraft({ key: location.key, value });
 
   const [products, setProducts] = useState([]);
   const [total, setTotal] = useState(0);
@@ -238,9 +304,6 @@ const ShopProfile = () => {
 
   /* ================= RESET KHI ĐỔI SHOP ================= */
   useEffect(() => {
-    setQuery({ page: 1, search: "", brand: "", sort: "newest" });
-    setSearchInput("");
-    setActiveTab("ALL");
     setProducts([]);
     setTotal(0);
     setTotalPages(1);
@@ -323,6 +386,12 @@ const ShopProfile = () => {
     showToast,
   ]);
 
+  // URL có ?page vượt quá tổng số trang → đưa về trang cuối.
+  useEffect(() => {
+    if (loading || totalPages < 1 || query.page <= totalPages) return;
+    writeQuery({ page: totalPages });
+  }, [loading, totalPages, query.page, writeQuery]);
+
   /* ================= PREFETCH TRANG KẾ ================= */
   useEffect(() => {
     if (!gh_ma || query.page >= totalPages) return undefined;
@@ -372,16 +441,14 @@ const ShopProfile = () => {
     if (term === query.search) return undefined;
 
     const timer = window.setTimeout(() => {
-      setQuery((prev) =>
-        prev.search === term ? prev : { ...prev, search: term, page: 1 },
-      );
+      writeQuery({ search: term, page: 1 });
     }, SEARCH_DEBOUNCE);
 
     return () => window.clearTimeout(timer);
-  }, [searchInput, query.search]);
+  }, [searchInput, query.search, writeQuery]);
 
   /* ================= THƯƠNG HIỆU CỦA SHOP (LAZY) ================= */
-  const ensureBrands = useCallback(() => {
+  const ensureBrands = () => {
     if (!gh_ma || brandsRequested.current) return;
     brandsRequested.current = true;
     setBrandLoading(true);
@@ -395,7 +462,7 @@ const ShopProfile = () => {
         brandsRequested.current = false; // cho phép thử lại
       })
       .finally(() => setBrandLoading(false));
-  }, [gh_ma]);
+  };
 
   // Ưu tiên danh sách đầy đủ; nếu chưa tải thì suy ra từ sản phẩm đang có
   const brands = useMemo(() => {
@@ -415,33 +482,30 @@ const ShopProfile = () => {
 
   /* ================= HANDLERS ================= */
   const handleSubmitSearch = useCallback(() => {
-    const term = searchInput.trim();
-    setQuery((prev) => ({ ...prev, search: term, page: 1 }));
+    writeQuery({ search: searchInput.trim(), page: 1 });
     scrollToGrid();
-  }, [searchInput, scrollToGrid]);
+  }, [searchInput, writeQuery, scrollToGrid]);
 
-  const handleClearSearch = useCallback(() => {
-    setSearchInput("");
-    setQuery((prev) => ({ ...prev, search: "", page: 1 }));
-  }, []);
+  const handleClearSearch = () => {
+    setSearchDraft({ key: location.key, value: "" });
+    writeQuery({ search: "", page: 1 });
+  };
 
   const handleClearFilters = () => {
-    setSearchInput("");
-    setActiveTab("ALL");
-    setQuery({ page: 1, search: "", brand: "", sort: "newest" });
+    setSearchDraft({ key: location.key, value: "" });
+    writeQuery({ search: "", brand: "", sort: "newest", dmsp: "ALL", page: 1 });
     scrollToGrid();
   };
 
   const handleTabChange = (key) => {
     if (key === activeTab) return;
-    setActiveTab(key);
-    setQuery((prev) => ({ ...prev, page: 1 }));
+    writeQuery({ dmsp: key, page: 1 });
     scrollToGrid();
   };
 
   const handlePageChange = (newPage) => {
     if (newPage < 1 || newPage > totalPages || newPage === query.page) return;
-    setQuery((prev) => ({ ...prev, page: newPage }));
+    writeQuery({ page: newPage });
     scrollToGrid();
   };
 
@@ -592,7 +656,7 @@ const ShopProfile = () => {
         onLogout={handleLogout}
         search={{
           value: searchInput,
-          onChange: setSearchInput,
+          onChange: handleSearchInput,
           onSubmit: handleSubmitSearch,
           onClear: handleClearSearch,
           loading: loading && query.page === 1,
@@ -757,13 +821,7 @@ const ShopProfile = () => {
                   value={query.brand}
                   onFocus={ensureBrands}
                   onMouseDown={ensureBrands}
-                  onChange={(e) =>
-                    setQuery((prev) => ({
-                      ...prev,
-                      brand: e.target.value,
-                      page: 1,
-                    }))
-                  }
+                  onChange={(e) => writeQuery({ brand: e.target.value, page: 1 })}
                   className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-2 text-sm text-[#0F172A] outline-none focus:border-[#2563EB] focus:bg-white"
                 >
                   <option value="">
@@ -778,13 +836,7 @@ const ShopProfile = () => {
 
                 <select
                   value={query.sort}
-                  onChange={(e) =>
-                    setQuery((prev) => ({
-                      ...prev,
-                      sort: e.target.value,
-                      page: 1,
-                    }))
-                  }
+                  onChange={(e) => writeQuery({ sort: e.target.value, page: 1 })}
                   className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-2 text-sm text-[#0F172A] outline-none focus:border-[#2563EB] focus:bg-white"
                 >
                   <option value="newest">Mới nhất</option>

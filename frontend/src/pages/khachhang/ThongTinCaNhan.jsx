@@ -48,10 +48,22 @@ const ORDER_TABS = [
   { id: "TTDH06", label: "Đã hủy" },
 ];
 
+// Tab hợp lệ của trang tài khoản — cũng chính là giá trị của ?tab= trên URL.
+const ACCOUNT_TAB_IDS = [
+  "ho-so",
+  "don-hang",
+  "danh-gia",
+  "lich-su-xem",
+  "dia-chi",
+  "ngan-hang",
+  "shop-theo-doi",
+  "doi-mat-khau",
+];
+
 const ThongTinCaNhan = () => {
   const { user } = useContext(AuthContext);
   const kh_ma = user?.kh_ma;
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -61,21 +73,21 @@ const ThongTinCaNhan = () => {
     type: "success",
   });
 
-  const [activeTab, setActiveTab] = useState(() => {
-    const tab = searchParams.get("tab");
-    return [
-      "ho-so",
-      "don-hang",
-      "danh-gia",
-      "lich-su-xem",
-      "dia-chi",
-      "ngan-hang",
-      "shop-theo-doi",
-      "doi-mat-khau",
-    ].includes(tab)
-      ? tab
-      : "ho-so";
-  });
+  // Tab lấy từ URL để Back/Forward hoạt động đúng. Bấm tab sẽ thêm 1 entry,
+  // nhờ vậy Back quay về tab trước thay vì thoát khỏi trang tài khoản.
+  const tabParam = searchParams.get("tab");
+  const activeTab = ACCOUNT_TAB_IDS.includes(tabParam) ? tabParam : "ho-so";
+  const setActiveTab = useCallback(
+    (tab) => {
+      if (!ACCOUNT_TAB_IDS.includes(tab) || tab === activeTab) return;
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set("tab", tab);
+        return next;
+      });
+    },
+    [activeTab, setSearchParams],
+  );
   const [profileData, setProfileData] = useState({
     kh_ten: "",
     kh_sdt: "",

@@ -6,6 +6,22 @@ const axiosClient = axios.create({
     baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080/api',
 });
 
+// Sự kiện để AuthRedirectHandler điều hướng mềm (không reload cả trang)
+const AUTH_UNAUTHORIZED_EVENT = 'auth:unauthorized';
+
+const redirectToLogin = (path) => {
+    const event = new CustomEvent(AUTH_UNAUTHORIZED_EVENT, {
+        detail: { path },
+        cancelable: true,
+    });
+    window.dispatchEvent(event);
+
+    // Fallback khi chưa có component nào lắng nghe (app chưa mount xong)
+    if (!event.defaultPrevented) {
+        window.location.replace(path);
+    }
+};
+
 // Tự động gắn Token vào header nếu có
 axiosClient.interceptors.request.use(
     (config) => {
@@ -38,21 +54,21 @@ axiosClient.interceptors.response.use(
                 localStorage.removeItem('user');
 
                 // 2. Tự động nhận biết khu vực để điều hướng về đúng trang đăng nhập
+                let loginPath = '/khach-hang/login';
                 if (currentPath.includes('/nguoi-ban')) {
-                    window.location.href = '/nguoi-ban/login';
+                    loginPath = '/nguoi-ban/login';
                 } else if (currentPath.includes('/dvvc')) {
-                    window.location.href = '/dvvc/login'; 
-                } else if (currentPath.includes('/shipper')) {          // ← THÊM
-                    window.location.href = '/shipper/login';            // ← THÊM
-                }
-                else if (currentPath.includes('/quan-ly-kho')) {     // ← THÊM
-                    window.location.href = '/quan-ly-kho/login';       // ← THÊM
+                    loginPath = '/dvvc/login';
+                } else if (currentPath.includes('/shipper')) {
+                    loginPath = '/shipper/login';
+                } else if (currentPath.includes('/quan-ly-kho')) {
+                    loginPath = '/quan-ly-kho/login';
                 } else if (currentPath.includes('/admin')) {
-                    window.location.href = '/admin/login';
-                } else {
-                    // 3. Fallback: Dành cho Khách hàng hoặc các trang public (như /san-pham)
-                    window.location.href = '/khach-hang/login';
+                    loginPath = '/admin/login';
                 }
+
+                // Điều hướng mềm: giữ nguyên history của SPA thay vì reload cứng
+                redirectToLogin(loginPath);
             }
             // Nếu đang ở trang login: Không làm gì cả, để trang Login tự hiển thị thông báo "Sai mật khẩu"
         }

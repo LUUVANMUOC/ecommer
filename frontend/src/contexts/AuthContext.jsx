@@ -24,6 +24,14 @@ export const AuthProvider = ({ children }) => {
     setLoading(false);
   }, []);
 
+  // Đồng bộ state khi axios gặp 401 và tự đăng xuất (không reload trang)
+  useEffect(() => {
+    const onUnauthorized = () => setUser(null);
+    window.addEventListener("auth:unauthorized", onUnauthorized);
+    return () =>
+      window.removeEventListener("auth:unauthorized", onUnauthorized);
+  }, []);
+
   // ==========================================
   // 1. ADMIN
   // ==========================================
