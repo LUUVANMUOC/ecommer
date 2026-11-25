@@ -1,7 +1,6 @@
 import { Navigate, Outlet } from "react-router-dom";
 
 const ProtectedRoute = ({ allowedRole, allowedRoles }) => {
-  const token = localStorage.getItem("token");
   const userStr = localStorage.getItem("user");
 
   // Chuẩn hóa quyền được phép truy cập thành 1 mảng
@@ -42,8 +41,8 @@ const ProtectedRoute = ({ allowedRole, allowedRoles }) => {
       `Chặn truy cập: User có role '${user.role}' nhưng yêu cầu '${roles.join(", ")}'`,
     );
 
-    // ĐÁ VỀ TRANG CHỦ (Home) thay vì đá về /admin để tránh vòng lặp vô hạn
-    return <Navigate to="/" replace />;
+    // ĐÁ VỀ TRANG CHỌN VAI TRÒ để chọn lại đúng role (tránh vòng lặp vô hạn)
+    return <Navigate to="/dang-nhap" replace />;
   }
 
   // --- BƯỚC 3: HỢP LỆ ---

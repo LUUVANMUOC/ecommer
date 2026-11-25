@@ -6,25 +6,25 @@
 // //               để comment chúng lại -> agent được quyền code.
 // //  LƯU Ý      : chặn git commit/push nằm ở khối 5, mở khoá cũng KHÔNG mở.
 // // ============================================================================
-// {
-//   "$schema": "https://opencode.ai/config.json",
+{
+  "$schema": "https://opencode.ai/config.json",
 
-//   "permissions": [
-//     // ─────────── 1. ĐỌC / TRA CỨU (luôn bật) ───────────
-//     { "action": "read", "resource": "*", "effect": "allow" },
-//     { "action": "read", "resource": "*.env", "effect": "allow" },
-//     { "action": "read", "resource": "*.env.*", "effect": "allow" },
-//     { "action": "glob", "resource": "*", "effect": "allow" },
-//     { "action": "grep", "resource": "*", "effect": "allow" },
-//     { "action": "webfetch", "resource": "*", "effect": "allow" },
-//     { "action": "websearch", "resource": "*", "effect": "allow" },
-//     { "action": "skill", "resource": "*", "effect": "allow" },
-//     { "action": "question", "resource": "*", "effect": "allow" },
-//     { "action": "subagent", "resource": "*", "effect": "allow" },
-//     { "action": "external_directory", "resource": "*", "effect": "allow" },
+  "permissions": [
+    // ─────────── 1. ĐỌC / TRA CỨU (luôn bật) ───────────
+    { "action": "read", "resource": "*", "effect": "allow" },
+    { "action": "read", "resource": "*.env", "effect": "allow" },
+    { "action": "read", "resource": "*.env.*", "effect": "allow" },
+    { "action": "glob", "resource": "*", "effect": "allow" },
+    { "action": "grep", "resource": "*", "effect": "allow" },
+    { "action": "webfetch", "resource": "*", "effect": "allow" },
+    { "action": "websearch", "resource": "*", "effect": "allow" },
+    { "action": "skill", "resource": "*", "effect": "allow" },
+    { "action": "question", "resource": "*", "effect": "allow" },
+    { "action": "subagent", "resource": "*", "effect": "allow" },
+    { "action": "external_directory", "resource": "*", "effect": "allow" },
 
-//     // ─────────── 2. Shell: mở toàn bộ (chỉ có hiệu lực khi ĐÃ MỞ KHOÁ) ───────────
-//     { "action": "shell", "resource": "*", "effect": "allow" },
+    // ─────────── 2. Shell: mở toàn bộ (chỉ có hiệu lực khi ĐÃ MỞ KHOÁ) ───────────
+    { "action": "shell", "resource": "*", "effect": "allow" },
 
 //     // ═══════════ 3. KHOÁ — ĐÂY LÀ CHỖ DUY NHẤT CẦN SỬA ═══════════
 //     //   ▼▼▼ Comment 2 dòng dưới (Ctrl + /) = agent được sửa code ▼▼▼

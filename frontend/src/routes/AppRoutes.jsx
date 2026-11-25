@@ -35,10 +35,12 @@ import ChiTietSanPhamKhachHang from "../pages/khachhang/ChiTietSanPham";
 const AppRoutes = () => {
   return (
     <Routes>
-      {/* 1. Trang chủ */}
-      <Route path="/" element={<Home />} />
+      {/* 1. Trang mặc định: trang bán hàng (mọi role đều thấy khi vào hệ thống) */}
+      <Route path="/" element={<DanhSachSanPham />} />
+      {/* 2. Trang chọn vai trò để đăng nhập (giữ /home cho link cũ) */}
+      <Route path="/dang-nhap" element={<Home />} />
       <Route path="/home" element={<Home />} />
-      {/* 2. Các trang Đăng nhập / Đăng ký (Public) */}
+      {/* 3. Các trang Đăng nhập / Đăng ký (Public) */}
       <Route path="/admin/login" element={<AdminLogin />} />
       <Route path="/admin/register" element={<AdminRegister />} />
       <Route path="/nguoi-ban/login" element={<ShopLogin />} />
@@ -52,10 +54,10 @@ const AppRoutes = () => {
       {/* Khách hàng Đăng nhập / Đăng ký */}
       <Route path="/khach-hang/login" element={<KhachHangLogin />} />
       <Route path="/khach-hang/register" element={<KhachHangRegister />} />
-      {/* 3. Xem sản phẩm công khai (Ai cũng xem được) */}
+      {/* 4. Xem sản phẩm công khai (Ai cũng xem được) */}
       <Route path="/san-pham" element={<DanhSachSanPham />} />
       <Route path="/san-pham/:sp_ma" element={<ChiTietSanPhamKhachHang />} />
-      {/* 4. Các Layout chính (Có phân quyền bảo vệ bên trong) */}
+      {/* 5. Các Layout chính (Có phân quyền bảo vệ bên trong) */}
       <Route path="/admin/*" element={<AdminRoutes />} />
       <Route path="/nguoi-ban/*" element={<ShopRoutes />} />
       <Route path="/dvvc/*" element={<DVVCRoutes />} />
@@ -63,7 +65,7 @@ const AppRoutes = () => {
       <Route path="/quan-ly-kho/*" element={<QuanLyKhoRoutes />} />
       <Route path="/khach-hang/*" element={<KhachHangRoutes />} />
       <Route path="/shop/:gh_ma" element={<ShopProfile />} />
-      {/* 5. Trang báo lỗi 404 */}
+      {/* 6. Trang báo lỗi 404 */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

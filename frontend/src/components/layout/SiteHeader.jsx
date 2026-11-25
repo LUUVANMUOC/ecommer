@@ -234,14 +234,14 @@ const SiteHeader = ({
       ) : (
         <div className="flex items-center gap-3">
           <SafeLink
-            to="/khach-hang/login"
+            to="/dang-nhap"
             editable={editable}
             className="text-[#334155] hover:text-[#2563EB]"
           >
             Đăng nhập
           </SafeLink>
           <SafeLink
-            to="/khach-hang/register"
+            to="/dang-nhap"
             editable={editable}
             className="rounded-full bg-[#2563EB] px-5 py-2 text-white hover:bg-[#1D4ED8]"
           >
