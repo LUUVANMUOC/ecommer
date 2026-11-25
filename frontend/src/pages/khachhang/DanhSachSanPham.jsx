@@ -95,7 +95,7 @@ const SectionRow = ({
     ) : empty ? (
       <p className="py-8 text-center text-sm text-[#94A3B8]">{emptyText}</p>
     ) : (
-      <div className="-mx-1 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pb-2">
+      <div className="-mx-1 -mt-1.5 flex snap-x snap-mandatory gap-3 overflow-x-auto px-1 pt-1.5 pb-2">
         {children}
       </div>
     )}
