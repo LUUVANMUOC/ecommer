@@ -810,9 +810,6 @@ const ChiTietSanPhamKhachHang = () => {
               <span className="text-4xl font-extrabold text-[#DC2626]">
                 {formatVND(activeVariant?.ctsp_gianban)}
               </span>
-              <span className="ml-4 text-sm font-medium text-[#94A3B8] line-through">
-                {(activeVariant?.ctsp_gianban * 1.2).toLocaleString("vi-VN")} đ
-              </span>
             </div>
 
             <div className="mt-8 space-y-5">
