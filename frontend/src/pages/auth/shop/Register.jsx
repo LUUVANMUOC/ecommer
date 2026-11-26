@@ -4,10 +4,22 @@ import { useNavigate, Link } from "react-router-dom";
 import { AuthContext } from "../../../contexts/AuthContext";
 import addressService from "../../../services/san/addressService";
 import PasswordInput from "../../../components/common/PasswordInput";
+import AuthShell, {
+  AuthAlert,
+  AuthField,
+  AuthFileField,
+  AuthSection,
+  AuthSubmit,
+} from "../../../components/auth/AuthShell";
+import {
+  authInputClass,
+  getAuthTone,
+} from "../../../components/auth/authTheme";
 
 const ShopRegister = () => {
   const { registerShop } = useContext(AuthContext);
   const navigate = useNavigate();
+  const tone = getAuthTone("shop");
 
   const [formData, setFormData] = useState({
     gh_ten: "",
@@ -97,210 +109,191 @@ const ShopRegister = () => {
   );
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background py-12 px-4">
-      <div className="w-full max-w-2xl bg-surface-container-lowest border border-outline-variant rounded-2xl shadow-xl overflow-hidden">
-        <div className="bg-orange-500 px-6 py-8 text-center">
-          <h2 className="text-headline-md font-headline-md font-bold text-white">
-            Tạo Gian Hàng Mới
-          </h2>
-          <p className="text-body-sm text-orange-100 mt-1">
-            Bắt đầu kinh doanh cùng CT255
+    <AuthShell
+      tone="shop"
+      width="xl"
+      icon="storefront"
+      eyebrow="Kênh người bán"
+      title="Tạo gian hàng mới"
+      subtitle="Bắt đầu kinh doanh cùng CT255"
+      panelTitle="Gian hàng của bạn, khách hàng của bạn"
+      panelDesc="Chỉ mất vài phút để mở gian hàng. Sau khi đăng ký, bạn có thể đăng sản phẩm, thiết lập địa chỉ lấy hàng và bắt đầu bán ngay."
+      panelPoints={[
+        { icon: "timer", text: "Đăng ký nhanh, duyệt hồ sơ minh bạch" },
+        { icon: "bar_chart", text: "Báo cáo doanh thu theo từng đơn hàng" },
+        { icon: "support_agent", text: "Đội ngũ hỗ trợ người bán 24/7" },
+      ]}
+      footer={
+        <>
+          Đã có tài khoản?{" "}
+          <Link
+            to="/nguoi-ban/login"
+            className={`font-semibold underline decoration-2 underline-offset-4 transition-colors ${tone.link}`}
+          >
+            Đăng nhập ngay
+          </Link>
+        </>
+      }
+    >
+      {error && <AuthAlert>{error}</AuthAlert>}
+
+      <form onSubmit={handleSubmit} className="space-y-7">
+        {/* 1. Thông tin gian hàng */}
+        <section className="space-y-4">
+          <AuthSection
+            step="1"
+            tone="shop"
+            title="Thông tin gian hàng"
+            description="Tên và mô tả giúp khách hàng nhận diện gian hàng của bạn."
+          />
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <AuthField label="Tên gian hàng" icon="storefront" required>
+              <input
+                type="text"
+                name="gh_ten"
+                required
+                onChange={handleChange}
+                placeholder="VD: Shop Thời Trang A"
+                className={authInputClass("shop")}
+              />
+            </AuthField>
+
+            <AuthField label="Email đăng nhập" icon="mail" required>
+              <input
+                type="email"
+                name="gh_email"
+                required
+                onChange={handleChange}
+                placeholder="shop@domain.com"
+                autoComplete="email"
+                className={authInputClass("shop")}
+              />
+            </AuthField>
+          </div>
+
+          <AuthField label="Mô tả gian hàng" icon="notes">
+            <textarea
+              name="gh_mota"
+              onChange={handleChange}
+              rows="3"
+              placeholder="Giới thiệu ngắn về sản phẩm và phong cách bán hàng của bạn..."
+              className={`${authInputClass("shop")} resize-none`}
+            ></textarea>
+          </AuthField>
+
+          <AuthFileField
+            tone="shop"
+            label="Ảnh đại diện (Logo)"
+            hint="PNG, JPG · Nên dùng ảnh vuông, không bắt buộc"
+            onChange={(e) => setSelectedFile(e.target.files[0])}
+          />
+        </section>
+
+        {/* 2. Địa chỉ liên hệ */}
+        <section className="space-y-4">
+          <AuthSection
+            step="2"
+            tone="shop"
+            title="Địa chỉ liên hệ"
+            description="Địa chỉ lấy hàng dùng để tính phí và điều phối vận chuyển."
+          />
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <AuthField label="Tỉnh / Thành phố" icon="location_on" required>
+              <select
+                value={selectedTinh}
+                onChange={(e) => {
+                  setSelectedTinh(e.target.value);
+                  setSelectedXa("");
+                }}
+                required
+                className={authInputClass("shop")}
+              >
+                <option value="">-- Chọn Tỉnh/Thành phố --</option>
+                {tinhs.map((tinh, index) => (
+                  <option key={tinh.ma || index} value={tinh.ma}>
+                    {tinh.ten}
+                  </option>
+                ))}
+              </select>
+            </AuthField>
+
+            <AuthField label="Phường / Xã" icon="holiday_village" required>
+              <select
+                value={selectedXa}
+                onChange={(e) => setSelectedXa(e.target.value)}
+                required
+                disabled={!selectedTinh}
+                className={`${authInputClass("shop")} disabled:cursor-not-allowed disabled:opacity-50`}
+              >
+                <option value="">-- Chọn Phường/Xã --</option>
+                {filteredXas.map((xa, index) => (
+                  <option key={xa.ma || index} value={xa.ma}>
+                    {xa.ten}
+                  </option>
+                ))}
+              </select>
+            </AuthField>
+          </div>
+
+          <AuthField label="Số nhà, tên đường" icon="signpost" required>
+            <input
+              type="text"
+              name="dc_mota"
+              required
+              onChange={handleChange}
+              placeholder="VD: 123 Nguyễn Văn Cừ"
+              className={authInputClass("shop")}
+            />
+          </AuthField>
+        </section>
+
+        {/* 3. Bảo mật */}
+        <section className="space-y-4">
+          <AuthSection
+            step="3"
+            tone="shop"
+            title="Bảo mật tài khoản"
+            description="Mật khẩu dùng để đăng nhập vào kênh người bán."
+          />
+
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <AuthField label="Mật khẩu" icon="lock" required>
+              <PasswordInput
+                name="password"
+                required
+                onChange={handleChange}
+                placeholder="••••••••"
+                autoComplete="new-password"
+                className={authInputClass("shop")}
+              />
+            </AuthField>
+
+            <AuthField label="Xác nhận mật khẩu" icon="lock_reset" required>
+              <PasswordInput
+                name="confirmPassword"
+                required
+                onChange={handleChange}
+                placeholder="••••••••"
+                autoComplete="new-password"
+                className={authInputClass("shop")}
+              />
+            </AuthField>
+          </div>
+        </section>
+
+        <div className="border-t border-slate-100 pt-5">
+          <AuthSubmit loading={loading} tone="shop" icon="storefront">
+            Đăng ký gian hàng
+          </AuthSubmit>
+          <p className="mt-3 text-center text-xs leading-relaxed text-slate-500">
+            Bằng việc đăng ký, bạn đồng ý tuân thủ chính sách bán hàng của
+            CT255.
           </p>
         </div>
-
-        <div className="p-8">
-          {error && (
-            <div className="mb-6 p-3 bg-error-container text-on-error-container text-sm rounded-lg flex items-center gap-2 border border-error/20">
-              <span className="material-symbols-outlined text-lg">error</span>
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div>
-              <h3 className="font-bold text-lg mb-4 text-on-surface border-b border-outline-variant pb-2">
-                1. Thông tin Gian hàng
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-label-md font-label-md text-on-surface block mb-1.5">
-                    Tên Gian Hàng <span className="text-error">*</span>
-                  </label>
-                  <input
-                    type="text"
-                    name="gh_ten"
-                    required
-                    onChange={handleChange}
-                    placeholder="VD: Shop Thời Trang A"
-                    className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="text-label-md font-label-md text-on-surface block mb-1.5">
-                    Email đăng nhập <span className="text-error">*</span>
-                  </label>
-                  <input
-                    type="email"
-                    name="gh_email"
-                    required
-                    onChange={handleChange}
-                    placeholder="shop@domain.com"
-                    className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all"
-                  />
-                </div>
-              </div>
-              <div className="mt-4">
-                <label className="text-label-md font-label-md text-on-surface block mb-1.5">
-                  Mô tả gian hàng
-                </label>
-                <textarea
-                  name="gh_mota"
-                  onChange={handleChange}
-                  className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all"
-                  rows="2"
-                ></textarea>
-              </div>
-              <div className="mt-4">
-                <label className="text-label-md font-label-md text-on-surface block mb-1.5">
-                  Ảnh đại diện (Logo)
-                </label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(e) => setSelectedFile(e.target.files[0])}
-                  className="w-full px-3 py-2 bg-surface-container-low border border-outline-variant rounded-lg text-sm file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-orange-50 file:text-orange-600 hover:file:bg-orange-100 transition-all"
-                />
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-bold text-lg mb-4 text-on-surface border-b border-outline-variant pb-2 mt-6">
-                2. Địa chỉ liên hệ
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-label-md font-label-md text-on-surface block mb-1.5">
-                    Tỉnh / Thành phố <span className="text-error">*</span>
-                  </label>
-                  <select
-                    value={selectedTinh}
-                    onChange={(e) => {
-                      setSelectedTinh(e.target.value);
-                      setSelectedXa("");
-                    }}
-                    className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all"
-                    required
-                  >
-                    <option value="">-- Chọn Tỉnh/Thành phố --</option>
-                    {tinhs.map((tinh, index) => (
-                      <option key={tinh.ma || index} value={tinh.ma}>
-                        {tinh.ten}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="text-label-md font-label-md text-on-surface block mb-1.5">
-                    Phường / Xã <span className="text-error">*</span>
-                  </label>
-                  <select
-                    value={selectedXa}
-                    onChange={(e) => setSelectedXa(e.target.value)}
-                    className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all disabled:opacity-50"
-                    required
-                    disabled={!selectedTinh}
-                  >
-                    <option value="">-- Chọn Phường/Xã --</option>
-                    {filteredXas.map((xa, index) => (
-                      <option key={xa.ma || index} value={xa.ma}>
-                        {xa.ten}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-              <div className="mt-4">
-                <label className="text-label-md font-label-md text-on-surface block mb-1.5">
-                  Số nhà, tên đường <span className="text-error">*</span>
-                </label>
-                <input
-                  type="text"
-                  name="dc_mota"
-                  required
-                  onChange={handleChange}
-                  className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all"
-                  placeholder="VD: 123 Nguyễn Văn Cừ"
-                />
-              </div>
-            </div>
-
-            <div>
-              <h3 className="font-bold text-lg mb-4 text-on-surface border-b border-outline-variant pb-2 mt-6">
-                3. Bảo mật
-              </h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="text-label-md font-label-md text-on-surface block mb-1.5">
-                    Mật khẩu <span className="text-error">*</span>
-                  </label>
-                  <PasswordInput
-                    name="password"
-                    required
-                    onChange={handleChange}
-                    placeholder="••••••••"
-                    className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all"
-                  />
-                </div>
-                <div>
-                  <label className="text-label-md font-label-md text-on-surface block mb-1.5">
-                    Xác nhận mật khẩu <span className="text-error">*</span>
-                  </label>
-                  <PasswordInput
-                    name="confirmPassword"
-                    required
-                    onChange={handleChange}
-                    placeholder="••••••••"
-                    className="w-full px-4 py-2.5 bg-surface-container-low border border-outline-variant rounded-lg text-body-md focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex items-center justify-center gap-2 bg-orange-500 hover:bg-orange-600 text-white font-bold py-3.5 rounded-lg transition-all shadow-sm disabled:opacity-50 mt-4"
-            >
-              {loading ? (
-                <>
-                  <span className="material-symbols-outlined animate-spin text-lg">
-                    progress_activity
-                  </span>
-                  Đang xử lý...
-                </>
-              ) : (
-                <>
-                  <span className="material-symbols-outlined text-lg">
-                    how_to_reg
-                  </span>
-                  Đăng Ký Gian Hàng
-                </>
-              )}
-            </button>
-          </form>
-
-          <div className="mt-8 text-center text-body-sm text-on-surface-variant border-t border-outline-variant/50 pt-6">
-            Đã có tài khoản?{" "}
-            <Link
-              to="/nguoi-ban/login"
-              className="text-orange-500 font-semibold hover:text-orange-600 transition-colors underline decoration-orange-500/30 underline-offset-4"
-            >
-              Đăng nhập ngay
-            </Link>
-          </div>
-        </div>
-      </div>
-    </div>
+      </form>
+    </AuthShell>
   );
 };
 
