@@ -9,13 +9,13 @@ import donHangService from "../../services/khachhang/donHangService";
 import trangThaiDonHangService from "../../services/san/trangThaiDonHangService";
 import publicSanPhamService from "../../services/san/publicSanPhamService";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import Avatar from "../../components/common/Avatar";
 import { ChangePasswordForm } from "../../components/account/AccountForms";
 import {
   BankAccountSection,
   BankQRModal,
 } from "../../components/account/BankAccount";
 import { DiaChiNhanHangSection } from "../../components/account/DiaChiNhanHangSection";
-import { toAssetUrl } from "../../utils/accountUtils";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import SanPhamLink from "../../components/common/SanPhamLink";
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
@@ -558,8 +558,10 @@ const ThongTinCaNhan = () => {
         <div className="bg-white rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col overflow-hidden self-start">
           <div className="p-6 flex items-center gap-4 border-b border-[#F1F5F9] bg-[#F8FAFC]">
             <div className="w-14 h-14 rounded-full border-2 border-blue-200 overflow-hidden bg-white p-0.5">
-              <img
-                src={toAssetUrl(profileData.kh_avatar)}
+              <Avatar
+                src={profileData.kh_avatar}
+                role="khachhang"
+                name={profileData.kh_ten}
                 className="w-full h-full object-cover rounded-full"
               />
             </div>
@@ -697,8 +699,10 @@ const ThongTinCaNhan = () => {
                   </div>
                 </div>
                 <div className="flex flex-col items-center border-l border-[#F1F5F9] pl-10 gap-4">
-                  <img
-                    src={toAssetUrl(profileData.kh_avatar)}
+                  <Avatar
+                    src={profileData.kh_avatar}
+                    role="khachhang"
+                    name={profileData.kh_ten}
                     className="w-28 h-28 rounded-full border-4 border-[#F8FAFC] shadow-sm object-cover"
                   />
                   <label className="cursor-pointer border border-[#E2E8F0] px-5 py-2.5 text-sm font-semibold text-[#334155] bg-white hover:bg-[#F8FAFC] rounded-xl shadow-sm transition-colors">
@@ -1186,14 +1190,11 @@ const ThongTinCaNhan = () => {
                         </div>
 
                         <div className="flex items-center gap-4 mb-4">
-                          <img
-                            src={
-                              selectedShopForReview.Shipper_HinhAnh
-                                ? `${BACKEND_URL}${selectedShopForReview.Shipper_HinhAnh}`
-                                : `https://ui-avatars.com/api/?name=${selectedShopForReview.Shipper_Ten}&background=random&color=fff`
-                            }
+                          <Avatar
+                            src={selectedShopForReview.Shipper_HinhAnh}
+                            role="shipper"
+                            name={selectedShopForReview.Shipper_Ten}
                             className="w-12 h-12 rounded-full object-cover border-2 border-white shadow-sm"
-                            alt=""
                           />
                           <div>
                             <p className="font-bold text-[#0F172A]">
@@ -1536,10 +1537,11 @@ const ThongTinCaNhan = () => {
                       key={shop.gh_ma}
                       className="border border-[#E2E8F0] rounded-2xl p-4 flex gap-4 items-center hover:shadow-md transition-shadow bg-white"
                     >
-                      <img
-                        src={toAssetUrl(shop.gh_hinhanh)}
+                      <Avatar
+                        src={shop.gh_hinhanh}
+                        role="shop"
+                        name={shop.gh_ten}
                         className="w-16 h-16 rounded-full object-cover border-2 border-[#F1F5F9]"
-                        alt={shop.gh_ten}
                       />
                       <div className="flex-1 min-w-0">
                         <h3 className="font-bold text-[#0F172A] truncate">

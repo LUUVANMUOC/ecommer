@@ -5,6 +5,7 @@ import { AuthContext } from "../../contexts/AuthContext";
 import gioHangService from "../../services/khachhang/gioHangService";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import Avatar from "../../components/common/Avatar";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
@@ -162,8 +163,13 @@ const GioHang = () => {
             CT255 Shop
           </Link>
           <div className="flex items-center gap-2">
-            <div className="w-8 h-8 rounded-full bg-[#2563EB] text-white flex items-center justify-center text-xs font-bold">
-              {user?.kh_ten?.charAt(0).toUpperCase()}
+            <div className="w-8 h-8 overflow-hidden rounded-full border border-[#E2E8F0] bg-[#F8FAFC]">
+              <Avatar
+                src={user?.kh_avatar}
+                role="khachhang"
+                name={user?.kh_ten}
+                className="h-full w-full object-cover"
+              />
             </div>
             <span className="text-sm font-semibold text-[#0F172A]">
               {user?.kh_ten}

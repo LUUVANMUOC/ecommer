@@ -15,6 +15,7 @@ import gioHangService from "../../services/khachhang/gioHangService";
 import { AuthContext } from "../../contexts/AuthContext";
 import { formatPriceRange } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import Avatar from "../../components/common/Avatar";
 import SiteHeader from "../../components/layout/SiteHeader";
 import SiteFooter from "../../components/layout/SiteFooter";
 
@@ -143,18 +144,12 @@ const ShopCard = ({ shop }) => {
       className="group flex w-[236px] shrink-0 snap-start gap-3 rounded-xl border border-[#E2E8F0] bg-white p-3 transition-all hover:-translate-y-0.5 hover:border-[#2563EB] hover:shadow-md"
     >
       <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full border border-[#E2E8F0] bg-[#F8FAFC]">
-        {shop.gh_hinhanh ? (
-          <img
-            src={imgUrl(shop.gh_hinhanh)}
-            alt={shop.gh_ten}
-            loading="lazy"
-            className="h-full w-full object-cover"
-          />
-        ) : (
-          <span className="material-symbols-outlined text-2xl text-gray-300">
-            storefront
-          </span>
-        )}
+        <Avatar
+          src={shop.gh_hinhanh}
+          role="shop"
+          name={shop.gh_ten}
+          className="h-full w-full object-cover"
+        />
       </div>
 
       <div className="min-w-0">

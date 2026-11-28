@@ -3,6 +3,14 @@ import { useState, useEffect, useMemo } from "react";
 import trangThaiChiTietSanPhamService from "../../services/gianhang/trangThaiChiTietSanPhamService";
 import axiosClient from "../../config/axiosClient";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import {
+  ProductToolbar,
+  ProductGrid,
+  ProductCard,
+  ProductEmptyState,
+  ProductRefreshButton,
+  productSelectClass,
+} from "../../components/product/ProductUI";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
@@ -155,116 +163,107 @@ const DuyetSanPham = () => {
   return (
     <div className="w-full space-y-6 relative">
       {/* HEADER & BỘ LỌC */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-[#E2DED3] flex flex-wrap items-center justify-between gap-4 sticky top-0 z-10">
-        <div>
-          <h1 className="text-2xl font-bold text-[#14201C]">Duyệt Sản Phẩm</h1>
-          <p className="text-sm text-[#7A857F]">
-            Xem xét và phê duyệt các phân loại sản phẩm do người bán gửi lên.
-          </p>
-        </div>
+      <ProductToolbar
+        title="Duyệt Sản Phẩm"
+        subtitle="Xem xét và phê duyệt các phân loại sản phẩm do người bán gửi lên."
+        total={filteredProducts.length}
+        totalLabel="sản phẩm chờ duyệt"
+        actions={<ProductRefreshButton onClick={fetchData} loading={loading} />}
+      >
+        <select
+          value={filterShop}
+          onChange={(e) => setFilterShop(e.target.value)}
+          className={`${productSelectClass} min-w-[160px]`}
+          aria-label="Lọc theo shop"
+        >
+          <option value="">Tất cả Shop</option>
+          {shops.map((shop) => (
+            <option key={shop.gh_ma} value={shop.gh_ma}>
+              {shop.gh_ten}
+            </option>
+          ))}
+        </select>
 
-        <div className="flex items-center gap-3">
-          <select
-            value={filterShop}
-            onChange={(e) => setFilterShop(e.target.value)}
-            className="px-4 py-2 border border-[#E2DED3] rounded-xl text-sm font-medium text-[#3D4A44] outline-none hover:border-[#F2A93B] bg-white min-w-[160px]"
-          >
-            <option value="">Tất cả Shop</option>
-            {shops.map((shop) => (
-              <option key={shop.gh_ma} value={shop.gh_ma}>
-                {shop.gh_ten}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={filterCategory}
-            onChange={(e) => setFilterCategory(e.target.value)}
-            className="px-4 py-2 border border-[#E2DED3] rounded-xl text-sm font-medium text-[#3D4A44] outline-none hover:border-[#F2A93B] bg-white min-w-[160px]"
-          >
-            <option value="">Tất cả Ngành hàng</option>
-            {categories.map((cat) => (
-              <option key={cat.nh_ma} value={cat.nh_ma}>
-                {cat.nh_ten}
-              </option>
-            ))}
-          </select>
-
-          <button
-            onClick={fetchData}
-            className="inline-flex items-center justify-center w-10 h-10 rounded-xl border border-[#D9CFC2] bg-white text-[#3D4A44] hover:bg-[#F7F5F0] transition-colors"
-            title="Làm mới"
-          >
-            <span className="material-symbols-outlined text-[20px]">
-              refresh
-            </span>
-          </button>
-        </div>
-      </div>
+        <select
+          value={filterCategory}
+          onChange={(e) => setFilterCategory(e.target.value)}
+          className={`${productSelectClass} min-w-[160px]`}
+          aria-label="Lọc theo ngành hàng"
+        >
+          <option value="">Tất cả Ngành hàng</option>
+          {categories.map((cat) => (
+            <option key={cat.nh_ma} value={cat.nh_ma}>
+              {cat.nh_ten}
+            </option>
+          ))}
+        </select>
+      </ProductToolbar>
 
       {/* DANH SÁCH SẢN PHẨM */}
-      {loading ? (
-        <div className="py-20 text-center text-[#7A857F]">
-          Đang tải dữ liệu...
-        </div>
-      ) : filteredProducts.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#E2DED3] bg-[#FBFAF7] py-16 text-center">
-          <span className="material-symbols-outlined text-[48px] text-[#C9C3B5]">
-            inbox
-          </span>
-          <p className="mt-2 text-[#5B6661]">
-            Không có sản phẩm nào đang chờ duyệt phù hợp với bộ lọc.
-          </p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-          {filteredProducts.map((product) => {
-            const firstVariant = product.variants[0];
-            const coverImg = firstVariant?.images?.[0]?.hasp_link;
+      <ProductGrid
+        loading={loading}
+        isEmpty={filteredProducts.length === 0}
+        skeletonCount={8}
+        empty={
+          <ProductEmptyState
+            icon="inbox"
+            title="Không có sản phẩm nào đang chờ duyệt phù hợp với bộ lọc."
+            hint="Thử đổi Shop hoặc Ngành hàng để xem thêm."
+          />
+        }
+      >
+        {filteredProducts.map((product) => {
+          const firstVariant = product.variants[0];
+          const coverImg = firstVariant?.images?.[0]?.hasp_link;
+          const nganhHang = [
+            ...new Set(product.variants.map((v) => v.nh_ten).filter(Boolean)),
+          ];
+          const prices = product.variants
+            .map((v) => Number(v.ctsp_gianban))
+            .filter((n) => Number.isFinite(n) && n > 0);
+          const giaThap = prices.length ? Math.min(...prices) : null;
+          const giaCao = prices.length ? Math.max(...prices) : null;
+          const price =
+            giaThap === null
+              ? "Chưa có giá"
+              : giaThap === giaCao
+                ? formatVND(giaThap)
+                : `${formatVND(giaThap)} – ${formatVND(giaCao)}`;
 
-            return (
-              <div
-                key={product.sp_ma}
-                className="bg-white rounded-2xl border border-[#E2DED3] shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col group"
-              >
-                <div className="aspect-square bg-[#FBFAF7] relative overflow-hidden flex items-center justify-center p-4">
-                  {coverImg ? (
-                    <img
-                      src={imgUrl(coverImg)}
-                      alt={product.sp_ten}
-                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <span className="material-symbols-outlined text-5xl text-[#C9C3B5]">
-                      image
-                    </span>
-                  )}
-                  <div className="absolute top-3 left-3 bg-yellow-100 text-yellow-800 text-[11px] font-bold px-2 py-1 rounded shadow-sm">
-                    {product.variants.length} phân loại chờ
-                  </div>
-                </div>
-                <div className="p-4 flex-1 flex flex-col">
-                  <h3 className="font-bold text-[#14201C] line-clamp-2 leading-tight group-hover:text-[#F2A93B] transition-colors">
-                    {product.sp_ten}
-                  </h3>
-                  <p className="text-sm text-[#7A857F] mt-1 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">
-                      storefront
-                    </span>
-                    {product.gh_ten}
-                  </p>
-                  <button
-                    onClick={() => setSelectedProduct(product)}
-                    className="mt-4 w-full py-2 bg-[#14201C] text-white rounded-xl text-sm font-semibold hover:bg-[#1E3A34] transition-colors"
-                  >
-                    Xem chi tiết & Duyệt
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+          return (
+            <ProductCard
+              key={product.sp_ma}
+              image={coverImg ? imgUrl(coverImg) : ""}
+              alt={product.sp_ten}
+              code={product.sp_ma}
+              badges={[
+                {
+                  label: `${product.variants.length} phân loại chờ`,
+                  tone: "yellow",
+                },
+              ]}
+              title={product.sp_ten}
+              shop={product.gh_ten}
+              price={price}
+              chips={nganhHang.slice(0, 2).map((ten) => ({
+                icon: "category",
+                label: ten,
+                tone: "green",
+              }))}
+              onClick={() => setSelectedProduct(product)}
+              footer={
+                <button
+                  type="button"
+                  onClick={() => setSelectedProduct(product)}
+                  className="w-full rounded-xl bg-[#14201C] py-2 text-sm font-semibold text-white transition-colors hover:bg-[#1E3A34]"
+                >
+                  Xem chi tiết &amp; Duyệt
+                </button>
+              }
+            />
+          );
+        })}
+      </ProductGrid>
 
       {/* 🟢 MODAL CHI TIẾT SẢN PHẨM (Cột ảnh to hơn, click để phóng to) */}
       {selectedProduct && (

@@ -3,7 +3,12 @@
 export const BACKEND_URL =
   import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
-export const toAssetUrl = (path) => (path ? `${BACKEND_URL}${path}` : "");
+export const toAssetUrl = (path) => {
+  if (!path) return "";
+  // Ảnh đã là URL tuyệt đối hoặc blob/data (xem trước khi upload) thì giữ nguyên
+  if (/^(https?:|data:|blob:)/i.test(path)) return path;
+  return `${BACKEND_URL}${path.startsWith("/") ? "" : "/"}${path}`;
+};
 
 export const removeVietnameseTones = (str) => {
   if (!str) return "";

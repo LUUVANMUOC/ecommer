@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Đơn vị vận chuyển">
+  <defs>
+    <clipPath id="avatar-dvvc-clip">
+      <circle cx="64" cy="64" r="64" />
+    </clipPath>
+  </defs>
+  <circle cx="64" cy="64" r="64" fill="#ECEAFE" />
+  <g clip-path="url(#avatar-dvvc-clip)">
+    <circle cx="64" cy="47" r="21" fill="#5B4BC4" />
+    <path d="M24 124c0-24 17.9-42 40-42s40 18 40 42v4H24z" fill="#5B4BC4" />
+  </g>
+  <g transform="translate(101 101)">
+    <circle cx="0" cy="0" r="19" fill="#ffffff" />
+    <path d="M-9 -6h11v11H-9z" fill="#5B4BC4" />
+    <path d="M2 -3h4l3 4v4H2z" fill="#5B4BC4" />
+    <circle cx="-5" cy="6.5" r="2.2" fill="#3F3399" />
+    <circle cx="6" cy="6.5" r="2.2" fill="#3F3399" />
+  </g>
+</svg>

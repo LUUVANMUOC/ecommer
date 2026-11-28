@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Shipper">
+  <defs>
+    <clipPath id="avatar-shipper-clip">
+      <circle cx="64" cy="64" r="64" />
+    </clipPath>
+  </defs>
+  <circle cx="64" cy="64" r="64" fill="#FFF1E3" />
+  <g clip-path="url(#avatar-shipper-clip)">
+    <circle cx="64" cy="48" r="21" fill="#E07A1F" />
+    <path d="M24 124c0-24 17.9-42 40-42s40 18 40 42v4H24z" fill="#E07A1F" />
+    <path d="M43 46a21 21 0 0 1 42 0z" fill="#B85C0C" />
+    <path d="M41 46h46" stroke="#B85C0C" stroke-width="5" stroke-linecap="round" />
+  </g>
+  <g transform="translate(101 101)">
+    <circle cx="0" cy="0" r="19" fill="#ffffff" />
+    <path d="M-8 -6h10v12h-10z" fill="#E07A1F" />
+    <path d="M2 -3h4l3 4v5H2z" fill="#E07A1F" />
+    <circle cx="-4" cy="7" r="2" fill="#B85C0C" />
+    <circle cx="6" cy="7" r="2" fill="#B85C0C" />
+  </g>
+</svg>

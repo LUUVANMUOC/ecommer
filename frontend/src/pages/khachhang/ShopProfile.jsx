@@ -22,6 +22,7 @@ import gioHangService from "../../services/khachhang/gioHangService";
 import { AuthContext } from "../../contexts/AuthContext";
 import { formatPriceRange } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import Avatar from "../../components/common/Avatar";
 import SiteHeader from "../../components/layout/SiteHeader";
 import SiteFooter from "../../components/layout/SiteFooter";
 import CustomerVoucherCard from "../../components/common/Voucher/CustomerVoucherCard";
@@ -671,13 +672,10 @@ const ShopProfile = () => {
           <div className="relative z-10 flex flex-col items-center justify-between gap-6 md:flex-row">
             <div className="flex flex-col items-center gap-6 text-center md:flex-row md:text-left">
               <div className="h-24 w-24 shrink-0 overflow-hidden rounded-full border-[5px] border-blue-50 bg-white shadow-sm md:h-28 md:w-28">
-                <img
-                  src={
-                    shopInfo.gh_hinhanh
-                      ? imgUrl(shopInfo.gh_hinhanh)
-                      : "https://placehold.co/150x150"
-                  }
-                  alt={shopInfo.gh_ten}
+                <Avatar
+                  src={shopInfo.gh_hinhanh}
+                  role="shop"
+                  name={shopInfo.gh_ten}
                   className="h-full w-full object-cover"
                 />
               </div>

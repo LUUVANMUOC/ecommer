@@ -3,8 +3,8 @@ import { AuthContext } from "../../contexts/AuthContext";
 import axiosClient from "../../config/axiosClient";
 import shipperService from "../../services/dvvc/shipperService";
 import khoService from "../../services/dvvc/dvvcKhoService";
-import { toAssetUrl } from "../../utils/accountUtils";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import Avatar from "../../components/common/Avatar";
 import useLoaiShipper from "../../hooks/useLoaiShipper";
 
 const EMPTY_FORM = {
@@ -362,15 +362,11 @@ const QuanLyShipper = () => {
                       </span>
                     </td>
                     <td className="p-4 text-center">
-                      <img
-                        src={toAssetUrl(sp.Shipper_HinhAnh)}
+                      <Avatar
+                        src={sp.Shipper_HinhAnh}
+                        role="shipper"
+                        name={sp.Shipper_Ten}
                         className="w-11 h-11 rounded-full object-cover border-2 border-white shadow-sm ring-1 ring-[#E2E8F0] mx-auto"
-                        onError={(e) =>
-                          (e.target.src =
-                            "https://ui-avatars.com/api/?name=" +
-                            sp.Shipper_Ten +
-                            "&background=random&color=fff")
-                        }
                       />
                     </td>
                     <td className="p-4">

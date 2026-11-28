@@ -2,7 +2,7 @@ import { useState, useEffect, useContext, useCallback } from "react";
 import { AuthContext } from "../../contexts/AuthContext";
 import vanChuyenShopService from "../../services/gianhang/vanChuyenShopService";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
-import { toAssetUrl } from "../../utils/accountUtils";
+import Avatar from "../../components/common/Avatar";
 
 const QuanLyVanChuyen = () => {
   const { user } = useContext(AuthContext);
@@ -138,18 +138,11 @@ const QuanLyVanChuyen = () => {
 
                 {/* Logo ĐVVC */}
                 <div className="w-20 h-20 rounded-full border border-[#E2E8F0] overflow-hidden bg-white mb-4 p-1">
-                  <img
-                    src={
-                      dvvc.DVVC_HinhAnh
-                        ? toAssetUrl(dvvc.DVVC_HinhAnh)
-                        : `https://ui-avatars.com/api/?name=${encodeURIComponent(dvvc.DVVC_Ten)}&background=random&color=fff&size=150`
-                    }
-                    alt={dvvc.DVVC_Ten}
+                  <Avatar
+                    src={dvvc.DVVC_HinhAnh}
+                    role="dvvc"
+                    name={dvvc.DVVC_Ten}
                     className="w-full h-full object-cover rounded-full"
-                    onError={(e) => {
-                      e.target.onerror = null;
-                      e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(dvvc.DVVC_Ten)}&background=random&color=fff&size=150`;
-                    }}
                   />
                 </div>
 

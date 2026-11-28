@@ -4,6 +4,7 @@ import { AuthContext } from "../../contexts/AuthContext";
 import axiosClient from "../../config/axiosClient";
 import sanThuongMaiService from "../../services/san/sanThuongMaiService";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import Avatar from "../../components/common/Avatar";
 import { ChangePasswordForm } from "../../components/account/AccountForms";
 import {
   BankAccountSection,
@@ -199,8 +200,6 @@ const ThongTinSan = () => {
     { id: "doi-mat-khau", icon: "lock", label: "Đổi Mật Khẩu" },
   ];
 
-  const avatarLetter = profileData.STMDT_Ten?.charAt(0).toUpperCase() || "S";
-
   return (
     <div className="min-h-screen bg-[#F8FAFC] pb-16 font-sans">
       {/* ... (Phần Header giữ nguyên) ... */}
@@ -225,8 +224,13 @@ const ThongTinSan = () => {
         {/* SIDEBAR TRÁI */}
         <div className="bg-white rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col overflow-hidden self-start">
           <div className="p-6 flex items-center gap-4 border-b border-[#F1F5F9] bg-[#F8FAFC]">
-            <div className="w-14 h-14 rounded-full bg-[#2563EB] text-white flex items-center justify-center text-xl font-bold shadow-sm">
-              {avatarLetter}
+            <div className="w-14 h-14 rounded-full border-2 border-blue-200 overflow-hidden bg-white p-0.5">
+              <Avatar
+                src={profileData.STMDT_HinhAnh}
+                role="admin"
+                name={profileData.STMDT_Ten}
+                className="w-full h-full object-cover rounded-full"
+              />
             </div>
             <div>
               <p className="font-bold text-[#0F172A] line-clamp-1">

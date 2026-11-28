@@ -2,7 +2,7 @@ import { useState, useContext } from "react";
 import { AuthContext } from "../../contexts/AuthContext";
 import shipperAuthService from "../../services/shipper/authService";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
-import { toAssetUrl } from "../../utils/accountUtils";
+import Avatar from "../../components/common/Avatar";
 
 const TaiKhoan = () => {
   const { user } = useContext(AuthContext);
@@ -75,17 +75,12 @@ const TaiKhoan = () => {
         <div className="lg:col-span-1 bg-white rounded-2xl shadow-sm border border-[#E2E8F0] p-6 h-fit">
           <div className="flex flex-col items-center text-center">
             <div className="w-24 h-24 rounded-full border-4 border-white shadow-md overflow-hidden bg-gray-100 mb-4">
-              {user?.shipper_hinhanh ? (
-                <img
-                  src={toAssetUrl(user.shipper_hinhanh)}
-                  alt="Avatar"
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <span className="material-symbols-outlined text-5xl text-gray-400 mt-5">
-                  person
-                </span>
-              )}
+              <Avatar
+                src={user?.shipper_hinhanh}
+                role="shipper"
+                name={user?.shipper_ten}
+                className="w-full h-full object-cover"
+              />
             </div>
             <h2 className="text-xl font-bold text-[#0F172A]">
               {user?.shipper_ten}

@@ -3,21 +3,26 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import sanPhamService from "../../services/gianhang/sanPhamService";
 import chiTietSanPhamService from "../../services/gianhang/chiTietSanPhamService";
-import CrudToolbar from "../../components/common/Crud/CrudToolbar";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
 import {
   FilterBar,
-  StatCell,
   SanPhamFormDrawer,
   formatPriceRange,
   getCurrentShopId,
   loadProductOptions,
 } from "../../components/shop/SanPhamShared";
+import {
+  ProductToolbar,
+  ProductGrid,
+  ProductCard,
+  ProductEmptyState,
+  ProductAddButton,
+  PaginationBar,
+} from "../../components/product/ProductUI";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 const imgUrl = (link) => (link ? `${BACKEND_URL}${link}` : "");
 
-const PAGE_SIZES = [12, 24, 48, 96];
 const SEARCH_DEBOUNCE = 350; // ms
 const SLIDER_DEBOUNCE = 400; // ms — ngừng kéo mới gọi API
 
@@ -45,6 +50,13 @@ const STATUS_TTCTSP = {
   TTCTSP0002: { label: "Đang bán", color: STATUS_MAP.active.color },
   TTCTSP0003: { label: "Bị đình chỉ", color: STATUS_MAP.suspended.color },
   DEFAULT: { label: "Chưa gửi duyệt", color: STATUS_MAP.draft.color },
+};
+
+const STATUS_TONE = {
+  active: "green",
+  pending: "yellow",
+  suspended: "red",
+  draft: "gray",
 };
 
 const fmtSo = (v) => {
@@ -100,34 +112,6 @@ const SORT_OPTIONS = [
 
 // null = không lọc (thanh trượt đang ở hết dải)
 const EMPTY_APPLIED = { mua: null, xem: null, gia: null, sao: null };
-
-/* Danh sách số trang có dấu "..." */
-const buildPageList = (page, totalPages) => {
-  if (totalPages <= 7) {
-    return Array.from({ length: totalPages }, (_, i) => i + 1);
-  }
-  const list = [1];
-  const start = Math.max(2, page - 1);
-  const end = Math.min(totalPages - 1, page + 1);
-  if (start > 2) list.push("...");
-  for (let p = start; p <= end; p += 1) list.push(p);
-  if (end < totalPages - 1) list.push("...");
-  list.push(totalPages);
-  return list;
-};
-
-const CardSkeleton = () => (
-  <div className="flex animate-pulse flex-col overflow-hidden rounded-2xl border border-[#E2DED3] bg-white shadow-sm">
-    <div className="h-40 bg-[#F1EEE6]" />
-    <div className="flex flex-1 flex-col gap-3 p-5">
-      <div className="h-4 w-3/4 rounded bg-[#EFEBE2]" />
-      <div className="h-3 w-full rounded bg-[#F4F1EA]" />
-      <div className="h-3 w-2/3 rounded bg-[#F4F1EA]" />
-      <div className="h-5 w-1/2 rounded bg-[#EFEBE2]" />
-      <div className="mt-auto h-9 w-full rounded-xl bg-[#F4F1EA]" />
-    </div>
-  </div>
-);
 
 /* Thanh trượt 2 đầu (không cần thư viện ngoài) */
 const RangeSlider = ({ min, max, step, value, onChange, format }) => {
@@ -601,11 +585,6 @@ const QuanLySanPham = () => {
     setPage(1);
   };
 
-  const handleLimitChange = (e) => {
-    setLimit(Number(e.target.value));
-    setPage(1);
-  };
-
   const handleSliderChange = (key, value) => {
     setSlider((prev) => (prev ? { ...prev, [key]: value } : prev));
   };
@@ -643,13 +622,6 @@ const QuanLySanPham = () => {
     },
   ];
 
-  const pageList = useMemo(
-    () => buildPageList(page, totalPages),
-    [page, totalPages],
-  );
-  const tuDong = total === 0 ? 0 : (page - 1) * limit + 1;
-  const denDong = Math.min(page * limit, total);
-
   const advancedCount = Object.values(applied).filter(Boolean).length;
   const hasAnyFilter = Boolean(
     q ||
@@ -668,15 +640,15 @@ const QuanLySanPham = () => {
 
   return (
     <div className="w-full space-y-6">
-      <CrudToolbar
+      <ProductToolbar
         title="Quản lý sản phẩm"
         subtitle="Bấm vào thẻ sản phẩm để xem chi tiết và quản lý phân loại."
-        totalItems={total}
-        onAdd={openAddDrawer}
-        addButtonText="Thêm sản phẩm"
+        total={total}
+        totalLabel="sản phẩm"
         searchPlaceholder="Tìm theo mã, tên sản phẩm hoặc tên phân loại..."
         searchValue={searchInput}
         onSearchChange={setSearchInput}
+        actions={<ProductAddButton onClick={openAddDrawer} label="Thêm sản phẩm" />}
       />
 
       <FilterBar
@@ -798,295 +770,183 @@ const QuanLySanPham = () => {
       </div>
 
       {/* ===== Lưới sản phẩm ===== */}
-      <div
-        aria-busy={loading}
-        className={`grid grid-cols-1 gap-6 transition-opacity duration-200 md:grid-cols-2 xl:grid-cols-3 ${
-          loading && rows.length > 0 ? "opacity-60" : ""
-        }`}
-      >
-        {loading && rows.length === 0 ? (
-          Array.from({ length: Math.min(limit, 6) }, (_, i) => (
-            <CardSkeleton key={`skeleton-${i}`} />
-          ))
-        ) : rows.length === 0 ? (
-          <div className="col-span-full flex flex-col items-center gap-2 py-14 text-center">
-            <span className="material-symbols-outlined text-[44px] text-[#C9C3B5]">
-              inventory_2
-            </span>
-            <p className="text-sm font-semibold text-[#3D4A44]">
-              {hasAnyFilter
+      <ProductGrid
+        loading={loading}
+        isEmpty={rows.length === 0}
+        skeletonCount={Math.min(limit, 6)}
+        empty={
+          <ProductEmptyState
+            icon="inventory_2"
+            title={
+              hasAnyFilter
                 ? "Không có sản phẩm nào phù hợp với bộ lọc."
-                : "Gian hàng chưa có sản phẩm nào."}
-            </p>
-            {hasAnyFilter && (
-              <button
-                type="button"
-                onClick={() => {
-                  setSearchInput("");
-                  handleClearFilter();
-                }}
-                className="mt-1 text-sm font-semibold text-[#8A5A0B] underline-offset-2 hover:underline"
-              >
-                Xóa bộ lọc & từ khóa
-              </button>
-            )}
-          </div>
-        ) : (
-          rows.map((sp) => {
-            const cover = covers[sp.sp_ma] || {};
-            const statusCfg = STATUS_MAP[cover.status] || STATUS_MAP.draft;
+                : "Gian hàng chưa có sản phẩm nào."
+            }
+            hint={
+              hasAnyFilter
+                ? "Thử đổi từ khóa hoặc xóa bớt bộ lọc."
+                : "Bấm “Thêm sản phẩm” để tạo sản phẩm đầu tiên."
+            }
+            action={
+              hasAnyFilter ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSearchInput("");
+                    handleClearFilter();
+                  }}
+                  className="mt-1 text-sm font-semibold text-[#8A5A0B] underline-offset-2 hover:underline"
+                >
+                  Xóa bộ lọc &amp; từ khóa
+                </button>
+              ) : null
+            }
+          />
+        }
+      >
+        {rows.map((sp) => {
+          const cover = covers[sp.sp_ma] || {};
+          const statusCfg = STATUS_MAP[cover.status] || STATUS_MAP.draft;
 
-            return (
-              <article
-                key={sp.sp_ma}
-                onClick={() =>
-                  navigate(`/nguoi-ban/quan-ly-san-pham/${sp.sp_ma}`)
-                }
-                className="group flex cursor-pointer flex-col overflow-hidden rounded-2xl border border-[#E2DED3] bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-[#F2A93B] hover:shadow-lg"
-              >
-                <div className="relative flex h-40 items-center justify-center overflow-hidden bg-gradient-to-br from-[#F7F5F0] to-[#EFE9DC]">
-                  {cover.url ? (
-                    <img
-                      src={cover.url}
-                      alt={sp.sp_ten}
-                      loading="lazy"
-                      decoding="async"
-                      className="h-full w-full object-contain p-4 transition-transform duration-300 group-hover:scale-105"
-                    />
-                  ) : (
-                    <span className="material-symbols-outlined text-[44px] text-[#B8AE98]">
-                      image
-                    </span>
-                  )}
-
-                  <span className="absolute left-3 top-3 rounded-full bg-white/90 px-2.5 py-0.5 font-mono text-[11px] font-semibold text-[#3D4A44] shadow-sm">
-                    {sp.sp_ma}
-                  </span>
-
-                  <div className="absolute right-3 top-3 flex gap-1.5 opacity-100 transition-opacity md:opacity-0 md:group-hover:opacity-100">
-                    <button
-                      onClick={(e) => openEditDrawer(e, sp)}
-                      title="Sửa sản phẩm"
-                      className="grid h-8 w-8 place-items-center rounded-full bg-white text-[#3D4A44] shadow-sm transition-colors hover:bg-[#14201C] hover:text-white"
-                    >
-                      <span className="material-symbols-outlined text-[17px]">
-                        edit
-                      </span>
-                    </button>
-                    <button
-                      onClick={(e) => handleDelete(e, sp)}
-                      title="Xóa sản phẩm"
-                      className="grid h-8 w-8 place-items-center rounded-full bg-white text-[#B42318] shadow-sm transition-colors hover:bg-[#B42318] hover:text-white"
-                    >
-                      <span className="material-symbols-outlined text-[17px]">
-                        delete
-                      </span>
-                    </button>
-                  </div>
-
-                  <span
-                    className={`absolute bottom-3 left-3 rounded-full border px-2.5 py-0.5 text-[11px] font-bold ${statusCfg.color}`}
+          return (
+            <ProductCard
+              key={sp.sp_ma}
+              image={cover.url}
+              alt={sp.sp_ten}
+              code={sp.sp_ma}
+              badges={[
+                {
+                  label: statusCfg.label,
+                  tone: STATUS_TONE[cover.status] || "gray",
+                },
+              ]}
+              title={sp.sp_ten}
+              description={sp.sp_mota || "Không có mô tả"}
+              price={formatPriceRange(cover)}
+              chips={[
+                {
+                  icon: "sell",
+                  label: sp.th_ten || "Chưa có thương hiệu",
+                  tone: "gold",
+                },
+                {
+                  icon: "category",
+                  label: sp.dmsp_ten || "Chưa có danh mục",
+                  tone: "green",
+                },
+                ...(cover.soPhanLoai > 0
+                  ? [
+                      {
+                        icon: "layers",
+                        label: `${cover.soPhanLoai} phân loại`,
+                        tone: "gray",
+                      },
+                    ]
+                  : []),
+              ]}
+              stats={[
+                {
+                  icon: "visibility",
+                  iconClass: "text-[#5B6661]",
+                  value: fmtSo(sp.sp_luotxem),
+                  label: "Lượt xem",
+                },
+                {
+                  icon: "favorite",
+                  iconClass: "text-[#C0446B]",
+                  value: fmtSo(sp.sp_luotthich),
+                  label: "Yêu thích",
+                },
+                {
+                  icon: "shopping_bag",
+                  iconClass: "text-[#2F7A5F]",
+                  value: fmtSo(sp.sp_luotmua),
+                  label: "Đã bán",
+                },
+                {
+                  icon: "star",
+                  iconClass: "text-[#F2A93B]",
+                  value: fmtRating(sp.sp_diemdanhgiatrungbinh),
+                  label: "Đánh giá",
+                },
+              ]}
+              footerNote={
+                cover.duyetLuc
+                  ? {
+                      icon: "verified",
+                      label: `Duyệt: ${fmtDate(cover.duyetLuc)}`,
+                    }
+                  : null
+              }
+              onClick={() =>
+                navigate(`/nguoi-ban/quan-ly-san-pham/${sp.sp_ma}`)
+              }
+              actions={
+                <>
+                  <button
+                    onClick={(e) => openEditDrawer(e, sp)}
+                    title="Sửa sản phẩm"
+                    className="grid h-8 w-8 place-items-center rounded-full bg-white text-[#3D4A44] shadow-sm transition-colors hover:bg-[#14201C] hover:text-white"
                   >
-                    {statusCfg.label}
-                  </span>
-                </div>
-
-                <div className="flex flex-1 flex-col p-5">
-                  <h3 className="line-clamp-1 text-base font-bold text-[#14201C] transition-colors group-hover:text-[#F2A93B]">
-                    {sp.sp_ten}
-                  </h3>
-                  <p className="mt-1 line-clamp-2 min-h-[2.5rem] text-sm text-[#5B6661]">
-                    {sp.sp_mota || "Không có mô tả"}
-                  </p>
-
-                  <p className="mt-3 text-base font-bold tabular-nums text-[#B42318]">
-                    {formatPriceRange(cover)}
-                  </p>
-
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[#FDF3E1] px-2.5 py-0.5 text-xs font-medium text-[#8A5A0B]">
-                      <span className="material-symbols-outlined text-[13px]">
-                        sell
-                      </span>
-                      {sp.th_ten || "Chưa có thương hiệu"}
+                    <span className="material-symbols-outlined text-[17px]">
+                      edit
                     </span>
-                    <span className="inline-flex items-center gap-1 rounded-full bg-[#EEF3F1] px-2.5 py-0.5 text-xs font-medium text-[#2F5D50]">
-                      <span className="material-symbols-outlined text-[13px]">
-                        category
-                      </span>
-                      {sp.dmsp_ten || "Chưa có danh mục"}
+                  </button>
+                  <button
+                    onClick={(e) => handleDelete(e, sp)}
+                    title="Xóa sản phẩm"
+                    className="grid h-8 w-8 place-items-center rounded-full bg-white text-[#B42318] shadow-sm transition-colors hover:bg-[#B42318] hover:text-white"
+                  >
+                    <span className="material-symbols-outlined text-[17px]">
+                      delete
                     </span>
-                    {cover.soPhanLoai > 0 && (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[#F1EEE6] px-2.5 py-0.5 text-xs font-medium text-[#5B6661]">
-                        <span className="material-symbols-outlined text-[13px]">
-                          layers
-                        </span>
-                        {cover.soPhanLoai} phân loại
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="mt-4 flex gap-2">
-                    <button
-                      onClick={(e) => handleOpenVariants(e, sp)}
-                      className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-[#F2A93B] py-2 text-sm font-bold text-white transition-colors hover:bg-[#d9942e]"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">
-                        view_list
-                      </span>
-                      Xem Phân Loại
-                    </button>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        navigate(`/nguoi-ban/quan-ly-san-pham/${sp.sp_ma}`);
-                      }}
-                      className="rounded-xl bg-gray-100 px-3 py-2 text-sm font-bold text-gray-700 transition-colors hover:bg-gray-200"
-                      title="Quản lý chi tiết"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">
-                        settings
-                      </span>
-                    </button>
-                  </div>
-
-                  <div className="mt-4 grid grid-cols-4 divide-x divide-[#EFEBE2] overflow-hidden rounded-xl border border-[#EFEBE2] bg-[#FBFAF7]">
-                    <StatCell
-                      icon="visibility"
-                      iconClass="text-[#5B6661]"
-                      value={fmtSo(sp.sp_luotxem)}
-                      label="Lượt xem"
-                    />
-                    <StatCell
-                      icon="favorite"
-                      iconClass="text-[#C0446B]"
-                      value={fmtSo(sp.sp_luotthich)}
-                      label="Yêu thích"
-                    />
-                    <StatCell
-                      icon="shopping_bag"
-                      iconClass="text-[#2F7A5F]"
-                      value={fmtSo(sp.sp_luotmua)}
-                      label="Đã bán"
-                    />
-                    <StatCell
-                      icon="star"
-                      iconClass="text-[#F2A93B]"
-                      value={fmtRating(sp.sp_diemdanhgiatrungbinh)}
-                      label="Đánh giá"
-                    />
-                  </div>
-
-                  {cover.duyetLuc && (
-                    <p className="mt-3 flex items-center gap-1 text-[11px] font-medium text-[#7A857F]">
-                      <span className="material-symbols-outlined text-[13px]">
-                        verified
-                      </span>
-                      Duyệt: {fmtDate(cover.duyetLuc)}
-                    </p>
-                  )}
-                </div>
-              </article>
-            );
-          })
-        )}
-      </div>
+                  </button>
+                </>
+              }
+              footer={
+                <>
+                  <button
+                    onClick={(e) => handleOpenVariants(e, sp)}
+                    className="flex flex-1 items-center justify-center gap-1 rounded-xl bg-[#F2A93B] py-2 text-sm font-bold text-white transition-colors hover:bg-[#d9942e]"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">
+                      view_list
+                    </span>
+                    Xem Phân Loại
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/nguoi-ban/quan-ly-san-pham/${sp.sp_ma}`);
+                    }}
+                    className="rounded-xl bg-gray-100 px-3 py-2 text-sm font-bold text-gray-700 transition-colors hover:bg-gray-200"
+                    title="Quản lý chi tiết"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">
+                      settings
+                    </span>
+                  </button>
+                </>
+              }
+            />
+          );
+        })}
+      </ProductGrid>
 
       {/* ===== Phân trang ===== */}
-      {total > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#E2DED3] bg-white px-4 py-3 shadow-sm">
-          <div className="flex flex-wrap items-center gap-2 text-sm text-[#5B6661]">
-            <span>Hiển thị</span>
-            <strong className="tabular-nums text-[#14201C]">
-              {tuDong}–{denDong}
-            </strong>
-            <span>trong</span>
-            <strong className="tabular-nums text-[#14201C]">{total}</strong>
-            <span>sản phẩm</span>
-
-            <span className="mx-1 h-4 w-px bg-[#E2DED3]" />
-
-            <label className="flex items-center gap-1.5">
-              <span>Mỗi trang</span>
-              <select
-                value={limit}
-                onChange={handleLimitChange}
-                className="rounded-lg border border-[#D9D4C7] bg-[#FBFAF7] px-2 py-1.5 text-sm text-[#14201C] outline-none focus:border-[#F2A93B] focus:ring-2 focus:ring-[#F2A93B]/20"
-              >
-                {PAGE_SIZES.map((n) => (
-                  <option key={n} value={n}>
-                    {n}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <button
-              type="button"
-              onClick={fetchPage}
-              disabled={loading}
-              title="Tải lại trang hiện tại"
-              className="ml-1 grid h-8 w-8 place-items-center rounded-lg border border-[#D9D4C7] text-[#5B6661] transition-colors hover:bg-[#FBFAF7] disabled:opacity-50"
-            >
-              <span
-                className={`material-symbols-outlined text-[18px] ${
-                  loading ? "animate-spin" : ""
-                }`}
-              >
-                refresh
-              </span>
-            </button>
-          </div>
-
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
-              disabled={page <= 1 || loading}
-              className="grid h-8 w-8 place-items-center rounded-lg border border-[#D9D4C7] text-[#3D4A44] transition-colors hover:bg-[#FBFAF7] disabled:cursor-not-allowed disabled:opacity-40"
-              title="Trang trước"
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                chevron_left
-              </span>
-            </button>
-
-            {pageList.map((p, i) =>
-              p === "..." ? (
-                <span key={`dots-${i}`} className="px-1 text-sm text-[#9AA39E]">
-                  …
-                </span>
-              ) : (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => setPage(p)}
-                  disabled={loading}
-                  className={`h-8 min-w-[32px] rounded-lg border px-2 text-sm font-semibold tabular-nums transition-colors disabled:opacity-60 ${
-                    p === page
-                      ? "border-[#14201C] bg-[#14201C] text-white"
-                      : "border-[#D9D4C7] bg-white text-[#3D4A44] hover:border-[#14201C]/40 hover:bg-[#FBFAF7]"
-                  }`}
-                >
-                  {p}
-                </button>
-              ),
-            )}
-
-            <button
-              type="button"
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              disabled={page >= totalPages || loading}
-              className="grid h-8 w-8 place-items-center rounded-lg border border-[#D9D4C7] text-[#3D4A44] transition-colors hover:bg-[#FBFAF7] disabled:cursor-not-allowed disabled:opacity-40"
-              title="Trang sau"
-            >
-              <span className="material-symbols-outlined text-[18px]">
-                chevron_right
-              </span>
-            </button>
-          </div>
-        </div>
-      )}
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        limit={limit}
+        onPageChange={setPage}
+        onLimitChange={(n) => {
+          setLimit(n);
+          setPage(1);
+        }}
+        onRefresh={fetchPage}
+        loading={loading}
+      />
 
       <SanPhamFormDrawer
         isOpen={drawer.isOpen}

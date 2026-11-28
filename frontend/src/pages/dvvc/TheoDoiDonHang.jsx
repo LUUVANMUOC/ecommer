@@ -6,6 +6,7 @@ import theoDoiService from "../../services/dvvc/theoDoiService";
 import { toAssetUrl } from "../../utils/accountUtils";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import Avatar from "../../components/common/Avatar";
 import LoTrinhVanChuyen from "../../components/common/LoTrinhVanChuyen";
 
 const STATUS_MAP = {
@@ -456,13 +457,10 @@ const TheoDoiDonHangDVVC = () => {
                                 <div
                                   className={`border p-3 rounded-xl flex items-center gap-3 ${config.bg} ${config.border}`}
                                 >
-                                  <img
-                                    src={
-                                      item.Shipper_HinhAnh
-                                        ? toAssetUrl(item.Shipper_HinhAnh)
-                                        : `https://ui-avatars.com/api/?name=${item.Shipper_Ten}&background=random&color=fff`
-                                    }
-                                    alt={item.Shipper_Ten}
+                                  <Avatar
+                                    src={item.Shipper_HinhAnh}
+                                    role="shipper"
+                                    name={item.Shipper_Ten}
                                     className="w-10 h-10 rounded-full object-cover border-2 border-white shadow-sm"
                                   />
                                   <div>

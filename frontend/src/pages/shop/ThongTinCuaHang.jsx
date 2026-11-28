@@ -337,9 +337,9 @@ const ThongTinCuaHang = () => {
       <div className="grid gap-6 lg:grid-cols-[320px_minmax(0,1fr)]">
         <AccountProfileCard
           avatarUrl={currentImage}
+          role="shop"
           name={formData.gh_ten}
           email={formData.gh_email}
-          fallbackIcon="storefront"
           stats={[
             { value: formData.gh_danhgia, label: "Đánh giá", icon: "star" },
             { value: formData.gh_theodoi, label: "Theo dõi" },

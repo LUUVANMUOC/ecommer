@@ -11,6 +11,7 @@ import theoDoiShopService from "../../services/khachhang/theoDoiShopService";
 import gioHangService from "../../services/khachhang/gioHangService";
 import { AuthContext } from "../../contexts/AuthContext";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import Avatar from "../../components/common/Avatar";
 import {
   Gallery,
   AttributeChips,
@@ -71,16 +72,6 @@ const formatReviewDate = (value) => {
     hour: "2-digit",
     minute: "2-digit",
   });
-};
-
-const getInitials = (name) => {
-  const parts = String(name || "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 };
 
 // Danh sách số trang có dấu "…" (dùng chuỗi "gap-x" làm key)
@@ -347,17 +338,12 @@ const DanhGiaSanPhamSection = ({ sp_ma, variants = [], shopName = "" }) => {
                 <li key={key} className="py-5 first:pt-0 last:pb-0">
                   <div className="flex items-start gap-3">
                     <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-[#E2E8F0] bg-[#F8FAFC]">
-                      {r.kh_avatar ? (
-                        <img
-                          src={reviewImgUrl(r.kh_avatar)}
-                          alt={r.kh_ten || "Khách hàng"}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <span className="flex h-full w-full items-center justify-center text-sm font-bold text-[#2563EB]">
-                          {getInitials(r.kh_ten)}
-                        </span>
-                      )}
+                      <Avatar
+                        src={r.kh_avatar}
+                        role="khachhang"
+                        name={r.kh_ten || "Khách hàng"}
+                        className="h-full w-full object-cover"
+                      />
                     </div>
 
                     <div className="min-w-0 flex-1">
@@ -719,8 +705,13 @@ const ChiTietSanPhamKhachHang = () => {
                 to="/khach-hang/thong-tin-ca-nhan"
                 className="flex items-center gap-2 hover:text-[#2563EB] transition-colors"
               >
-                <div className="w-8 h-8 rounded-full bg-[#2563EB] text-white flex items-center justify-center text-xs">
-                  {user.kh_ten?.charAt(0).toUpperCase()}
+                <div className="w-8 h-8 overflow-hidden rounded-full border border-[#E2E8F0] bg-[#F8FAFC]">
+                  <Avatar
+                    src={user.kh_avatar}
+                    role="khachhang"
+                    name={user.kh_ten}
+                    className="h-full w-full object-cover"
+                  />
                 </div>
                 {user.kh_ten}
               </Link>
@@ -898,12 +889,10 @@ const ChiTietSanPhamKhachHang = () => {
             className="flex items-center gap-4 cursor-pointer group"
           >
             <div className="w-14 h-14 rounded-full border-2 border-blue-100 overflow-hidden bg-[#F8FAFC] p-1 group-hover:border-[#2563EB] transition-colors">
-              <img
-                src={
-                  product.gh_hinhanh
-                    ? `${BACKEND_URL}${product.gh_hinhanh}`
-                    : "https://placehold.co/100x100"
-                }
+              <Avatar
+                src={product.gh_hinhanh}
+                role="shop"
+                name={product.gh_ten}
                 className="w-full h-full object-cover rounded-full"
               />
             </div>

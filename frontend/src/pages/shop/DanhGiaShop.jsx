@@ -2,6 +2,7 @@ import { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AuthContext } from "../../contexts/AuthContext";
 import danhGiaShopService from "../../services/gianhang/danhGiaShopService";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import Avatar from "../../components/common/Avatar";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 const LIMIT = 10;
@@ -51,16 +52,6 @@ const formatDateTime = (value) => {
     hour: "2-digit",
     minute: "2-digit",
   });
-};
-
-const getInitials = (name) => {
-  const parts = String(name || "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
 };
 
 const StarRow = ({ value = 0, size = 15 }) => {
@@ -405,17 +396,12 @@ const DanhGiaShop = () => {
                 {/* Khách + sao */}
                 <div className="flex items-start gap-3">
                   <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-[#E2E8F0] bg-[#F8FAFC]">
-                    {r.kh_avatar ? (
-                      <img
-                        src={assetUrl(r.kh_avatar)}
-                        alt={r.kh_ten || "Khách hàng"}
-                        className="h-full w-full object-cover"
-                      />
-                    ) : (
-                      <span className="flex h-full w-full items-center justify-center text-sm font-bold text-[#2563EB]">
-                        {getInitials(r.kh_ten)}
-                      </span>
-                    )}
+                    <Avatar
+                      src={r.kh_avatar}
+                      role="khachhang"
+                      name={r.kh_ten || "Khách hàng"}
+                      className="h-full w-full object-cover"
+                    />
                   </div>
 
                   <div className="min-w-0 flex-1">

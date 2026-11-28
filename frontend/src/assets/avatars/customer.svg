@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Khách hàng">
+  <defs>
+    <clipPath id="avatar-customer-clip">
+      <circle cx="64" cy="64" r="64" />
+    </clipPath>
+  </defs>
+  <circle cx="64" cy="64" r="64" fill="#E8F0FE" />
+  <g clip-path="url(#avatar-customer-clip)">
+    <circle cx="64" cy="47" r="21" fill="#2563EB" />
+    <path d="M24 124c0-24 17.9-42 40-42s40 18 40 42v4H24z" fill="#2563EB" />
+  </g>
+  <g transform="translate(101 101)">
+    <circle cx="0" cy="0" r="19" fill="#ffffff" />
+    <path d="M-6.5 -3.5h13v11h-13z" fill="#2563EB" rx="1.5" />
+    <path d="M-3.5 -3.5v-3a3.5 3.5 0 0 1 7 0v3" fill="none" stroke="#2563EB" stroke-width="2" stroke-linecap="round" />
+  </g>
+</svg>

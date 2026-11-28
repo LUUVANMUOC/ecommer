@@ -1,9 +1,24 @@
 // src/layouts/Header.jsx
+import { useContext } from "react";
 import { LogOut } from "lucide-react";
-import NotificationBell from "../pages/common/NotificationBell"; // ✅ sửa: components/common → pages/common
+import NotificationBell from "../pages/common/NotificationBell";
+import Avatar from "../components/common/Avatar";
+import { AuthContext } from "../contexts/AuthContext";
+
+const pickAvatarSrc = (user) =>
+  user?.gh_hinhanh ||
+  user?.GH_hinhanh ||
+  user?.dvvc_hinhanh ||
+  user?.DVVC_HinhAnh ||
+  user?.shipper_hinhanh ||
+  user?.kho_hinhanh ||
+  user?.STMDT_HinhAnh ||
+  user?.kh_avatar ||
+  "";
 
 const Header = ({ userName = "", onLogout }) => {
-  const initial = (userName || "?").trim().charAt(0).toUpperCase();
+  const { user } = useContext(AuthContext) || {};
+  const displayName = userName || user?.kh_ten || user?.GH_Ten || "";
 
   const dateLabel = new Intl.DateTimeFormat("vi-VN", {
     weekday: "long",
@@ -22,12 +37,19 @@ const Header = ({ userName = "", onLogout }) => {
         <NotificationBell />
 
         <div className="flex items-center gap-3 rounded-full border border-[#DDD9CE] bg-white py-1.5 pl-1.5 pr-4">
-          <span className="grid h-8 w-8 place-items-center rounded-full bg-[#1E3A34] text-sm font-semibold text-[#F2A93B]">
-            {initial}
+          <span className="h-8 w-8 overflow-hidden rounded-full border border-[#E2DED3] bg-[#F1EEE6]">
+            <Avatar
+              src={pickAvatarSrc(user)}
+              role={user?.role}
+              name={displayName}
+              className="h-full w-full object-cover"
+            />
           </span>
           <span className="text-sm text-[#5B6661]">
             Xin chào,{" "}
-            <strong className="font-semibold text-[#14201C]">{userName}</strong>
+            <strong className="font-semibold text-[#14201C]">
+              {displayName}
+            </strong>
           </span>
         </div>
 

@@ -4,6 +4,7 @@ import { Send, Store } from "lucide-react";
 import { AuthContext } from "../../contexts/AuthContext";
 import thongBaoService from "../../services/thongbao/thongBaoService";
 import DinhKemThongBao from "../common/DinhKemThongBao"; // ✅ sửa: ../../components/common → ../common
+import Avatar from "../../components/common/Avatar";
 
 const BACKEND_URL =
   import.meta.env.VITE_BACKEND_URL ||
@@ -249,17 +250,12 @@ const GuiThongBaoShop = () => {
                     checked={daChon.includes(shop.gh_ma)}
                     onChange={() => toggleChon(shop.gh_ma)}
                   />
-                  {shop.gh_hinhanh ? (
-                    <img
-                      src={`${BACKEND_URL}${shop.gh_hinhanh}`}
-                      alt={shop.gh_ten}
-                      className="h-8 w-8 shrink-0 rounded-full object-cover"
-                    />
-                  ) : (
-                    <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-slate-100 text-xs font-semibold text-slate-600">
-                      {(shop.gh_ten || "?").charAt(0).toUpperCase()}
-                    </span>
-                  )}
+                  <Avatar
+                    src={shop.gh_hinhanh}
+                    role="shop"
+                    name={shop.gh_ten}
+                    className="h-8 w-8 shrink-0 rounded-full object-cover"
+                  />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium text-slate-700">
                       {shop.gh_ten}

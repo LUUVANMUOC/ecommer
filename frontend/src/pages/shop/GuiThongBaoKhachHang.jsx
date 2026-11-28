@@ -4,6 +4,7 @@ import { Send, Users } from "lucide-react";
 import { AuthContext } from "../../contexts/AuthContext";
 import thongBaoService from "../../services/thongbao/thongBaoService";
 import DinhKemThongBao from "../common/DinhKemThongBao"; // ✅ sửa: ../../components/common → ../common
+import Avatar from "../../components/common/Avatar";
 
 const GuiThongBaoKhachHang = () => {
   const { user } = useContext(AuthContext);
@@ -255,9 +256,12 @@ const GuiThongBaoKhachHang = () => {
                     checked={daChon.includes(khach.kh_ma)}
                     onChange={() => toggleChon(khach.kh_ma)}
                   />
-                  <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-sky-100 text-xs font-semibold text-sky-700">
-                    {(khach.kh_ten || "?").charAt(0).toUpperCase()}
-                  </span>
+                  <Avatar
+                    src={khach.kh_avatar}
+                    role="khachhang"
+                    name={khach.kh_ten}
+                    className="h-8 w-8 shrink-0 rounded-full object-cover"
+                  />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-medium text-slate-700">
                       {khach.kh_ten}

@@ -3,6 +3,16 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import trangThaiChiTietSanPhamService from "../../services/gianhang/trangThaiChiTietSanPhamService";
 import axiosClient from "../../config/axiosClient";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import Avatar from "../../components/common/Avatar";
+import {
+  ProductToolbar,
+  ProductGrid,
+  ProductCard,
+  ProductEmptyState,
+  ProductRefreshButton,
+  PaginationBar,
+  productSelectClass,
+} from "../../components/product/ProductUI";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 const imgUrl = (link) => (link ? `${BACKEND_URL}${link}` : "");
@@ -63,13 +73,6 @@ const TONE = {
   gray: "border-gray-200 bg-gray-50 text-gray-600",
   blue: "border-blue-200 bg-blue-50 text-blue-700",
 };
-
-const pageBtn = (active) =>
-  `h-9 min-w-9 rounded-lg border px-2 text-sm font-bold transition-colors ${
-    active
-      ? "border-[#F2A93B] bg-[#FDF3E1] text-[#8A5A0B]"
-      : "border-[#E2DED3] bg-white text-[#3D4A44] hover:bg-[#F7F5F0]"
-  }`;
 
 // Chuyển danh sách ngành hàng phẳng -> mảng phẳng sắp theo cây (cha trước, con sau)
 const buildCategoryOptions = (list) => {
@@ -984,19 +987,12 @@ const ChiTietSanPhamModal = ({
                         </h3>
                         <div className="mt-3 flex items-center gap-3">
                           <div className="h-14 w-14 shrink-0 overflow-hidden rounded-full border border-[#E2DED3] bg-white">
-                            {sp?.gh_hinhanh ? (
-                              <img
-                                src={imgUrl(sp.gh_hinhanh)}
-                                alt={sp.gh_ten}
-                                loading="lazy"
-                                decoding="async"
-                                className="h-full w-full object-cover"
-                              />
-                            ) : (
-                              <span className="flex h-full items-center justify-center material-symbols-outlined text-[#C9C3B5]">
-                                storefront
-                              </span>
-                            )}
+                            <Avatar
+                              src={sp?.gh_hinhanh}
+                              role="shop"
+                              name={sp?.gh_ten}
+                              className="h-full w-full object-cover"
+                            />
                           </div>
                           <div className="min-w-0">
                             <p className="truncate font-bold text-[#14201C]">
@@ -1270,11 +1266,6 @@ const QuanLySanPhamAdmin = () => {
     setPage(1);
   };
 
-  const changeLimit = (e) => {
-    setLimit(Number(e.target.value));
-    setPage(1);
-  };
-
   const changePage = (p) => {
     if (p === page) return;
     setPage(p);
@@ -1286,21 +1277,6 @@ const QuanLySanPhamAdmin = () => {
     () => buildCategoryOptions(categories),
     [categories],
   );
-
-  const pageNumbers = useMemo(() => {
-    const totalP = Math.max(1, totalPages);
-    const size = 5;
-    let start = Math.max(1, page - Math.floor(size / 2));
-    let end = Math.min(totalP, start + size - 1);
-    start = Math.max(1, end - size + 1);
-
-    const arr = [];
-    for (let i = start; i <= end; i++) arr.push(i);
-    return { arr, start, end, totalP };
-  }, [page, totalPages]);
-
-  const from = total === 0 ? 0 : (page - 1) * limit + 1;
-  const to = Math.min(page * limit, total);
 
   /* ================= MODAL CHI TIẾT ================= */
 
@@ -1525,72 +1501,52 @@ const QuanLySanPhamAdmin = () => {
   return (
     <div className="w-full space-y-6">
       {/* HEADER & BỘ LỌC CƠ BẢN */}
-      <div className="bg-white p-5 rounded-2xl shadow-sm border border-[#E2DED3] flex flex-col xl:flex-row xl:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-[#14201C]">
-            Quản lý Sản phẩm Toàn sàn
-          </h1>
-          <p className="text-sm text-[#7A857F]">
-            Giám sát, xem chi tiết và đình chỉ các sản phẩm vi phạm.
-          </p>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
-            <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-[#7A857F] text-[20px]">
-              search
-            </span>
-            <input
-              type="text"
-              placeholder="Tìm tên SP / shop..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="w-56 rounded-xl border border-[#D9CFC2] bg-[#FBFAF7] py-2 pl-10 pr-3 text-sm focus:border-[#F2A93B] focus:outline-none"
-            />
-          </div>
-
-          <select
-            value={filterCategory}
-            onChange={changeCategory}
-            title="Lọc theo ngành hàng (bao gồm ngành hàng con)"
-            className="px-4 py-2 border border-[#E2DED3] rounded-xl text-sm font-medium text-[#3D4A44] outline-none hover:border-[#F2A93B] bg-white min-w-[180px] max-w-[240px]"
-          >
-            <option value="">Tất cả ngành hàng</option>
-            {categoryOptions.map((c) => (
-              <option key={c.nh_ma} value={c.nh_ma}>
-                {"— ".repeat(c.depth)}
-                {c.nh_ten}
-              </option>
-            ))}
-          </select>
-
-          <select
-            value={filterStatus}
-            onChange={changeStatus}
-            className="px-4 py-2 border border-[#E2DED3] rounded-xl text-sm font-medium text-[#3D4A44] outline-none hover:border-[#F2A93B] bg-white min-w-[160px]"
-          >
-            <option value="">Tất cả Trạng thái</option>
-            <option value="TTCTSP0001">Chờ duyệt</option>
-            <option value="TTCTSP0002">Đang bán</option>
-            <option value="TTCTSP0003">Bị đình chỉ</option>
-            <option value="DEFAULT">Chưa gửi duyệt</option>
-          </select>
-
-          <button
+      <ProductToolbar
+        title="Quản lý Sản phẩm Toàn sàn"
+        subtitle="Giám sát, xem chi tiết và đình chỉ các sản phẩm vi phạm."
+        total={total}
+        totalLabel="sản phẩm"
+        searchValue={searchInput}
+        onSearchChange={setSearchInput}
+        searchPlaceholder="Tìm tên SP / shop..."
+        actions={
+          <ProductRefreshButton
             onClick={() => {
               fetchSanPham();
               fetchShops();
               fetchCategories();
             }}
-            className="inline-flex items-center justify-center w-10 h-10 rounded-xl border border-[#D9CFC2] bg-white text-[#3D4A44] hover:bg-[#F7F5F0] transition-colors"
-            title="Làm mới"
-          >
-            <span className="material-symbols-outlined text-[20px]">
-              refresh
-            </span>
-          </button>
-        </div>
-      </div>
+            loading={loading}
+          />
+        }
+      >
+        <select
+          value={filterCategory}
+          onChange={changeCategory}
+          title="Lọc theo ngành hàng (bao gồm ngành hàng con)"
+          className={`${productSelectClass} min-w-[180px] max-w-[240px]`}
+        >
+          <option value="">Tất cả ngành hàng</option>
+          {categoryOptions.map((c) => (
+            <option key={c.nh_ma} value={c.nh_ma}>
+              {"— ".repeat(c.depth)}
+              {c.nh_ten}
+            </option>
+          ))}
+        </select>
+
+        <select
+          value={filterStatus}
+          onChange={changeStatus}
+          className={`${productSelectClass} min-w-[160px]`}
+        >
+          <option value="">Tất cả Trạng thái</option>
+          <option value="TTCTSP0001">Chờ duyệt</option>
+          <option value="TTCTSP0002">Đang bán</option>
+          <option value="TTCTSP0003">Bị đình chỉ</option>
+          <option value="DEFAULT">Chưa gửi duyệt</option>
+        </select>
+      </ProductToolbar>
 
       {/* THANH LỌC SHOP */}
       <div className="bg-white px-5 py-3 rounded-2xl shadow-sm border border-[#E2DED3] flex items-center gap-3 overflow-x-auto custom-scrollbar">
@@ -1618,19 +1574,12 @@ const QuanLySanPhamAdmin = () => {
               className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-semibold whitespace-nowrap transition-colors border-2 ${isActive ? "border-[#F2A93B] bg-[#FDF3E1] text-[#8A5A0B]" : "border-transparent bg-[#FBFAF7] text-[#3D4A44] hover:border-[#E2DED3] hover:bg-[#F1EEE6]"}`}
             >
               <div className="w-7 h-7 rounded-full border border-gray-200 overflow-hidden bg-white shrink-0">
-                {shop.gh_hinhanh ? (
-                  <img
-                    src={imgUrl(shop.gh_hinhanh)}
-                    alt={shop.gh_ten}
-                    loading="lazy"
-                    decoding="async"
-                    className="w-full h-full object-cover"
-                  />
-                ) : (
-                  <span className="flex h-full w-full items-center justify-center text-gray-400 material-symbols-outlined text-[14px]">
-                    store
-                  </span>
-                )}
+                <Avatar
+                  src={shop.gh_hinhanh}
+                  role="shop"
+                  name={shop.gh_ten}
+                  className="w-full h-full object-cover"
+                />
               </div>
               {shop.gh_ten}
             </button>
@@ -1642,189 +1591,83 @@ const QuanLySanPhamAdmin = () => {
       <div ref={listTopRef} />
 
       {/* DANH SÁCH THẺ SẢN PHẨM */}
-      {loading && products.length === 0 ? (
-        <div className="py-20 text-center text-[#7A857F]">
-          Đang tải dữ liệu...
-        </div>
-      ) : products.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-2xl border-2 border-dashed border-[#E2DED3] bg-[#FBFAF7] py-16 text-center">
-          <span className="material-symbols-outlined text-[48px] text-[#C9C3B5]">
-            search_off
-          </span>
-          <p className="mt-2 text-[#5B6661]">
-            Không tìm thấy sản phẩm nào phù hợp.
-          </p>
-        </div>
-      ) : (
-        <div
-          className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 transition-opacity ${
-            loading ? "opacity-60 pointer-events-none" : ""
-          }`}
-        >
-          {products.map((product) => {
-            const variants = product.variants || [];
-            const firstVariant = variants[0];
-            const coverImg = firstVariant?.main_image;
-            const countSuspended = variants.filter(
-              (v) => v.ttctsp_ma === "TTCTSP0003",
-            ).length;
-            const danhMuc = [
-              ...new Set(variants.map((v) => v.nh_ten).filter(Boolean)),
-            ];
+      <ProductGrid
+        loading={loading}
+        isEmpty={products.length === 0}
+        skeletonCount={8}
+        empty={
+          <ProductEmptyState
+            icon="search_off"
+            title="Không tìm thấy sản phẩm nào phù hợp."
+            hint="Thử đổi từ khóa, shop, ngành hàng hoặc trạng thái."
+          />
+        }
+      >
+        {products.map((product) => {
+          const variants = product.variants || [];
+          const firstVariant = variants[0];
+          const coverImg = firstVariant?.main_image;
+          const countSuspended = variants.filter(
+            (v) => v.ttctsp_ma === "TTCTSP0003",
+          ).length;
+          const danhMuc = [
+            ...new Set(variants.map((v) => v.nh_ten).filter(Boolean)),
+          ];
 
-            return (
-              <div
-                key={product.sp_ma}
-                className="bg-white rounded-2xl border border-[#E2DED3] shadow-sm hover:shadow-md transition-shadow overflow-hidden flex flex-col group"
-              >
-                <div className="aspect-square bg-[#FBFAF7] relative overflow-hidden flex items-center justify-center p-4">
-                  {coverImg ? (
-                    <img
-                      src={imgUrl(coverImg)}
-                      alt={product.sp_ten}
-                      loading="lazy"
-                      decoding="async"
-                      className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-300"
-                    />
-                  ) : (
-                    <span className="material-symbols-outlined text-5xl text-[#C9C3B5]">
-                      image
-                    </span>
-                  )}
-                  <div className="absolute top-3 left-3 bg-white/90 backdrop-blur-sm border border-[#E2DED3] text-[#3D4A44] text-[11px] font-bold px-2 py-1 rounded shadow-sm">
-                    {variants.length} phân loại
-                  </div>
-                  {countSuspended > 0 && (
-                    <div className="absolute top-3 right-3 bg-red-100 text-red-700 text-[11px] font-bold px-2 py-1 rounded shadow-sm border border-red-200">
-                      {countSuspended} bị đình chỉ
-                    </div>
-                  )}
-                </div>
-                <div className="p-4 flex-1 flex flex-col">
-                  <h3 className="font-bold text-[#14201C] line-clamp-2 leading-tight group-hover:text-[#F2A93B] transition-colors">
-                    {product.sp_ten}
-                  </h3>
-                  <p className="text-sm text-[#7A857F] mt-1 flex items-center gap-1">
-                    <span className="material-symbols-outlined text-[14px]">
-                      storefront
-                    </span>
-                    <span className="truncate">{product.gh_ten}</span>
-                  </p>
-                  {danhMuc.length > 0 && (
-                    <p
-                      className="text-xs text-[#7A857F] mt-1 flex items-center gap-1"
-                      title={danhMuc.join(", ")}
-                    >
-                      <span className="material-symbols-outlined text-[14px]">
-                        category
-                      </span>
-                      <span className="truncate">{danhMuc.join(", ")}</span>
-                    </p>
-                  )}
-                  <button
-                    onClick={() => openDetail(product)}
-                    className="mt-4 w-full py-2 bg-[#FBFAF7] border border-[#E2DED3] text-[#14201C] rounded-xl text-sm font-semibold hover:bg-[#F1EEE6] transition-colors"
-                  >
-                    Xem chi tiết
-                  </button>
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
+          return (
+            <ProductCard
+              key={product.sp_ma}
+              image={coverImg ? imgUrl(coverImg) : ""}
+              alt={product.sp_ten}
+              code={product.sp_ma}
+              badges={[
+                { label: `${variants.length} phân loại`, tone: "gray" },
+                ...(countSuspended > 0
+                  ? [
+                      {
+                        label: `${countSuspended} bị đình chỉ`,
+                        tone: "red",
+                      },
+                    ]
+                  : []),
+              ]}
+              title={product.sp_ten}
+              shop={product.gh_ten}
+              chips={danhMuc.slice(0, 3).map((ten) => ({
+                icon: "category",
+                label: ten,
+                tone: "green",
+              }))}
+              onClick={() => openDetail(product)}
+              footer={
+                <button
+                  type="button"
+                  onClick={() => openDetail(product)}
+                  className="w-full rounded-xl border border-[#E2DED3] bg-[#FBFAF7] py-2 text-sm font-semibold text-[#14201C] transition-colors hover:bg-[#F1EEE6]"
+                >
+                  Xem chi tiết
+                </button>
+              }
+            />
+          );
+        })}
+      </ProductGrid>
 
       {/* PHÂN TRANG */}
-      {total > 0 && (
-        <div className="flex flex-wrap items-center justify-between gap-4 rounded-2xl border border-[#E2DED3] bg-white px-5 py-3 shadow-sm">
-          <p className="text-sm text-[#7A857F]">
-            Hiển thị{" "}
-            <b className="text-[#14201C]">
-              {from}–{to}
-            </b>{" "}
-            / <b className="text-[#14201C]">{total}</b> sản phẩm
-          </p>
-
-          <div className="flex flex-wrap items-center gap-3">
-            <select
-              value={limit}
-              onChange={changeLimit}
-              className="rounded-xl border border-[#E2DED3] bg-white px-3 py-2 text-sm font-medium text-[#3D4A44] outline-none hover:border-[#F2A93B]"
-            >
-              {PAGE_SIZES.map((s) => (
-                <option key={s} value={s}>
-                  {s} / trang
-                </option>
-              ))}
-            </select>
-
-            <div className="flex items-center gap-1">
-              <button
-                type="button"
-                onClick={() => changePage(page - 1)}
-                disabled={page <= 1}
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2DED3] bg-white text-[#3D4A44] hover:bg-[#F7F5F0] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <span className="material-symbols-outlined text-[20px]">
-                  chevron_left
-                </span>
-              </button>
-
-              {pageNumbers.start > 1 && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => changePage(1)}
-                    className={pageBtn(page === 1)}
-                  >
-                    1
-                  </button>
-                  {pageNumbers.start > 2 && (
-                    <span className="px-1 text-[#7A857F]">…</span>
-                  )}
-                </>
-              )}
-
-              {pageNumbers.arr.map((p) => (
-                <button
-                  key={p}
-                  type="button"
-                  onClick={() => changePage(p)}
-                  className={pageBtn(page === p)}
-                >
-                  {p}
-                </button>
-              ))}
-
-              {pageNumbers.end < pageNumbers.totalP && (
-                <>
-                  {pageNumbers.end < pageNumbers.totalP - 1 && (
-                    <span className="px-1 text-[#7A857F]">…</span>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => changePage(pageNumbers.totalP)}
-                    className={pageBtn(page === pageNumbers.totalP)}
-                  >
-                    {pageNumbers.totalP}
-                  </button>
-                </>
-              )}
-
-              <button
-                type="button"
-                onClick={() => changePage(page + 1)}
-                disabled={page >= totalPages}
-                className="flex h-9 w-9 items-center justify-center rounded-lg border border-[#E2DED3] bg-white text-[#3D4A44] hover:bg-[#F7F5F0] disabled:cursor-not-allowed disabled:opacity-40"
-              >
-                <span className="material-symbols-outlined text-[20px]">
-                  chevron_right
-                </span>
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <PaginationBar
+        page={page}
+        totalPages={totalPages}
+        total={total}
+        limit={limit}
+        pageSizes={PAGE_SIZES}
+        onPageChange={changePage}
+        onLimitChange={(n) => {
+          setLimit(n);
+          setPage(1);
+        }}
+        onRefresh={fetchSanPham}
+        loading={loading}
+      />
 
       {/* MODAL CHI TIẾT SẢN PHẨM */}
       {selectedProduct && (

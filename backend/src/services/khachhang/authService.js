@@ -42,8 +42,8 @@ const AuthKhachHangService = {
       newMa = 'KH' + num.toString().padStart(3, '0');
     }
 
-    // ✅ Xử lý ảnh Avatar: Nếu có file thì lấy đường dẫn, không thì lấy ảnh mặc định
-    let avatarPath = file ? `/uploads/avatars/${file.filename}` : 'https://ui-avatars.com/api/?name=Khach+Hang&background=random';
+    // Không có ảnh đăng ký thì lưu null để frontend dùng avatar mặc định theo vai trò
+    let avatarPath = file ? `/uploads/avatars/${file.filename}` : null;
 
     const newKH = {
       kh_ma: newMa,

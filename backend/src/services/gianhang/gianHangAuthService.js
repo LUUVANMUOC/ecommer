@@ -60,6 +60,7 @@ const GianHangAuthService = {
                 GH_Ma: shop.gh_ma,
                 GH_Ten: shop.gh_ten,
                 GH_Email: shop.gh_email,
+                GH_hinhanh: shop.gh_hinhanh || null,
                 role: 'shop'
             }
         };

@@ -5,6 +5,7 @@ import { formatVND } from "../../components/shop/SanPhamShared";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
 import LoTrinhVanChuyen from "../../components/common/LoTrinhVanChuyen";
 import SanPhamLink from "../../components/common/SanPhamLink";
+import Avatar from "../../components/common/Avatar";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
@@ -617,12 +618,10 @@ const QuanLyDonHangAdmin = () => {
                                     <div
                                       className={`flex items-center gap-2 p-2 rounded-lg border ${config.bg} ${config.border}`}
                                     >
-                                      <img
-                                        src={
-                                          item.Shipper_HinhAnh
-                                            ? `${BACKEND_URL}${item.Shipper_HinhAnh}`
-                                            : `https://ui-avatars.com/api/?name=${item.Shipper_Ten}&background=random&color=fff`
-                                        }
+                                      <Avatar
+                                        src={item.Shipper_HinhAnh}
+                                        role="shipper"
+                                        name={item.Shipper_Ten}
                                         className="w-8 h-8 rounded-full object-cover border border-white shadow-sm"
                                       />
                                       <div>

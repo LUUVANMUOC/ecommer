@@ -1,4 +1,6 @@
 // Class dùng chung cho input và nút
+import Avatar from "../common/Avatar";
+
 export const fieldBase =
   "w-full rounded-xl border border-[#D9D4C7] bg-[#FBFAF7] px-4 py-2.5 text-sm text-[#14201C] placeholder:text-[#9AA39E] transition-all focus:border-[#F2A93B] focus:bg-white focus:outline-none focus:ring-4 focus:ring-[#F2A93B]/20 disabled:cursor-not-allowed disabled:opacity-60";
 
@@ -38,22 +40,21 @@ export const AccountSection = ({ title, description, icon, children }) => (
 
 export const AccountProfileCard = ({
   avatarUrl,
+  role = "khachhang",
   name,
   email,
   stats = [],
-  fallbackIcon = "person",
   children,
 }) => (
   <aside className="flex flex-col self-start rounded-2xl border border-[#E2DED3] bg-white p-6 shadow-[0_1px_0_rgba(20,32,28,0.04)]">
     <div className="flex flex-col items-center text-center">
       <div className="h-28 w-28 overflow-hidden rounded-full border-4 border-[#FBFAF7] bg-[#F1EEE6] shadow-md ring-1 ring-[#E2DED3]">
-        {avatarUrl ? (
-          <img src={avatarUrl} alt={name} className="h-full w-full object-cover" />
-        ) : (
-          <div className="grid h-full w-full place-items-center text-[#9AA39E]">
-            <span className="material-symbols-outlined text-[44px]">{fallbackIcon}</span>
-          </div>
-        )}
+        <Avatar
+          src={avatarUrl}
+          role={role}
+          name={name}
+          className="h-full w-full object-cover"
+        />
       </div>
       <h2 className="mt-4 break-words text-lg font-bold text-[#14201C]">{name}</h2>
       <p className="mt-0.5 break-all text-sm text-[#5B6661]">{email}</p>

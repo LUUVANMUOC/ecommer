@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-label="Gian hàng">
+  <defs>
+    <clipPath id="avatar-shop-clip">
+      <circle cx="64" cy="64" r="64" />
+    </clipPath>
+  </defs>
+  <circle cx="64" cy="64" r="64" fill="#E7F6EE" />
+  <g clip-path="url(#avatar-shop-clip)">
+    <circle cx="64" cy="47" r="21" fill="#1E8E5A" />
+    <path d="M24 124c0-24 17.9-42 40-42s40 18 40 42v4H24z" fill="#1E8E5A" />
+  </g>
+  <g transform="translate(101 101)">
+    <circle cx="0" cy="0" r="19" fill="#ffffff" />
+    <path d="M-9 -7h18l1.5 4.5H-10.5z" fill="#1E8E5A" />
+    <path d="M-7.5 -2.5h15V8h-15z" fill="#1E8E5A" />
+    <path d="M-2.5 8V1.5h5V8z" fill="#ffffff" />
+  </g>
+</svg>

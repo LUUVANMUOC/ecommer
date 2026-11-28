@@ -2,8 +2,8 @@ import { useState, useEffect, useContext } from "react";
 import { AuthContext } from "../../contexts/AuthContext";
 import phieuKhoService from "../../services/quanlykho/phieuKhoService";
 import { formatVND } from "../../components/shop/SanPhamShared";
-import { toAssetUrl } from "../../utils/accountUtils";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import Avatar from "../../components/common/Avatar";
 
 const moTaShipper = (ten, vaiTro) => {
   if (!ten) return "—";
@@ -374,13 +374,11 @@ const QuanLyPhieuKho = () => {
                   </div>
 
                   <div className="flex items-center gap-3 mb-3 pb-3 border-b border-[#F1F5F9]">
-                    <img
-                      src={toAssetUrl(o.Shipper_HinhAnh)}
-                      alt=""
+                    <Avatar
+                      src={o.Shipper_HinhAnh}
+                      role="shipper"
+                      name={o.Shipper_Ten}
                       className="w-10 h-10 rounded-full object-cover border border-[#E2E8F0]"
-                      onError={(e) => {
-                        e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(o.Shipper_Ten || "S")}&background=random&color=fff`;
-                      }}
                     />
                     <div className="min-w-0">
                       <p className="font-bold text-sm text-[#0F172A] truncate">

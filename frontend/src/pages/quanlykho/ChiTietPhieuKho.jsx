@@ -4,6 +4,7 @@ import phieuKhoService from "../../services/quanlykho/phieuKhoService";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import { toAssetUrl } from "../../utils/accountUtils";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import Avatar from "../../components/common/Avatar";
 
 const LY_DO_LABEL = {
   TU_LSP01: "Nhập kho từ Shipper LSP01 (lấy hàng từ Shop)",
@@ -367,15 +368,11 @@ const ChiTietPhieuKho = () => {
           <div className="bg-white rounded-2xl shadow-sm border border-[#E2E8F0] p-6">
             <div className="flex justify-between items-start mb-4 border-b pb-4">
               <div className="flex items-center gap-3">
-                <img
-                  src={toAssetUrl(data.Kho_HinhAnh)}
-                  alt=""
+                <Avatar
+                  src={data.Kho_HinhAnh}
+                  role="dvvc"
+                  name={data.Kho_Ten}
                   className="w-14 h-14 rounded-xl object-cover border border-[#E2E8F0]"
-                  onError={(e) => {
-                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                      data.Kho_Ten || "K",
-                    )}&background=4f46e5&color=fff`;
-                  }}
                 />
                 <div>
                   <p className="font-bold text-[#0F172A]">{data.Kho_Ten}</p>
@@ -586,15 +583,11 @@ const ChiTietPhieuKho = () => {
                 Shipper
               </h3>
               <div className="flex items-center gap-3">
-                <img
-                  src={toAssetUrl(data.Shipper_HinhAnh)}
-                  alt=""
+                <Avatar
+                  src={data.Shipper_HinhAnh}
+                  role="shipper"
+                  name={data.Shipper_Ten}
                   className="w-14 h-14 rounded-full object-cover border border-[#E2E8F0]"
-                  onError={(e) => {
-                    e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(
-                      data.Shipper_Ten,
-                    )}&background=random&color=fff`;
-                  }}
                 />
                 <div>
                   <p className="font-bold text-[#0F172A]">{data.Shipper_Ten}</p>

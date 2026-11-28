@@ -4,12 +4,12 @@ import { AuthContext } from "../../contexts/AuthContext";
 import axiosClient from "../../config/axiosClient";
 import dvvcProfileService from "../../services/dvvc/dvvcProfileService";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import Avatar from "../../components/common/Avatar";
 import { ChangePasswordForm } from "../../components/account/AccountForms";
 import {
   BankAccountSection,
   BankQRModal,
 } from "../../components/account/BankAccount";
-import { toAssetUrl } from "../../utils/accountUtils";
 
 const EMPTY_BANK_FORM = {
   NganHang_Ma: "",
@@ -222,8 +222,10 @@ const ThongTinDVVC = () => {
         <div className="bg-white rounded-3xl shadow-sm border border-[#E2E8F0] flex flex-col overflow-hidden self-start">
           <div className="p-6 flex items-center gap-4 border-b border-[#F1F5F9] bg-[#F8FAFC]">
             <div className="w-14 h-14 rounded-full border-2 border-blue-200 overflow-hidden bg-white p-0.5">
-              <img
-                src={toAssetUrl(profileData.DVVC_HinhAnh)}
+              <Avatar
+                src={profileData.DVVC_HinhAnh}
+                role="dvvc"
+                name={profileData.DVVC_Ten}
                 className="w-full h-full object-cover rounded-full"
               />
             </div>
@@ -322,8 +324,10 @@ const ThongTinDVVC = () => {
                   </div>
                 </div>
                 <div className="flex flex-col items-center border-l border-[#F1F5F9] pl-10 gap-4">
-                  <img
-                    src={toAssetUrl(profileData.DVVC_HinhAnh)}
+                  <Avatar
+                    src={profileData.DVVC_HinhAnh}
+                    role="dvvc"
+                    name={profileData.DVVC_Ten}
                     className="w-28 h-28 rounded-full border-4 border-[#F8FAFC] shadow-sm object-cover"
                   />
                   <label className="cursor-pointer border border-[#E2E8F0] px-5 py-2.5 text-sm font-semibold text-[#334155] bg-white hover:bg-[#F8FAFC] rounded-xl shadow-sm transition-colors">

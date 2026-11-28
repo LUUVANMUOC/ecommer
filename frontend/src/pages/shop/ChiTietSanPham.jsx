@@ -6,6 +6,7 @@ import chiTietSanPhamService from "../../services/gianhang/chiTietSanPhamService
 import trangThaiChiTietSanPhamService from "../../services/gianhang/trangThaiChiTietSanPhamService";
 import publicSanPhamService from "../../services/san/publicSanPhamService";
 import ToastNotification from "../../components/common/Crud/ToastNotification";
+import Avatar from "../../components/common/Avatar";
 import {
   Card,
   SpecRow,
@@ -285,16 +286,6 @@ const formatReviewDate = (value) => {
   });
 };
 
-const getInitials = (name) => {
-  const parts = String(name || "")
-    .trim()
-    .split(/\s+/)
-    .filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
-  return (parts[0].charAt(0) + parts[parts.length - 1].charAt(0)).toUpperCase();
-};
-
 // Danh sách số trang có dấu "…" (dùng chuỗi "gap-x" làm key)
 const buildPageList = (current, total) => {
   if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1);
@@ -556,17 +547,12 @@ const DanhGiaSection = ({ sp_ma, variants }) => {
                   <li key={key} className="py-4 first:pt-0 last:pb-0">
                     <div className="flex items-start gap-3">
                       <div className="h-10 w-10 shrink-0 overflow-hidden rounded-full border border-[#E2DED3] bg-[#F1EEE6]">
-                        {r.kh_avatar ? (
-                          <img
-                            src={reviewImgUrl(r.kh_avatar)}
-                            alt={r.kh_ten || "Khách hàng"}
-                            className="h-full w-full object-cover"
-                          />
-                        ) : (
-                          <span className="flex h-full w-full items-center justify-center text-sm font-bold text-[#8A5A0B]">
-                            {getInitials(r.kh_ten)}
-                          </span>
-                        )}
+                        <Avatar
+                          src={r.kh_avatar}
+                          role="khachhang"
+                          name={r.kh_ten || "Khách hàng"}
+                          className="h-full w-full object-cover"
+                        />
                       </div>
 
                       <div className="min-w-0 flex-1">

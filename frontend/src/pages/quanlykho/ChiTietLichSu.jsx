@@ -4,6 +4,7 @@ import { AuthContext } from "../../contexts/AuthContext";
 import axiosClient from "../../config/axiosClient";
 import { formatVND } from "../../components/shop/SanPhamShared";
 import { toAssetUrl } from "../../utils/accountUtils";
+import Avatar from "../../components/common/Avatar";
 import LoTrinhVanChuyen from "../../components/common/LoTrinhVanChuyen";
 
 const TT_COLOR = {
@@ -493,19 +494,12 @@ const ChiTietLichSu = () => {
                 {shippers.map((s) => (
                   <div key={s.Shipper_Ma} className="flex items-center gap-3">
                     <div className="w-12 h-12 rounded-full bg-gray-100 overflow-hidden shrink-0 border border-[#E2E8F0]">
-                      {s.Shipper_HinhAnh ? (
-                        <img
-                          src={toAssetUrl(s.Shipper_HinhAnh)}
-                          alt={s.Shipper_Ten}
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full flex items-center justify-center text-gray-400">
-                          <span className="material-symbols-outlined">
-                            person
-                          </span>
-                        </div>
-                      )}
+                      <Avatar
+                        src={s.Shipper_HinhAnh}
+                        role="shipper"
+                        name={s.Shipper_Ten}
+                        className="w-full h-full object-cover"
+                      />
                     </div>
                     <div className="min-w-0">
                       <p className="font-bold text-[#0F172A] truncate">

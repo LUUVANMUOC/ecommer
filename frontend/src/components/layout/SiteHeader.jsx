@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import useGiaoDien from "../../hooks/useGiaoDien";
 import SiteBlock from "./SiteBlock";
 import NotificationBell from "../../pages/common/NotificationBell"; // ✅ sửa: ../common → ../../pages/common
+import Avatar from "../common/Avatar";
 
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
@@ -213,8 +214,13 @@ const SiteHeader = ({
             editable={editable}
             className="flex items-center gap-2 rounded-full px-3 py-1.5 hover:bg-[#F8FAFC]"
           >
-            <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#2563EB] text-xs text-white">
-              {user.kh_ten?.charAt(0).toUpperCase()}
+            <div className="flex h-8 w-8 items-center justify-center overflow-hidden rounded-full border border-[#E2E8F0] bg-[#F8FAFC]">
+              <Avatar
+                src={user.kh_avatar}
+                role="khachhang"
+                name={user.kh_ten}
+                className="h-full w-full object-cover"
+              />
             </div>
             <span className="hidden text-[#334155] sm:block">
               {user.kh_ten}
