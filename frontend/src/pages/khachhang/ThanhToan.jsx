@@ -14,6 +14,7 @@ import SanPhamLink from "../../components/common/SanPhamLink";
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || "http://localhost:8080";
 
 const EMPTY_ADDRESS_FORM = {
+  ttnh_ma: "",
   dc_ma: "",
   ttnh_ten: "",
   ttnh_sdt: "",
@@ -175,6 +176,7 @@ const ThanhToan = () => {
     if (addr) {
       setIsEditingAddress(true);
       setAddressFormData({
+        ttnh_ma: addr.ttnh_ma || "",
         dc_ma: addr.dc_ma || "",
         ttnh_ten: addr.ttnh_ten || "",
         ttnh_sdt: addr.ttnh_sdt || "",
@@ -197,6 +199,11 @@ const ThanhToan = () => {
 
   const handleSaveAddress = async (e) => {
     e.preventDefault();
+    if (isEditingAddress && !addressFormData.ttnh_ma)
+      return showToast(
+        "Không xác định được địa chỉ cần sửa. Vui lòng đóng và mở lại.",
+        "error",
+      );
     if (!addressFormData.tinh_ma || !addressFormData.xa_ma)
       return showToast("Chọn đầy đủ Tỉnh/Xã!", "error");
 
